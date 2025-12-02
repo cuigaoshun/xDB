@@ -1,7 +1,59 @@
-# Tauri + React + Typescript
+# NeoDB
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+NeoDB 是一个现代化的、跨平台的数据库管理工具，旨在提供类似 Navicat 的流畅体验。基于 Tauri 构建，拥有轻量级、高性能的特点。
 
-## Recommended IDE Setup
+## ✨ 功能特性
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- **多数据库支持**
+  - 🐬 **MySQL**: 支持连接管理、SQL 执行、表结构查看与设计等。
+  - 🔑 **Redis**: 支持键值对管理、命令行交互等。
+- **多标签页设计**
+  - 支持同时打开多个连接和查询窗口，类似浏览器的多标签页体验，提高工作效率。
+- **跨平台**
+  - 支持 Windows, macOS 和 Linux。
+- **现代化 UI**
+  - 简洁直观的用户界面。
+
+## 🛠️ 技术栈
+
+- **前端**: [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/)
+- **后端**: [Rust](https://www.rust-lang.org/), [Tauri](https://tauri.app/)
+- **UI 框架**: (待定，建议使用 shadcn/ui 或 Ant Design)
+
+## 🚀 开发指南
+
+### 环境要求
+
+- [Node.js](https://nodejs.org/) (建议 v18+)
+- [Rust](https://www.rust-lang.org/tools/install) (用于 Tauri 后端)
+- [pnpm](https://pnpm.io/) (推荐) 或 npm/yarn
+
+### 安装依赖
+
+```bash
+pnpm install
+```
+
+### 启动开发环境
+
+```bash
+# 同时启动前端和 Tauri 窗口
+pnpm tauri dev
+```
+
+### 构建
+
+```bash
+pnpm tauri build
+```
+
+## 📝 待办事项
+
+- [ ] 实现 MySQL 连接与基本查询
+- [ ] 实现 Redis 连接与基本操作
+- [ ] 实现多标签页状态管理
+- [ ] 完善 UI 设计与交互
+
+## 📄 许可证
+
+MIT
