@@ -52,7 +52,8 @@ const resources = {
         "name": "NeoDB"
       },
       "sidebar": {
-        "connections": "连接列表"
+        "connections": "连接列表",
+        "explorer": "全部连接"
       },
       "common": {
         "noActiveConnection": "无活动连接",
@@ -60,7 +61,25 @@ const resources = {
         "close": "关闭",
         "settings": "设置",
         "theme": "主题",
-        "language": "语言"
+        "language": "语言",
+        "name": "名称",
+        "type": "类型",
+        "host": "主机/端口",
+        "actions": "操作",
+        "create": "创建",
+        "connect": "连接",
+        "searchPlaceholder": "搜索连接...",
+        "noConnectionsFound": "未找到连接。"
+      },
+      "menu": {
+        "home": "首页",
+        "file": "文件",
+        "newConnection": "新建连接",
+        "exit": "退出",
+        "edit": "编辑",
+        "view": "视图",
+        "help": "帮助",
+        "about": "关于"
       },
       "mysql": {
         "query": "查询",
