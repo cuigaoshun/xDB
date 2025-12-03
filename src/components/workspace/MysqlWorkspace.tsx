@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
-import { Play, Loader2, FileCode } from "lucide-react";
+import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -19,8 +19,13 @@ import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppStore } from "@/store/useAppStore";
 
+interface ColumnInfo {
+    name: string;
+    type_name: string;
+}
+
 interface SqlResult {
-  columns: string[];
+  columns: ColumnInfo[];
   rows: Record<string, any>[];
   affected_rows: number;
 }
@@ -131,22 +136,15 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
               if (ddlValue) {
                   setDdl(ddlValue as string);
               } else {
-                  // Strategy 2: Fallback to second column if available (standard MySQL behavior)
+                  // Fallback: try second column if exists
                   if (res.columns.length >= 2) {
-                       const ddlCol = res.columns[1];
-                       // Try to access by column name
-                       if (row[ddlCol]) {
-                           setDdl(row[ddlCol] as string);
+                       const ddlColName = res.columns[1].name;
+                       if (row[ddlColName]) {
+                           setDdl(row[ddlColName] as string);
                        } else {
-                           // If not found by name, try second value
-                           if (values.length >= 2) {
-                               setDdl(values[1] as string);
-                           } else {
-                               setDdl("-- DDL not found in result row.");
-                           }
+                           setDdl("-- DDL not found in result row.");
                        }
                   } else {
-                      // Fallback: just show the whole row
                       setDdl("-- DDL structure unrecognized: " + JSON.stringify(row, null, 2));
                   }
               }
@@ -184,6 +182,23 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
   const handleExecute = () => {
       executeSql(sql);
+  };
+
+  const getColumnTypeIcon = (typeName: string) => {
+      const type = typeName.toUpperCase();
+      if (type.includes("INT") || type.includes("FLOAT") || type.includes("DOUBLE") || type.includes("DECIMAL") || type.includes("BOOL")) {
+          return <Hash className="h-3 w-3 text-blue-500" />;
+      }
+      if (type.includes("CHAR") || type.includes("TEXT") || type.includes("ENUM")) {
+          return <Type className="h-3 w-3 text-orange-500" />;
+      }
+      if (type.includes("DATE") || type.includes("TIME")) {
+          return <Calendar className="h-3 w-3 text-green-500" />;
+      }
+      if (type.includes("BLOB") || type.includes("BINARY")) {
+          return <Binary className="h-3 w-3 text-purple-500" />;
+      }
+      return <Type className="h-3 w-3 text-gray-500" />;
   };
 
   return (
@@ -257,7 +272,15 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                     <TableHeader className="sticky top-0 bg-muted/50">
                                         <TableRow>
                                             {result.columns.map((col, i) => (
-                                                <TableHead key={i} className="whitespace-nowrap">{col}</TableHead>
+                                                <TableHead key={i} className="whitespace-nowrap">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="font-semibold text-foreground">{col.name}</span>
+                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground font-normal">
+                                                            {getColumnTypeIcon(col.type_name)}
+                                                            <span className="lowercase">{col.type_name}</span>
+                                                        </div>
+                                                    </div>
+                                                </TableHead>
                                             ))}
                                         </TableRow>
                                     </TableHeader>
@@ -266,7 +289,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                             <TableRow key={idx} className="hover:bg-muted/50">
                                                 {result.columns.map((col, i) => (
                                                     <TableCell key={i} className="whitespace-nowrap max-w-[300px] truncate">
-                                                        {row[col] === null ? <span className="text-muted-foreground italic">NULL</span> : String(row[col])}
+                                                        {row[col.name] === null ? <span className="text-muted-foreground italic">NULL</span> : String(row[col.name])}
                                                     </TableCell>
                                                 ))}
                                             </TableRow>

@@ -1,6 +1,7 @@
 use crate::db::DbState;
 use crate::models::Connection;
 use crate::state::AppState;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
@@ -8,8 +9,14 @@ use sqlx::{Column, MySqlPool, Row, TypeInfo};
 use tauri::{State, command};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ColumnInfo {
+    pub name: String,
+    pub type_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SqlResult {
-    pub columns: Vec<String>,
+    pub columns: Vec<ColumnInfo>,
     pub rows: Vec<Map<String, Value>>,
     pub affected_rows: u64,
 }
@@ -84,10 +91,8 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
         let type_name = type_info.name();
 
         // 根据类型动态获取值
-        // 注意：这里只覆盖了常见类型，更复杂的类型可能需要额外处理
         let value: Value = match type_name {
             "BOOLEAN" | "TINYINT" => {
-                 // SQLx 可能会把 TINYINT(1) 映射为 boolean 或 i8
                  if let Ok(v) = row.try_get::<bool, _>(i) {
                      Value::Bool(v)
                  } else {
@@ -103,17 +108,21 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
                 row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
             },
             "DATETIME" | "TIMESTAMP" => {
-                // 使用 chrono 处理时间，转为字符串 ISO 8601
-                row.try_get::<chrono::NaiveDateTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                if let Ok(v) = row.try_get::<NaiveDateTime, _>(i) {
+                    Value::String(v.to_string())
+                } else if let Ok(v) = row.try_get::<DateTime<Utc>, _>(i) {
+                    Value::String(v.to_string())
+                } else {
+                    row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
+                }
             },
             "DATE" => {
-                row.try_get::<chrono::NaiveDate, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                row.try_get::<NaiveDate, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
             },
             "TIME" => {
-                row.try_get::<chrono::NaiveTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                row.try_get::<NaiveTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
             },
             _ => {
-                // 默认尝试作为字符串获取，或者返回 Null
                  match row.try_get::<String, _>(i) {
                      Ok(v) => Value::String(v),
                      Err(_) => Value::Null
@@ -149,7 +158,10 @@ pub async fn execute_sql(
 
         if let Some(first_row) = rows.first() {
             for col in first_row.columns() {
-                columns.push(col.name().to_string());
+                columns.push(ColumnInfo {
+                    name: col.name().to_string(),
+                    type_name: col.type_info().name().to_string(),
+                });
             }
         }
 
@@ -157,8 +169,6 @@ pub async fn execute_sql(
             result_rows.push(row_to_json(&row));
         }
         
-        // println!("Result rows: {:?}", result_rows);
-
         Ok(SqlResult {
             columns,
             rows: result_rows,
