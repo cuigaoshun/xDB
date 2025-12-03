@@ -74,7 +74,12 @@ export function MainLayout() {
                             <div className="flex-1 overflow-hidden relative">
                                 {activeTab ? (
                                     activeTab.type === 'mysql' ? (
-                                        <MysqlWorkspace key={activeTab.id} name={activeTab.title} connectionId={activeTab.connectionId} />
+                                        <MysqlWorkspace 
+                                            key={activeTab.id} 
+                                            name={activeTab.title} 
+                                            connectionId={activeTab.connectionId}
+                                            initialSql={activeTab.initialSql}
+                                        />
                                     ) : activeTab.type === 'redis' ? (
                                         <RedisWorkspace key={activeTab.id} name={activeTab.title} connectionId={activeTab.connectionId} />
                                     ) : (

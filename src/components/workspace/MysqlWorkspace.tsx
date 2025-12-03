@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Play, Loader2 } from "lucide-react";
@@ -22,27 +22,38 @@ interface SqlResult {
 interface MysqlWorkspaceProps {
     name: string;
     connectionId: number;
+    initialSql?: string;
 }
 
-export function MysqlWorkspace({ name, connectionId }: MysqlWorkspaceProps) {
+export function MysqlWorkspace({ name, connectionId, initialSql }: MysqlWorkspaceProps) {
   const { t } = useTranslation();
-  const [sql, setSql] = useState("SELECT * FROM users LIMIT 100;");
+  const [sql, setSql] = useState(initialSql || "SELECT * FROM users LIMIT 100;");
   const [result, setResult] = useState<SqlResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleExecute = async () => {
-      if (!sql.trim()) return;
+  // If initialSql is provided (e.g. when opening a table), update state and run it
+  useEffect(() => {
+      if (initialSql) {
+          setSql(initialSql);
+          // We define a separate async function inside effect or call handleExecute
+          // but handleExecute depends on current scope 'sql' state which might not be updated yet in this closure if we call it directly.
+          // Actually, if we setSql, we should wait for re-render or pass the sql directly.
+          executeSql(initialSql);
+      }
+  }, [initialSql]);
+
+  const executeSql = async (query: string) => {
+      if (!query.trim()) return;
       
       setIsLoading(true);
       setError(null);
       setResult(null);
 
       try {
-          // Invoke Rust command
           const data = await invoke<SqlResult>("execute_sql", {
               connectionId,
-              sql
+              sql: query
           });
           setResult(data);
       } catch (err: any) {
@@ -51,6 +62,10 @@ export function MysqlWorkspace({ name, connectionId }: MysqlWorkspaceProps) {
       } finally {
           setIsLoading(false);
       }
+  };
+
+  const handleExecute = () => {
+      executeSql(sql);
   };
 
   return (

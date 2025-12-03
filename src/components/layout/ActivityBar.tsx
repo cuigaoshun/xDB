@@ -1,8 +1,7 @@
 import { useAppStore, Connection } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
 import { 
-  Database, 
-  Server,
+  Database,
   ChevronLeft,
   Home
 } from "lucide-react";
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useTranslation } from "react-i18next";
 import { SettingsMenu } from "./SettingsMenu";
+import { ConnectionTreeItem } from "./ConnectionTree";
 
 interface ActivityBarProps {
     activeView: 'home' | 'connections';
@@ -83,7 +83,7 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
     
     // If a connection is already open in a tab, switch to it. Otherwise open new tab.
     const handleConnectionClick = (conn: Connection) => {
-        const existingTab = tabs.find(t => t.connectionId === conn.id);
+        const existingTab = tabs.find(t => t.connectionId === conn.id && !t.id.startsWith('table-'));
         if (existingTab) {
             setActiveTab(existingTab.id);
         } else {
@@ -92,6 +92,23 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
                 title: conn.name,
                 type: conn.db_type,
                 connectionId: conn.id,
+            });
+        }
+    };
+
+    const handleTableSelect = (conn: Connection, db: string, table: string) => {
+        const tabId = `table-${conn.id}-${db}-${table}`;
+        const existingTab = tabs.find(t => t.id === tabId);
+        
+        if (existingTab) {
+            setActiveTab(existingTab.id);
+        } else {
+            addTab({
+                id: tabId,
+                title: table,
+                type: conn.db_type,
+                connectionId: conn.id,
+                initialSql: `SELECT * FROM \`${db}\`.\`${table}\` LIMIT 100;`
             });
         }
     };
@@ -110,24 +127,13 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
              </div>
              <div className="flex-1 overflow-y-auto p-2">
                 {connections.map((conn) => (
-                    <div
+                    <ConnectionTreeItem
                         key={conn.id}
-                        onClick={() => handleConnectionClick(conn)}
-                        className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors mb-1 text-sm",
-                            // Highlight if this connection has an active tab
-                            tabs.find(t => t.connectionId === conn.id && t.id === activeTabId)
-                                ? "bg-primary text-primary-foreground font-medium"
-                                : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        {conn.db_type === 'mysql' ? (
-                            <Database className={cn("h-4 w-4", conn.db_type === 'mysql' ? "text-blue-500" : "")} />
-                        ) : (
-                            <Server className={cn("h-4 w-4", conn.db_type === 'redis' ? "text-red-500" : "")} />
-                        )}
-                        <span className="truncate">{conn.name}</span>
-                    </div>
+                        connection={conn}
+                        isActive={!!tabs.find(t => t.connectionId === conn.id && t.id === activeTabId)}
+                        onSelect={handleConnectionClick}
+                        onSelectTable={handleTableSelect}
+                    />
                 ))}
              </div>
         </div>

@@ -20,7 +20,7 @@ export interface Tab {
   type: DbType;
   connectionId: number;
   active?: boolean;
-  // 可以在这里扩展更多 Tab 状态，比如查询内容、滚动位置等
+  initialSql?: string;
 }
 
 interface AppState {
