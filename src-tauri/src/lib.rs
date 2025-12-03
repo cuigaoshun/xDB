@@ -7,7 +7,7 @@ mod state;
 
 use commands::*;
 use mysql_manager::execute_sql;
-use redis_manager::execute_redis_command;
+use redis_manager::{execute_redis_command, get_redis_keys};
 use state::AppState;
 use tauri::Manager;
 
@@ -47,7 +47,8 @@ pub fn run() {
             update_connection,
             delete_connection,
             execute_sql,
-            execute_redis_command
+            execute_redis_command,
+            get_redis_keys
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

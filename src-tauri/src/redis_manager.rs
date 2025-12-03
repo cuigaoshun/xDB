@@ -11,6 +11,12 @@ pub struct RedisResult {
     pub output: JsonValue,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanResult {
+    pub cursor: String,
+    pub keys: Vec<String>,
+}
+
 async fn get_or_create_redis_client(
     app_state: &State<'_, AppState>,
     db_state: &State<'_, DbState>,
@@ -94,6 +100,45 @@ pub async fn execute_redis_command(
     let json_result = redis_value_to_json(result);
 
     Ok(RedisResult { output: json_result })
+}
+
+#[command]
+pub async fn get_redis_keys(
+    app_state: State<'_, AppState>,
+    db_state: State<'_, DbState>,
+    connection_id: i64,
+    cursor: String,
+    count: Option<usize>,
+    pattern: Option<String>,
+) -> Result<ScanResult, String> {
+    let client = get_or_create_redis_client(&app_state, &db_state, connection_id).await?;
+
+    let mut con = client
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|e| format!("Failed to get Redis connection: {}", e))?;
+
+    let count = count.unwrap_or(100);
+    let pattern = pattern.unwrap_or_else(|| "*".to_string());
+
+    // We can pass the cursor string directly to SCAN command
+    let mut cmd = redis::cmd("SCAN");
+    cmd.arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
+
+    // We ask redis-rs to return the cursor as a String directly
+    // Since Redis protocol returns it as bulk string, this should work.
+    // If it fails, we can fallback to u64. But String is more robust.
+    // Actually, redis-rs SCAN helper usually returns u64 cursor.
+    // Let's try to get (String, Vec<String>)
+    let (next_cursor, keys): (String, Vec<String>) = cmd
+        .query_async(&mut con)
+        .await
+        .map_err(|e| format!("Redis scan failed: {}", e))?;
+
+    Ok(ScanResult {
+        cursor: next_cursor,
+        keys,
+    })
 }
 
 fn redis_value_to_json(v: redis::Value) -> JsonValue {

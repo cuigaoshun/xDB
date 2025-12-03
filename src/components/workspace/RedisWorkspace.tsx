@@ -17,6 +17,11 @@ interface RedisResult {
     output: any;
 }
 
+interface ScanResult {
+    cursor: string;
+    keys: string[];
+}
+
 interface KeyDetail {
     type: string;
     ttl: number;
@@ -27,25 +32,43 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
   const { t } = useTranslation();
   const [keys, setKeys] = useState<string[]>([]);
   const [filter, setFilter] = useState("");
+  const [cursor, setCursor] = useState<string>("0");
+  const [hasMore, setHasMore] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [keyDetails, setKeyDetails] = useState<KeyDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const fetchKeys = async () => {
+  const fetchKeys = async (reset = false) => {
+    if (loading && !reset) return; // Allow reset even if loading (maybe cancel prev? but for now just ignore)
+    // Actually if loading, we should probably wait.
+    // But simplistic check:
+    if (loading) return;
+    
+    if (!reset && !hasMore) return;
+
     setLoading(true);
+    const currentCursor = reset ? "0" : cursor;
+    const searchPattern = filter ? `*${filter}*` : "*";
+
     try {
-      const result = await invoke<RedisResult>("execute_redis_command", {
-          connectionId,
-          command: "KEYS",
-          args: ["*"]
+      console.log("Fetching keys with cursor:", currentCursor);
+      const result = await invoke<ScanResult>("get_redis_keys", {
+          connectionId: connectionId,
+          cursor: currentCursor,
+          count: 100,
+          pattern: searchPattern
       });
+      console.log("Fetch result:", result);
       
-      if (Array.isArray(result.output)) {
-          setKeys(result.output.sort());
+      if (reset) {
+          setKeys(result.keys);
       } else {
-          setKeys([]);
+          setKeys(prev => [...prev, ...result.keys]);
       }
+      
+      setCursor(result.cursor);
+      setHasMore(result.cursor !== "0");
     } catch (e) {
         console.error("Failed to fetch keys", e);
     } finally {
@@ -53,9 +76,39 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
     }
   };
 
+  // Reset and fetch when connection changes
   useEffect(() => {
-      fetchKeys();
+      setKeys([]);
+      setCursor("0");
+      setHasMore(true);
+      setFilter(""); 
+      // Use a timeout to allow state updates to settle? 
+      // Or just call fetchKeys(true) which uses 0 anyway.
+      // We need to pass the function to the effect, or define it inside.
+      // To avoid stale closures, we can use a ref for the fetch function or just rely on dependency array.
+      // But here we want to trigger fetchKeys(true).
+      fetchKeys(true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId]);
+
+  // Debounce filter change
+  useEffect(() => {
+      const timer = setTimeout(() => {
+          fetchKeys(true);
+      }, 300);
+      return () => clearTimeout(timer);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+      // Threshold 50px
+      if (scrollHeight - scrollTop <= clientHeight + 50) {
+          if (!loading && hasMore) {
+              fetchKeys(false);
+          }
+      }
+  };
 
   const handleKeyClick = async (key: string) => {
       setSelectedKey(key);
@@ -113,8 +166,6 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
       }
   };
 
-  const filteredKeys = keys.filter(k => k.toLowerCase().includes(filter.toLowerCase()));
-
   return (
     <div className="h-full flex flex-col">
        {/* Header */}
@@ -124,7 +175,7 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
             <div className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{t('redis.connected') || "Connected"}</div>
         </div>
         <div className="flex gap-2">
-            <Button variant="ghost" size="icon" onClick={fetchKeys} title="Refresh">
+            <Button variant="ghost" size="icon" onClick={() => fetchKeys(true)} title="Refresh">
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button variant="ghost" size="icon" title="CLI"><Terminal className="w-4 h-4" /></Button>
@@ -149,7 +200,7 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
          </div>
 
          {/* List */}
-         <div className="flex-1 overflow-auto">
+         <div className="flex-1 overflow-auto" onScroll={handleScroll}>
              <table className="w-full text-sm text-left">
                  <thead className="text-xs text-muted-foreground bg-muted/10 font-medium uppercase border-b sticky top-0 bg-background">
                      <tr>
@@ -157,7 +208,7 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
                      </tr>
                  </thead>
                  <tbody className="divide-y">
-                     {filteredKeys.map(key => (
+                     {keys.map(key => (
                          <tr 
                             key={key} 
                             className={`hover:bg-accent/50 cursor-pointer ${selectedKey === key ? 'bg-accent' : ''}`}
@@ -166,7 +217,7 @@ export function RedisWorkspace({ name, connectionId }: { name: string; connectio
                              <td className="px-4 py-2 font-mono text-sm">{key}</td>
                          </tr>
                      ))}
-                     {filteredKeys.length === 0 && (
+                     {keys.length === 0 && (
                          <tr><td className="p-4 text-center text-muted-foreground">
                              {loading ? "Loading..." : "No keys found"}
                          </td></tr>
