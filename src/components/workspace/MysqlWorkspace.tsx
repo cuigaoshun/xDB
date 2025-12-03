@@ -14,6 +14,10 @@ import {
 } from "@/components/ui/table";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from "@/components/theme/ThemeProvider";
+import { useAppStore } from "@/store/useAppStore";
 
 interface SqlResult {
   columns: string[];
@@ -22,20 +26,64 @@ interface SqlResult {
 }
 
 interface MysqlWorkspaceProps {
+    tabId: string;
     name: string;
     connectionId: number;
     initialSql?: string;
+    savedSql?: string;
     dbName?: string;
     tableName?: string;
 }
 
-export function MysqlWorkspace({ name, connectionId, initialSql, dbName, tableName }: MysqlWorkspaceProps) {
+export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql, dbName, tableName }: MysqlWorkspaceProps) {
   const { t } = useTranslation();
-  const [sql, setSql] = useState(initialSql || "SELECT * FROM users LIMIT 100;");
+  const { theme } = useTheme();
+  const updateTab = useAppStore(state => state.updateTab);
+  
+  const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users LIMIT 100;");
   const [result, setResult] = useState<SqlResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Sync SQL changes to global store (debounced)
+  useEffect(() => {
+      const timer = setTimeout(() => {
+          updateTab(tabId, { currentSql: sql });
+      }, 500);
+      return () => clearTimeout(timer);
+  }, [sql, tabId, updateTab]);
+
+  // Determine effective theme for syntax highlighter
+  const [isDark, setIsDark] = useState(true);
+  
+  useEffect(() => {
+      if (theme === 'system') {
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+          setIsDark(mediaQuery.matches);
+          
+          const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+          mediaQuery.addEventListener('change', handler);
+          return () => mediaQuery.removeEventListener('change', handler);
+      } else {
+          setIsDark(theme === 'dark');
+      }
+  }, [theme]);
+
+  // Helper to remove background from theme for seamless integration
+  const transparentTheme = (theme: any) => {
+      const newTheme = { ...theme };
+      // Override pre and code blocks to be transparent
+      const transparent = { background: 'transparent', textShadow: 'none' };
+      
+      if (newTheme['pre[class*="language-"]']) {
+          newTheme['pre[class*="language-"]'] = { ...newTheme['pre[class*="language-"]'], ...transparent };
+      }
+      if (newTheme['code[class*="language-"]']) {
+          newTheme['code[class*="language-"]'] = { ...newTheme['code[class*="language-"]'], ...transparent };
+      }
+      return newTheme;
+  };
+
   // DDL related state
   const [showDDL, setShowDDL] = useState(!!tableName);
   const [ddl, setDdl] = useState<string>("");
@@ -43,7 +91,7 @@ export function MysqlWorkspace({ name, connectionId, initialSql, dbName, tableNa
 
   // If initialSql is provided (e.g. when opening a table), update state and run it
   useEffect(() => {
-      if (initialSql) {
+      if (initialSql && !savedSql) {
           setSql(initialSql);
           executeSql(initialSql);
       }
@@ -69,31 +117,41 @@ export function MysqlWorkspace({ name, connectionId, initialSql, dbName, tableNa
           
           if (res.rows.length > 0) {
               const row = res.rows[0];
-              // Robustly find DDL. 
-              // Strategy 1: Check columns[1] (standard behavior)
-              if (res.columns.length >= 2) {
-                  const ddlCol = res.columns[1];
-                  setDdl(row[ddlCol] as string);
-              } 
-              // Strategy 2: Look for "Create Table" or "Create View" key
-              else {
-                  const createKey = Object.keys(row).find(k => 
-                      k.toLowerCase().includes('create table') || k.toLowerCase().includes('create view')
-                  );
-                  if (createKey) {
-                      setDdl(row[createKey] as string);
+              
+              // Strategy 1: Search for value starting with CREATE TABLE/VIEW
+              // This is the most robust way as it ignores column names
+              const values = Object.values(row);
+              const ddlValue = values.find(v => 
+                  typeof v === 'string' && (
+                      v.trim().toUpperCase().startsWith('CREATE TABLE') || 
+                      v.trim().toUpperCase().startsWith('CREATE VIEW')
+                  )
+              );
+              
+              if (ddlValue) {
+                  setDdl(ddlValue as string);
+              } else {
+                  // Strategy 2: Fallback to second column if available (standard MySQL behavior)
+                  if (res.columns.length >= 2) {
+                       const ddlCol = res.columns[1];
+                       // Try to access by column name
+                       if (row[ddlCol]) {
+                           setDdl(row[ddlCol] as string);
+                       } else {
+                           // If not found by name, try second value
+                           if (values.length >= 2) {
+                               setDdl(values[1] as string);
+                           } else {
+                               setDdl("-- DDL not found in result row.");
+                           }
+                       }
                   } else {
-                      // Strategy 3: Fallback to second value if available, or first
-                      const values = Object.values(row);
-                      if (values.length >= 2) {
-                          setDdl(values[1] as string);
-                      } else if (values.length === 1) {
-                           setDdl(values[0] as string);
-                      } else {
-                          setDdl("-- DDL not found in result columns: " + JSON.stringify(res.columns));
-                      }
+                      // Fallback: just show the whole row
+                      setDdl("-- DDL structure unrecognized: " + JSON.stringify(row, null, 2));
                   }
               }
+          } else {
+              setDdl("-- No results returned for SHOW CREATE TABLE");
           }
       } catch (err: any) {
           console.error("Failed to load DDL:", err);
@@ -238,21 +296,26 @@ export function MysqlWorkspace({ name, connectionId, initialSql, dbName, tableNa
             {showDDL && (
                 <>
                     <ResizableHandle />
-                    <ResizablePanel defaultSize={30} minSize={20} maxSize={60}>
+                    <ResizablePanel defaultSize={25} minSize={20} maxSize={60}>
                         <div className="h-full flex flex-col bg-background border-l">
                             <div className="p-2 border-b bg-muted/10 text-sm font-medium flex justify-between items-center">
                                 <span>Table DDL: {tableName}</span>
                             </div>
-                            <div className="flex-1 overflow-auto p-4 bg-muted/5">
+                            <div className="flex-1 overflow-auto p-4 bg-background">
                                 {isLoadingDDL ? (
                                     <div className="flex items-center justify-center h-full text-muted-foreground">
                                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                                         Loading...
                                     </div>
                                 ) : (
-                                    <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
+                                    <SyntaxHighlighter
+                                        language="sql"
+                                        style={transparentTheme(isDark ? vscDarkPlus : vs)}
+                                        customStyle={{ margin: 0, height: '100%', borderRadius: 0, fontSize: '14px', backgroundColor: 'transparent' }}
+                                        wrapLongLines={true}
+                                    >
                                         {ddl}
-                                    </pre>
+                                    </SyntaxHighlighter>
                                 )}
                             </div>
                         </div>

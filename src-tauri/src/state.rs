@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 pub struct AppState {
     pub pools: Arc<Mutex<HashMap<i64, MySqlPool>>>,
-    pub redis_clients: Arc<Mutex<HashMap<i64, redis::Client>>>,
+    pub redis_clients: Arc<Mutex<HashMap<String, redis::Client>>>,
 }
 
 impl AppState {

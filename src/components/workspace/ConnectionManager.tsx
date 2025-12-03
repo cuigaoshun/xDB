@@ -175,7 +175,7 @@ export function ConnectionManager() {
                         <TableHead>{t('common.name')}</TableHead>
                         <TableHead>{t('common.host')}</TableHead>
                         <TableHead>{t('common.type')}</TableHead>
-                        <TableHead className="text-right">{t('common.actions')}</TableHead>
+                        <TableHead className="text-right"></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>

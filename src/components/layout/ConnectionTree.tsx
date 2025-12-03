@@ -16,13 +16,14 @@ interface ConnectionTreeItemProps {
     isActive: boolean;
     onSelect: (conn: Connection) => void;
     onSelectTable?: (conn: Connection, db: string, table: string) => void;
+    filterTerm?: string;
 }
 
 interface SqlResult {
     rows: Record<string, any>[];
 }
 
-export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTable }: ConnectionTreeItemProps) {
+export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTable, filterTerm }: ConnectionTreeItemProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [databases, setDatabases] = useState<string[]>([]);
     const [isLoadingDatabases, setIsLoadingDatabases] = useState(false);
@@ -34,13 +35,37 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     // System databases to exclude
     const SYSTEM_DBS = new Set(['information_schema', 'mysql', 'performance_schema', 'sys']);
 
+    // Auto-expand if filter matches something inside (and we have data)
+    // This is tricky with lazy loading. We only filter what we have.
+    
+    const isMatch = (text: string) => !filterTerm || text.toLowerCase().includes(filterTerm.toLowerCase());
+
+    // Filter databases to display
+    const getFilteredDatabases = () => {
+        if (!filterTerm) return databases;
+        return databases.filter(db => {
+            if (isMatch(db)) return true;
+            // Check if any table matches
+            const dbTables = tables[db];
+            if (dbTables && dbTables.some(t => isMatch(t))) return true;
+            return false;
+        });
+    };
+
+    // Filter tables to display for a db
+    const getFilteredTables = (db: string) => {
+        const dbTables = tables[db] || [];
+        if (!filterTerm) return dbTables;
+        return dbTables.filter(t => isMatch(t));
+    };
+
     const toggleExpand = async (e: React.MouseEvent) => {
         e.stopPropagation();
         
         if (!isExpanded) {
             setIsExpanded(true);
-            // Only load databases if it's MySQL and we haven't loaded them yet
-            if (connection.db_type === 'mysql' && databases.length === 0) {
+            // Load databases if not loaded yet (for supported types)
+            if ((connection.db_type === 'mysql' || connection.db_type === 'redis') && databases.length === 0) {
                 await loadDatabases();
             }
         } else {
@@ -51,10 +76,20 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     // Also expand when selecting the connection
     const handleSelect = (e: React.MouseEvent) => {
         onSelect(connection);
-        toggleExpand(e);
+        if (!isExpanded) {
+            toggleExpand(e);
+        }
     };
 
     const loadDatabases = async () => {
+        if (connection.db_type === 'redis') {
+            // Redis usually has 16 databases (0-15)
+            // We could fetch config, but for now hardcode standard 16
+            const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
+            setDatabases(redisDbs);
+            return;
+        }
+
         setIsLoadingDatabases(true);
         try {
             const result = await invoke<SqlResult>('execute_sql', {
@@ -79,6 +114,12 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
         e.stopPropagation();
         
+        // For Redis, clicking a DB just selects it (opens tab)
+        if (connection.db_type === 'redis') {
+            onSelectTable?.(connection, dbName, ""); // Table name empty for Redis
+            return;
+        }
+
         const newExpanded = new Set(expandedDatabases);
         if (newExpanded.has(dbName)) {
             newExpanded.delete(dbName);
@@ -122,8 +163,11 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         }
     };
 
-    // Redis doesn't support this tree view yet
-    if (connection.db_type !== 'mysql') {
+    // Other types (sqlite, postgres) might not support tree view yet
+    if (connection.db_type !== 'mysql' && connection.db_type !== 'redis') {
+        // Simple filter for non-supported types
+        if (filterTerm && !isMatch(connection.name)) return null;
+        
         return (
             <div
                 onClick={() => onSelect(connection)}
@@ -138,6 +182,17 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 <span className="truncate">{connection.name}</span>
             </div>
         );
+    }
+    
+    // For MySQL & Redis:
+    const filteredDatabases = getFilteredDatabases();
+    
+    const selfMatch = isMatch(connection.name);
+    const hasMatchingChildren = filteredDatabases.length > 0;
+    
+    // Hide if loaded and no matches
+    if (filterTerm && !selfMatch && databases.length > 0 && !hasMatchingChildren) {
+        return null;
     }
 
     return (
@@ -159,8 +214,14 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                     {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </button>
                 
-                <Database className="h-4 w-4 text-blue-500 shrink-0" />
-                <span className="truncate flex-1">{connection.name}</span>
+                {connection.db_type === 'redis' ? (
+                    <Server className="h-4 w-4 text-red-500 shrink-0" />
+                ) : (
+                    <Database className="h-4 w-4 text-blue-500 shrink-0" />
+                )}
+                <span className="truncate flex-1">
+                    {connection.name} 
+                </span>
             </div>
 
             {/* Databases List */}
@@ -172,21 +233,29 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                             <span>Loading...</span>
                         </div>
                     ) : (
-                        databases.map(db => (
+                        filteredDatabases.map(db => (
                             <div key={db} className="flex flex-col">
                                 <div 
                                     className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
                                     onClick={(e) => toggleDatabaseExpand(db, e)}
                                 >
-                                    <button className="p-0.5">
-                                        {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                    </button>
-                                    <Database className="h-3 w-3 text-yellow-500/70 shrink-0" />
-                                    <span className="truncate">{db}</span>
+                                    {connection.db_type === 'mysql' && (
+                                        <button className="p-0.5">
+                                            {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                        </button>
+                                    )}
+                                    
+                                    <Database className={cn(
+                                        "h-3 w-3 shrink-0",
+                                        connection.db_type === 'redis' ? "text-red-400/70" : "text-yellow-500/70"
+                                    )} />
+                                    <span className="truncate">
+                                        {connection.db_type === 'redis' ? `DB ${db}` : db}
+                                    </span>
                                 </div>
 
-                                {/* Tables List */}
-                                {expandedDatabases.has(db) && (
+                                {/* Tables List (MySQL only) */}
+                                {connection.db_type === 'mysql' && expandedDatabases.has(db) && (
                                     <div className="ml-4 border-l border-border/40 pl-1">
                                         {loadingTables.has(db) ? (
                                             <div className="px-4 py-1 flex items-center gap-2 text-muted-foreground text-xs">
@@ -194,7 +263,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                                                 <span>Loading...</span>
                                             </div>
                                         ) : (
-                                            tables[db]?.map(table => (
+                                            getFilteredTables(db).map(table => (
                                                 <div 
                                                     key={table}
                                                     className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs ml-4"

@@ -76,14 +76,21 @@ export function MainLayout() {
                                     activeTab.type === 'mysql' ? (
                                         <MysqlWorkspace 
                                             key={activeTab.id} 
+                                            tabId={activeTab.id}
                                             name={activeTab.title} 
                                             connectionId={activeTab.connectionId}
                                             initialSql={activeTab.initialSql}
+                                            savedSql={activeTab.currentSql}
                                             dbName={activeTab.dbName}
                                             tableName={activeTab.tableName}
                                         />
                                     ) : activeTab.type === 'redis' ? (
-                                        <RedisWorkspace key={activeTab.id} name={activeTab.title} connectionId={activeTab.connectionId} />
+                                        <RedisWorkspace 
+                                            key={activeTab.id} 
+                                            name={activeTab.title} 
+                                            connectionId={activeTab.connectionId} 
+                                            db={activeTab.dbName ? parseInt(activeTab.dbName) : 0}
+                                        />
                                     ) : (
                                          <div>Unsupported Type: {activeTab.type}</div>
                                     )

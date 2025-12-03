@@ -78,7 +78,7 @@ async fn get_or_create_pool(
 fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
     let mut json_row = Map::new();
 
-    for column in row.columns() {
+    for (i, column) in row.columns().iter().enumerate() {
         let name = column.name();
         let type_info = column.type_info();
         let type_name = type_info.name();
@@ -88,33 +88,36 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
         let value: Value = match type_name {
             "BOOLEAN" | "TINYINT" => {
                  // SQLx 可能会把 TINYINT(1) 映射为 boolean 或 i8
-                 if let Ok(v) = row.try_get::<bool, _>(name) {
+                 if let Ok(v) = row.try_get::<bool, _>(i) {
                      Value::Bool(v)
                  } else {
-                     row.try_get::<i8, _>(name).map(|v| Value::Number(v.into())).unwrap_or(Value::Null)
+                     row.try_get::<i8, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null)
                  }
             },
-            "SMALLINT" => row.try_get::<i16, _>(name).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "INT" | "INTEGER" => row.try_get::<i32, _>(name).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "BIGINT" => row.try_get::<i64, _>(name).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "FLOAT" => row.try_get::<f32, _>(name).map(|v| Value::from(v)).unwrap_or(Value::Null),
-            "DOUBLE" | "REAL" => row.try_get::<f64, _>(name).map(|v| Value::from(v)).unwrap_or(Value::Null),
-            "VARCHAR" | "CHAR" | "TEXT" | "ENUM" => {
-                row.try_get::<String, _>(name).map(Value::String).unwrap_or(Value::Null)
+            "SMALLINT" => row.try_get::<i16, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
+            "INT" | "INTEGER" => row.try_get::<i32, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
+            "BIGINT" => row.try_get::<i64, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
+            "FLOAT" => row.try_get::<f32, _>(i).map(|v| Value::from(v)).unwrap_or(Value::Null),
+            "DOUBLE" | "REAL" => row.try_get::<f64, _>(i).map(|v| Value::from(v)).unwrap_or(Value::Null),
+            "VARCHAR" | "CHAR" | "TEXT" | "TINYTEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" => {
+                row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
             },
             "DATETIME" | "TIMESTAMP" => {
                 // 使用 chrono 处理时间，转为字符串 ISO 8601
-                row.try_get::<chrono::NaiveDateTime, _>(name).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                row.try_get::<chrono::NaiveDateTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
             },
             "DATE" => {
-                row.try_get::<chrono::NaiveDate, _>(name).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                row.try_get::<chrono::NaiveDate, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
             },
             "TIME" => {
-                row.try_get::<chrono::NaiveTime, _>(name).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
+                row.try_get::<chrono::NaiveTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
             },
             _ => {
                 // 默认尝试作为字符串获取，或者返回 Null
-                 row.try_get::<String, _>(name).map(Value::String).unwrap_or(Value::Null)
+                 match row.try_get::<String, _>(i) {
+                     Ok(v) => Value::String(v),
+                     Err(_) => Value::Null
+                 }
             }
         };
 
@@ -153,6 +156,8 @@ pub async fn execute_sql(
         for row in rows {
             result_rows.push(row_to_json(&row));
         }
+        
+        // println!("Result rows: {:?}", result_rows);
 
         Ok(SqlResult {
             columns,
