@@ -213,24 +213,34 @@ pub async fn get_keys_details(
 }
 
 fn redis_value_to_json(v: redis::Value) -> JsonValue {
-    match v {
+    match &v {
         redis::Value::Nil => JsonValue::Null,
-        redis::Value::Int(i) => JsonValue::Number(i.into()),
+        redis::Value::Int(i) => JsonValue::Number((*i).into()),
         _ => {
-            // Try as a list of values (Bulk/Array) first
-            // We ask for Vec<redis::Value> to capture nested structures like lists/sets
+            // Try to convert to string generically first (handles Data, Status, Okay, etc.)
+            // This covers most non-list cases including valid UTF-8 strings.
+            if let Ok(s) = String::from_redis_value(&v) {
+                return JsonValue::String(s);
+            }
+
+            // Try as a list of values (Bulk/Array)
+            // Note: Vec::from_redis_value wraps single non-bulk items in a Vec.
+            // We must detect this to avoid infinite recursion.
             if let Ok(items) = Vec::<redis::Value>::from_redis_value(&v) {
-                 let json_items: Vec<JsonValue> = items.into_iter().map(redis_value_to_json).collect();
-                 return JsonValue::Array(json_items);
+                 // Check for auto-wrapping
+                 // If we have exactly 1 item and it is equal to the original value, it was wrapped.
+                 if items.len() == 1 && items[0] == v {
+                     // This means v was NOT a Bulk/Array, but a single value that failed String conversion
+                     // Fallback to debug string below
+                 } else {
+                     // It is a real list/set/map structure
+                     let json_items: Vec<JsonValue> = items.into_iter().map(redis_value_to_json).collect();
+                     return JsonValue::Array(json_items);
+                 }
             }
             
-            // Try to convert to string generically (handles Data, Status, Okay, etc.)
-            if let Ok(s) = String::from_redis_value(&v) {
-                JsonValue::String(s)
-            } else {
-                // Fallback
-                JsonValue::String(format!("{:?}", v))
-            }
+            // Fallback for binary data or unknown types
+            JsonValue::String(format!("{:?}", v))
         }
     }
 }
