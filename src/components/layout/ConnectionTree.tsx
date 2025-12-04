@@ -28,6 +28,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const [databases, setDatabases] = useState<string[]>([]);
     const [isLoadingDatabases, setIsLoadingDatabases] = useState(false);
     const [expandedDatabases, setExpandedDatabases] = useState<Set<string>>(new Set());
+    const [error, setError] = useState<string | null>(null);
     // Map dbName -> tables
     const [tables, setTables] = useState<Record<string, string[]>>({});
     const [loadingTables, setLoadingTables] = useState<Set<string>>(new Set());
@@ -86,6 +87,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     }
 
     const loadDatabases = async () => {
+        setError(null);
         if (connection.db_type === 'redis') {
             try {
                 // Try to fetch real config
@@ -113,10 +115,17 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
                 const redisDbs = Array.from({ length: count }, (_, i) => i.toString());
                 setDatabases(redisDbs);
-            } catch (err) {
-                console.warn("Failed to fetch Redis config, falling back to 16:", err);
-                const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
-                setDatabases(redisDbs);
+            } catch (err: any) {
+                const errorMsg = String(err);
+                if (errorMsg.toLowerCase().includes("failed to connect") || errorMsg.toLowerCase().includes("connection refused")) {
+                     setError(errorMsg);
+                     // If connection fails, do NOT fallback to 16 DBs, just show error
+                     setDatabases([]); 
+                } else {
+                    console.warn("Failed to fetch Redis config, falling back to 16:", err);
+                    const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
+                    setDatabases(redisDbs);
+                }
             }
             return;
         }
@@ -137,6 +146,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             setDatabases(dbs);
         } catch (err) {
             console.error("Failed to load databases:", err);
+            setError(String(err));
+            setDatabases([]);
         } finally {
             setIsLoadingDatabases(false);
         }
@@ -258,6 +269,11 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             {/* Databases List */}
             {isExpanded && (
                 <div className="ml-4 border-l border-border/40 pl-1 max-h-[320px] overflow-y-auto">
+                    {error && (
+                        <div className="px-2 py-1.5 text-xs text-destructive bg-destructive/10 rounded mx-1 mb-1 break-words">
+                            {error}
+                        </div>
+                    )}
                     {isLoadingDatabases ? (
                         <div className="px-4 py-2 flex items-center gap-2 text-muted-foreground text-xs">
                             <Loader2 className="h-3 w-3 animate-spin" />

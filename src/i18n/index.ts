@@ -40,7 +40,11 @@ const resources = {
         "confirmDelete": "Are you sure you want to delete this connection?",
         "edit": "Edit",
         "delete": "Delete",
-        "connection": "Connection"
+        "connection": "Connection",
+        "name_required": "Name is required",
+        "host_required": "Host is required",
+        "port_invalid": "Port must be a valid number > 0",
+        "path_required": "Database path is required"
       },
       "menu": {
         "file": "File",
@@ -107,7 +111,11 @@ const resources = {
         "confirmDelete": "确定要删除此连接吗？",
         "edit": "编辑",
         "delete": "删除",
-        "connection": "连接"
+        "connection": "连接",
+        "name_required": "请输入连接名称",
+        "host_required": "请输入主机地址",
+        "port_invalid": "端口必须是有效的正整数",
+        "path_required": "请输入数据库路径"
       },
       "menu": {
         "home": "首页",

@@ -56,7 +56,7 @@ async fn get_or_create_pool(
 
     // 3. 构建 MySQL 连接字符串
     // mysql://user:password@host:port/database
-    let host = connection.host.unwrap_or_else(|| "localhost".to_string());
+    let host = connection.host.ok_or("Host is required")?;
     let port = connection.port.unwrap_or(3306);
     let username = connection.username.unwrap_or_else(|| "root".to_string());
     let password = connection.password.unwrap_or_default();

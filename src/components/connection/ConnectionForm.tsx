@@ -23,12 +23,37 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
         database: initialData?.database || "",
     });
 
+    const [error, setError] = useState<string | null>(null);
+
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        if (error) setError(null);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!formData.name.trim()) {
+            setError(t('common.name_required'));
+            return;
+        }
+
+        if (formData.db_type !== 'sqlite') {
+            if (!formData.host.trim()) {
+                setError(t('common.host_required'));
+                return;
+            }
+            if (!formData.port || Number(formData.port) <= 0) {
+                setError(t('common.port_invalid'));
+                return;
+            }
+        } else {
+            if (!formData.database.trim()) {
+                setError(t('common.path_required'));
+                return;
+            }
+        }
+
         onSubmit(formData as any);
     };
 
@@ -47,7 +72,6 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
             <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">{t('common.name')}</label>
                 <Input
-                    required
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="col-span-3"
@@ -124,6 +148,10 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
                     placeholder={formData.db_type === 'sqlite' ? "/path/to/db.sqlite" : "default_db"}
                 />
             </div>
+
+            {error && (
+                <div className="text-destructive text-sm text-center">{error}</div>
+            )}
 
             <div className="flex justify-end gap-2 mt-4">
                 <Button type="button" variant="outline" onClick={onCancel}>{t('common.cancel')}</Button>

@@ -71,7 +71,7 @@ async fn get_or_create_redis_client(
     }
 
     // 5. Build connection URL
-    let host = connection.host.unwrap_or_else(|| "localhost".to_string());
+    let host = connection.host.ok_or("Host is required")?;
     let port = connection.port.unwrap_or(6379);
     let password = connection.password.unwrap_or_default();
     
@@ -92,6 +92,11 @@ async fn get_or_create_redis_client(
     Ok(client)
 }
 
+async fn get_redis_connection_with_retry(client: &redis::Client) -> Result<redis::aio::MultiplexedConnection, String> {
+    client.get_multiplexed_async_connection().await
+        .map_err(|e| format!("Failed to get Redis connection: {}", e))
+}
+
 #[command]
 pub async fn execute_redis_command(
     app_state: State<'_, AppState>,
@@ -104,8 +109,7 @@ pub async fn execute_redis_command(
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
     
     // Use multiplexed async connection as recommended by warning
-    let mut con = client.get_multiplexed_async_connection().await
-        .map_err(|e| format!("Failed to get Redis connection: {}", e))?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
 
     let mut cmd = redis::cmd(&command);
     for arg in args {
@@ -132,10 +136,7 @@ pub async fn get_redis_keys(
 ) -> Result<ScanResult, String> {
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
 
-    let mut con = client
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("Failed to get Redis connection: {}", e))?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
 
     let count = count.unwrap_or(100);
     let pattern = pattern.unwrap_or_else(|| "*".to_string());
@@ -198,8 +199,7 @@ pub async fn get_keys_details(
     }
 
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
-    let mut con = client.get_multiplexed_async_connection().await
-        .map_err(|e| format!("Failed to get Redis connection: {}", e))?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
 
     let mut pipe = redis::pipe();
     

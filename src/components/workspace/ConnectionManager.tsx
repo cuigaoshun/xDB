@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ConnectionForm } from "../connection/ConnectionForm";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -28,6 +28,7 @@ export function ConnectionManager() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewConnOpen, setIsNewConnOpen] = useState(false);
   const [editingConn, setEditingConn] = useState<Connection | null>(null);
+  const [deletingConnId, setDeletingConnId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Load connections from backend
@@ -94,14 +95,20 @@ export function ConnectionManager() {
       }
   };
 
-  const handleDelete = async (id: number) => {
-      if (!confirm(t('common.confirmDelete') || "Are you sure you want to delete this connection?")) return;
-      try {
-          await invoke("delete_connection", { id });
-          await fetchConnections();
-      } catch (error) {
-          console.error("Failed to delete connection:", error);
-      }
+  const handleDelete = (id: number) => {
+    setDeletingConnId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deletingConnId === null) return;
+    try {
+        await invoke("delete_connection", { id: deletingConnId });
+        await fetchConnections();
+    } catch (error) {
+        console.error("Failed to delete connection:", error);
+    } finally {
+        setDeletingConnId(null);
+    }
   };
 
   const getIcon = (type: DbType) => {
@@ -256,6 +263,26 @@ export function ConnectionManager() {
                         submitLabel={t('common.save')}
                     />
                 )}
+            </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deletingConnId !== null} onOpenChange={(open) => !open && setDeletingConnId(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{t('common.delete')} {t('common.connection')}</DialogTitle>
+                    <DialogDescription>
+                        {t('common.confirmDelete') || "Are you sure you want to delete this connection?"}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeletingConnId(null)}>
+                        {t('common.cancel')}
+                    </Button>
+                    <Button variant="destructive" onClick={confirmDelete}>
+                        {t('common.delete')}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>
