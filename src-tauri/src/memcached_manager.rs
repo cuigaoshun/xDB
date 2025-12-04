@@ -185,15 +185,38 @@ pub async fn get_memcached_value(
         match val {
             Some(bytes) => {
                 // Try to decompress with Zlib (PHP Memcached often uses Zlib)
+                // Note: PHP memcached might store flags in the first few bytes or handle flags separately.
+                // But the `memcache` crate usually returns the raw body.
+                // If it's raw zlib stream, ZlibDecoder works.
+                // However, sometimes there are headers.
+                
+                // Attempt 1: Direct Zlib decode
                 let mut decoder = ZlibDecoder::new(&bytes[..]);
                 let mut decompressed = Vec::new();
                 
-                let final_bytes = match decoder.read_to_end(&mut decompressed) {
-                    Ok(_) => decompressed, // Decompression successful
-                    Err(_) => bytes,       // Not compressed or failed, use original
-                };
+                if decoder.read_to_end(&mut decompressed).is_ok() && !decompressed.is_empty() {
+                     return Ok::<_, String>(Some(String::from_utf8_lossy(&decompressed).to_string()));
+                }
+                
+                // Attempt 2: Try skipping first 4 bytes (sometimes legacy clients add length header)
+                if bytes.len() > 4 {
+                    let mut decoder2 = ZlibDecoder::new(&bytes[4..]);
+                    let mut decompressed2 = Vec::new();
+                    if decoder2.read_to_end(&mut decompressed2).is_ok() && !decompressed2.is_empty() {
+                         return Ok::<_, String>(Some(String::from_utf8_lossy(&decompressed2).to_string()));
+                    }
+                }
 
-                Ok::<_, String>(Some(String::from_utf8_lossy(&final_bytes).to_string()))
+                // If direct decode failed, maybe it's not compressed or format is different.
+                // Let's just return original as string (lossy).
+                let raw_str = String::from_utf8_lossy(&bytes).to_string();
+                // Check if it looks like Zlib (starts with 0x78)
+                if bytes.len() > 2 && bytes[0] == 0x78 {
+                     // It looks like zlib but failed to decode.
+                     // return Ok::<_, String>(Some(format!("(Zlib data, failed to decode, len: {})\n{}", bytes.len(), raw_str)));
+                }
+                
+                Ok::<_, String>(Some(raw_str))
             },
             None => Ok::<_, String>(None)
         }

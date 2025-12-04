@@ -1,17 +1,55 @@
-import { Search, RefreshCw, Copy, Trash2, Clock } from "lucide-react";
+import { Search, RefreshCw, Copy, Trash2, Clock, Code, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Basic PHP Unserializer (Best Effort)
+function parsePhpSerialize(str: string): any {
+    try {
+        if (!str.startsWith('O:') && !str.startsWith('a:')) return null;
+
+        const result: Record<string, any> = {};
+        let match;
+        // Match string keys and string/int values
+        const regex = /s:\d+:"([^"]+)";(?:s:\d+:"([^"]*)";|i:(\d+);)/g;
+        
+        let found = false;
+        while ((match = regex.exec(str)) !== null) {
+            found = true;
+            const key = match[1];
+            const valStr = match[2];
+            const valInt = match[3];
+            result[key] = valInt !== undefined ? parseInt(valInt) : valStr;
+        }
+        
+        if (!found) return null;
+        return result;
+    } catch (e) {
+        return null;
+    }
+}
 
 export function MemcachedWorkspace({ name, connectionId }: { name: string; connectionId: number }) {
   const [searchKey, setSearchKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"raw" | "json">("raw");
+
+  const parsedData = useMemo(() => {
+      if (!selectedValue) return null;
+      return parsePhpSerialize(selectedValue);
+  }, [selectedValue]);
+
+  useEffect(() => {
+      if (parsedData) setViewMode("json");
+      else setViewMode("raw");
+  }, [parsedData]);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -68,7 +106,6 @@ export function MemcachedWorkspace({ name, connectionId }: { name: string; conne
               key: searchKey
           });
           setSelectedValue("(deleted)");
-          // Optionally remove from history? Maybe not, as users might want to confirm it's gone.
       } catch (error) {
           console.error("Failed to delete key", error);
           alert("Failed to delete key: " + error);
@@ -169,11 +206,36 @@ export function MemcachedWorkspace({ name, connectionId }: { name: string; conne
                         </div>
                     </CardHeader>
                     <CardContent>
-                         <div className="bg-muted/30 rounded-md p-4 border overflow-x-auto">
-                            <pre className="font-mono text-sm whitespace-pre-wrap break-all">
-                                {selectedValue}
-                            </pre>
-                         </div>
+                         {parsedData ? (
+                             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
+                                <div className="flex justify-between items-center mb-2">
+                                    <TabsList>
+                                        <TabsTrigger value="json" className="gap-2"><Code className="w-4 h-4"/> Parsed JSON</TabsTrigger>
+                                        <TabsTrigger value="raw" className="gap-2"><FileText className="w-4 h-4"/> Raw Data</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                                <TabsContent value="json">
+                                    <div className="bg-muted/30 rounded-md p-4 border overflow-x-auto">
+                                        <pre className="font-mono text-sm whitespace-pre-wrap break-all">
+                                            {JSON.stringify(parsedData, null, 2)}
+                                        </pre>
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="raw">
+                                    <div className="bg-muted/30 rounded-md p-4 border overflow-x-auto">
+                                        <pre className="font-mono text-sm whitespace-pre-wrap break-all">
+                                            {selectedValue}
+                                        </pre>
+                                    </div>
+                                </TabsContent>
+                             </Tabs>
+                         ) : (
+                             <div className="bg-muted/30 rounded-md p-4 border overflow-x-auto">
+                                <pre className="font-mono text-sm whitespace-pre-wrap break-all">
+                                    {selectedValue}
+                                </pre>
+                             </div>
+                         )}
                     </CardContent>
                 </Card>
             )}
