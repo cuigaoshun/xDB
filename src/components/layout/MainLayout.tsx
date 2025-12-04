@@ -1,6 +1,7 @@
 import { TabBar } from "./TabBar";
 import { MysqlWorkspace } from "../workspace/MysqlWorkspace";
 import { RedisWorkspace } from "../workspace/RedisWorkspace";
+import { MemcachedWorkspace } from "../workspace/MemcachedWorkspace";
 import { ConnectionManager } from "../workspace/ConnectionManager";
 import { useAppStore } from "@/store/useAppStore";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -90,6 +91,12 @@ export function MainLayout() {
                                             name={activeTab.title} 
                                             connectionId={activeTab.connectionId} 
                                             db={activeTab.dbName ? parseInt(activeTab.dbName) : 0}
+                                        />
+                                    ) : activeTab.type === 'memcached' ? (
+                                        <MemcachedWorkspace 
+                                            key={activeTab.id}
+                                            name={activeTab.title}
+                                            connectionId={activeTab.connectionId}
                                         />
                                     ) : (
                                          <div>Unsupported Type: {activeTab.type}</div>

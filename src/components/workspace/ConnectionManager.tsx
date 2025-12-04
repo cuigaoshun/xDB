@@ -116,7 +116,8 @@ export function ConnectionManager() {
           case 'mysql': return <Database className="w-4 h-4" />;
           case 'redis': return <Server className="w-4 h-4" />;
           case 'sqlite': return <FileCode className="w-4 h-4" />;
-          case 'postgres': return <LayoutGrid className="w-4 h-4" />; // Placeholder icon
+          case 'postgres': return <LayoutGrid className="w-4 h-4" />;
+          case 'memcached': return <Server className="w-4 h-4" />; // Use Server icon for now, maybe distinct later
           default: return <Database className="w-4 h-4" />;
       }
   };
@@ -127,6 +128,7 @@ export function ConnectionManager() {
           case 'redis': return "bg-red-100 text-red-600";
           case 'sqlite': return "bg-green-100 text-green-600";
           case 'postgres': return "bg-indigo-100 text-indigo-600";
+          case 'memcached': return "bg-orange-100 text-orange-600";
           default: return "bg-gray-100 text-gray-600";
       }
   };

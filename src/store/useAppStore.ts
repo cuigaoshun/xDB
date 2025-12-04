@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type DbType = 'mysql' | 'redis' | 'sqlite' | 'postgres';
+export type DbType = 'mysql' | 'redis' | 'sqlite' | 'postgres' | 'memcached';
 
 export interface Connection {
   id: number;

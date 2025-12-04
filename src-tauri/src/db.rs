@@ -4,6 +4,7 @@ use tauri::{AppHandle, Manager};
 
 pub type DbPool = Pool<Sqlite>;
 
+#[derive(Clone)]
 pub struct DbState {
     pub pool: DbPool,
 }

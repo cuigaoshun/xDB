@@ -64,6 +64,8 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
              handleChange('port', 3306);
         } else if (formData.db_type === 'redis' && formData.port === 3306) {
              handleChange('port', 6379);
+        } else if (formData.db_type === 'memcached' && formData.port === 3306) {
+             handleChange('port', 11211);
         }
     }, [formData.db_type]);
 
@@ -82,7 +84,7 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
             <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">{t('common.type')}</label>
                 <div className="col-span-3 flex gap-2">
-                    {(['mysql', 'redis', 'postgres', 'sqlite'] as DbType[]).map((type) => (
+                    {(['mysql', 'redis', 'memcached', 'postgres', 'sqlite'] as DbType[]).map((type) => (
                         <Button
                             key={type}
                             type="button"

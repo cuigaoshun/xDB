@@ -3,11 +3,13 @@ mod db;
 mod models;
 mod mysql_manager;
 mod redis_manager;
+mod memcached_manager;
 mod state;
 
 use commands::*;
 use mysql_manager::execute_sql;
 use redis_manager::{execute_redis_command, get_redis_keys, get_keys_details};
+use memcached_manager::{get_memcached_keys, get_memcached_value, set_memcached_value, delete_memcached_key};
 use state::AppState;
 use tauri::Manager;
 
@@ -49,7 +51,11 @@ pub fn run() {
             execute_sql,
             execute_redis_command,
             get_redis_keys,
-            get_keys_details
+            get_keys_details,
+            get_memcached_keys,
+            get_memcached_value,
+            set_memcached_value,
+            delete_memcached_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
