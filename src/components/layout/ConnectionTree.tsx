@@ -81,12 +81,43 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         }
     };
 
+    interface RedisCommandResult {
+        output: any;
+    }
+
     const loadDatabases = async () => {
         if (connection.db_type === 'redis') {
-            // Redis usually has 16 databases (0-15)
-            // We could fetch config, but for now hardcode standard 16
-            const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
-            setDatabases(redisDbs);
+            try {
+                // Try to fetch real config
+                const result = await invoke<RedisCommandResult>('execute_redis_command', {
+                    connectionId: connection.id,
+                    command: 'CONFIG',
+                    args: ['GET', 'databases'],
+                    db: 0
+                });
+
+                let count = 16; // Default fallback
+                
+                // Output format for CONFIG GET databases is usually ["databases", "16"]
+                if (Array.isArray(result.output) && result.output.length >= 2) {
+                    const key = result.output[0];
+                    const value = result.output[1];
+                    
+                    if (key === 'databases') {
+                        const parsed = parseInt(value);
+                        if (!isNaN(parsed) && parsed > 0) {
+                            count = parsed;
+                        }
+                    }
+                }
+
+                const redisDbs = Array.from({ length: count }, (_, i) => i.toString());
+                setDatabases(redisDbs);
+            } catch (err) {
+                console.warn("Failed to fetch Redis config, falling back to 16:", err);
+                const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
+                setDatabases(redisDbs);
+            }
             return;
         }
 
@@ -226,7 +257,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
             {/* Databases List */}
             {isExpanded && (
-                <div className="ml-4 border-l border-border/40 pl-1">
+                <div className="ml-4 border-l border-border/40 pl-1 max-h-[320px] overflow-y-auto">
                     {isLoadingDatabases ? (
                         <div className="px-4 py-2 flex items-center gap-2 text-muted-foreground text-xs">
                             <Loader2 className="h-3 w-3 animate-spin" />
