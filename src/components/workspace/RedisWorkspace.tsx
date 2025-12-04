@@ -308,7 +308,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           <ResizableHandle />
 
           {/* Right Content */}
-          <ResizablePanel defaultSize={65}>
+          <ResizablePanel defaultSize={40}>
             {selectedKey ? (
               <div className="h-full flex flex-col">
                 {/* Content Header */}
