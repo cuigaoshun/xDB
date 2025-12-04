@@ -149,7 +149,7 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
         // Check if we can reuse the current active tab
         const activeTab = tabs.find(t => t.id === activeTabId);
         const isReusable = activeTab && 
-                           activeTab.type === 'mysql' && 
+                           (activeTab.type === 'mysql' || activeTab.type === 'sqlite') && 
                            (!activeTab.currentSql || activeTab.currentSql === activeTab.initialSql);
 
         const newTab = {
@@ -157,7 +157,9 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
             title: table,
             type: conn.db_type,
             connectionId: conn.id,
-            initialSql: `SELECT * FROM \`${db}\`.\`${table}\` LIMIT 100;`,
+            initialSql: conn.db_type === 'sqlite' 
+                ? `SELECT * FROM "${table}" LIMIT 100;` 
+                : `SELECT * FROM \`${db}\`.\`${table}\` LIMIT 100;`,
             dbName: db,
             tableName: table
         };

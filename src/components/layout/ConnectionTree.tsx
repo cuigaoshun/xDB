@@ -7,7 +7,8 @@ import {
   ChevronRight, 
   ChevronDown, 
   Table as TableIcon,
-  Loader2
+  Loader2,
+  FileCode
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -66,7 +67,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         if (!isExpanded) {
             setIsExpanded(true);
             // Load databases if not loaded yet (for supported types)
-            if ((connection.db_type === 'mysql' || connection.db_type === 'redis') && databases.length === 0) {
+            if ((connection.db_type === 'mysql' || connection.db_type === 'redis' || connection.db_type === 'sqlite') && databases.length === 0) {
                 await loadDatabases();
             }
         } else {
@@ -88,6 +89,12 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
     const loadDatabases = async () => {
         setError(null);
+        if (connection.db_type === 'sqlite') {
+            // SQLite doesn't have multiple databases per connection usually, just treat the file as "main"
+            setDatabases(['main']);
+            return;
+        }
+
         if (connection.db_type === 'redis') {
             try {
                 // Try to fetch real config
@@ -182,15 +189,27 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         setLoadingTables(newLoading);
 
         try {
-            const result = await invoke<SqlResult>('execute_sql', {
-                connectionId: connection.id,
-                sql: `SHOW TABLES FROM ${dbName}`
-            });
+            let tableNames: string[] = [];
             
-            // Robustly parse result by taking the first value of each row
-            const tableNames = result.rows
-                .map(row => Object.values(row)[0] as string)
-                .filter(Boolean);
+            if (connection.db_type === 'sqlite') {
+                const result = await invoke<SqlResult>('execute_sqlite_sql', {
+                    connectionId: connection.id,
+                    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+                });
+                tableNames = result.rows
+                    .map(row => Object.values(row)[0] as string)
+                    .filter(Boolean);
+            } else {
+                const result = await invoke<SqlResult>('execute_sql', {
+                    connectionId: connection.id,
+                    sql: `SHOW TABLES FROM ${dbName}`
+                });
+                
+                // Robustly parse result by taking the first value of each row
+                tableNames = result.rows
+                    .map(row => Object.values(row)[0] as string)
+                    .filter(Boolean);
+            }
 
             setTables(prev => ({
                 ...prev,
@@ -205,8 +224,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         }
     };
 
-    // Other types (sqlite, postgres) might not support tree view yet
-    if (connection.db_type !== 'mysql' && connection.db_type !== 'redis') {
+    // Other types (postgres) might not support tree view yet
+    if (connection.db_type !== 'mysql' && connection.db_type !== 'redis' && connection.db_type !== 'sqlite') {
         // Simple filter for non-supported types
         if (filterTerm && !isMatch(connection.name)) return null;
         
@@ -226,7 +245,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         );
     }
     
-    // For MySQL & Redis:
+    // For MySQL & Redis & SQLite:
     const filteredDatabases = getFilteredDatabases();
     
     const selfMatch = isMatch(connection.name);
@@ -258,6 +277,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 
                 {connection.db_type === 'redis' ? (
                     <Server className="h-4 w-4 text-red-500 shrink-0" />
+                ) : connection.db_type === 'sqlite' ? (
+                    <FileCode className="h-4 w-4 text-green-500 shrink-0" />
                 ) : (
                     <Database className="h-4 w-4 text-blue-500 shrink-0" />
                 )}
@@ -270,7 +291,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             {isExpanded && (
                 <div className={cn(
                     "ml-4 border-l border-border/40 pl-1 overflow-y-auto",
-                    connection.db_type === 'mysql' ? "max-h-[600px]" : "max-h-[320px]"
+                    (connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? "max-h-[600px]" : "max-h-[320px]"
                 )}>
                     {error && (
                         <div className="px-2 py-1.5 text-xs text-destructive bg-destructive/10 rounded mx-1 mb-1 break-words">
@@ -289,7 +310,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                                     className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
                                     onClick={(e) => toggleDatabaseExpand(db, e)}
                                 >
-                                    {connection.db_type === 'mysql' && (
+                                    {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && (
                                         <button className="p-0.5">
                                             {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                                         </button>
@@ -304,8 +325,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                                     </span>
                                 </div>
 
-                                {/* Tables List (MySQL only) */}
-                                {connection.db_type === 'mysql' && expandedDatabases.has(db) && (
+                                {/* Tables List (MySQL & SQLite) */}
+                                {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && expandedDatabases.has(db) && (
                                     <div className="ml-4 border-l border-border/40 pl-1">
                                         {loadingTables.has(db) ? (
                                             <div className="px-4 py-1 flex items-center gap-2 text-muted-foreground text-xs">

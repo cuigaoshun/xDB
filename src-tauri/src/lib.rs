@@ -4,10 +4,12 @@ mod models;
 mod mysql_manager;
 mod redis_manager;
 mod memcached_manager;
+mod sqlite_manager;
 mod state;
 
 use commands::*;
 use mysql_manager::execute_sql;
+use sqlite_manager::execute_sqlite_sql;
 use redis_manager::{execute_redis_command, get_redis_keys, get_keys_details};
 use memcached_manager::{get_memcached_keys, get_memcached_value, set_memcached_value, delete_memcached_key};
 use state::AppState;
@@ -49,6 +51,7 @@ pub fn run() {
             update_connection,
             delete_connection,
             execute_sql,
+            execute_sqlite_sql,
             execute_redis_command,
             get_redis_keys,
             get_keys_details,

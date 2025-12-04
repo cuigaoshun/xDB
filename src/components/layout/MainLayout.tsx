@@ -2,6 +2,7 @@ import { TabBar } from "./TabBar";
 import { MysqlWorkspace } from "../workspace/MysqlWorkspace";
 import { RedisWorkspace } from "../workspace/RedisWorkspace";
 import { MemcachedWorkspace } from "../workspace/MemcachedWorkspace";
+import { SqliteWorkspace } from "../workspace/SqliteWorkspace";
 import { ConnectionManager } from "../workspace/ConnectionManager";
 import { useAppStore } from "@/store/useAppStore";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -97,6 +98,15 @@ export function MainLayout() {
                                             key={activeTab.id}
                                             name={activeTab.title}
                                             connectionId={activeTab.connectionId}
+                                        />
+                                    ) : activeTab.type === 'sqlite' ? (
+                                        <SqliteWorkspace 
+                                            key={activeTab.id}
+                                            tabId={activeTab.id}
+                                            name={activeTab.title}
+                                            connectionId={activeTab.connectionId}
+                                            initialSql={activeTab.initialSql}
+                                            savedSql={activeTab.currentSql}
                                         />
                                     ) : (
                                          <div>Unsupported Type: {activeTab.type}</div>
