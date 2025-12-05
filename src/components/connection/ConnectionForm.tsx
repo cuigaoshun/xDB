@@ -83,19 +83,18 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
             
             <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">{t('common.type')}</label>
-                <div className="col-span-3 flex gap-2">
-                    {(['mysql', 'redis', 'memcached', 'postgres', 'sqlite'] as DbType[]).map((type) => (
-                        <Button
-                            key={type}
-                            type="button"
-                            variant={formData.db_type === type ? 'default' : 'outline'}
-                            onClick={() => handleChange('db_type', type)}
-                            size="sm"
-                            className="capitalize"
-                        >
-                            {type}
-                        </Button>
-                    ))}
+                <div className="col-span-3">
+                    <select
+                        value={formData.db_type}
+                        onChange={(e) => handleChange('db_type', e.target.value as DbType)}
+                        className="w-full p-2 border border-input rounded-md bg-background text-sm"
+                    >
+                        <option value="mysql">MySQL</option>
+                        <option value="redis">Redis</option>
+                        <option value="memcached">Memcached</option>
+                        <option value="postgres">PostgreSQL</option>
+                        <option value="sqlite">SQLite</option>
+                    </select>
                 </div>
             </div>
 

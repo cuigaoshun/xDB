@@ -18,6 +18,12 @@ pub struct ScanResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ValueScanResult {
+    pub cursor: String,
+    pub values: Vec<JsonValue>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KeyDetail {
     pub key: String,
     pub r#type: String,
@@ -231,6 +237,129 @@ pub async fn get_keys_details(
     }
 
     Ok(details)
+}
+
+#[command]
+pub async fn scan_hash_values(
+    app_state: State<'_, AppState>,
+    db_state: State<'_, DbState>,
+    connection_id: i64,
+    key: String,
+    cursor: String,
+    count: Option<usize>,
+    pattern: Option<String>,
+    db: Option<u32>,
+) -> Result<ValueScanResult, String> {
+    let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
+
+    let count = count.unwrap_or(100);
+    let pattern = pattern.unwrap_or_else(|| "*".to_string());
+
+    let mut cmd = redis::cmd("HSCAN");
+    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
+
+    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
+        .query_async(&mut con)
+        .await
+        .map_err(|e| format!("Redis HSCAN failed: {}", e))?;
+
+    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
+
+    Ok(ValueScanResult {
+        cursor: next_cursor,
+        values: json_values,
+    })
+}
+
+#[command]
+pub async fn scan_set_members(
+    app_state: State<'_, AppState>,
+    db_state: State<'_, DbState>,
+    connection_id: i64,
+    key: String,
+    cursor: String,
+    count: Option<usize>,
+    pattern: Option<String>,
+    db: Option<u32>,
+) -> Result<ValueScanResult, String> {
+    let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
+
+    let count = count.unwrap_or(100);
+    let pattern = pattern.unwrap_or_else(|| "*".to_string());
+
+    let mut cmd = redis::cmd("SSCAN");
+    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
+
+    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
+        .query_async(&mut con)
+        .await
+        .map_err(|e| format!("Redis SSCAN failed: {}", e))?;
+
+    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
+
+    Ok(ValueScanResult {
+        cursor: next_cursor,
+        values: json_values,
+    })
+}
+
+#[command]
+pub async fn scan_zset_members(
+    app_state: State<'_, AppState>,
+    db_state: State<'_, DbState>,
+    connection_id: i64,
+    key: String,
+    cursor: String,
+    count: Option<usize>,
+    pattern: Option<String>,
+    db: Option<u32>,
+) -> Result<ValueScanResult, String> {
+    let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
+
+    let count = count.unwrap_or(100);
+    let pattern = pattern.unwrap_or_else(|| "*".to_string());
+
+    let mut cmd = redis::cmd("ZSCAN");
+    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
+
+    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
+        .query_async(&mut con)
+        .await
+        .map_err(|e| format!("Redis ZSCAN failed: {}", e))?;
+
+    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
+
+    Ok(ValueScanResult {
+        cursor: next_cursor,
+        values: json_values,
+    })
+}
+
+#[command]
+pub async fn scan_list_values(
+    app_state: State<'_, AppState>,
+    db_state: State<'_, DbState>,
+    connection_id: i64,
+    key: String,
+    start: i64,
+    end: i64,
+    db: Option<u32>,
+) -> Result<RedisResult, String> {
+    let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
+    let mut con = get_redis_connection_with_retry(&client).await?;
+
+    let mut cmd = redis::cmd("LRANGE");
+    cmd.arg(&key).arg(start).arg(end);
+
+    let result: redis::Value = cmd.query_async(&mut con).await
+        .map_err(|e| format!("Redis LRANGE failed: {}", e))?;
+
+    let json_result = redis_value_to_json(result);
+
+    Ok(RedisResult { output: json_result })
 }
 
 fn redis_value_to_json(v: redis::Value) -> JsonValue {

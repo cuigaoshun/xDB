@@ -1,7 +1,5 @@
 import { Search, Terminal, RefreshCw, Plus, Copy, X, Trash2, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useTranslation } from "react-i18next";
-import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +9,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useEffect, useRef } from "react";
 
 interface RedisResult {
     output: any;
@@ -23,13 +22,17 @@ interface KeyDetail {
     length: number | null; 
 }
 
+interface ValueScanResult {
+    cursor: string;
+    values: any[];
+}
+
 interface ScanResult {
     cursor: string;
     keys: KeyDetail[];
 }
 
 export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; connectionId: number; db?: number }) {
-  const { t } = useTranslation();
   const [keys, setKeys] = useState<KeyDetail[]>([]);
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState<string>("0");
@@ -40,6 +43,28 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   // Details for the selected key (value content)
   const [selectedValue, setSelectedValue] = useState<any>(null);
   const [valueLoading, setValueLoading] = useState(false);
+  
+  // Scan state for complex data types
+  const [valueCursor, setValueCursor] = useState<string>("0");
+  const [valueHasMore, setValueHasMore] = useState(true);
+  const [valueFilter, setValueFilter] = useState<string>("");
+  const [allValues, setAllValues] = useState<any[]>([]);
+
+  // Generate search pattern based on input
+  const getSearchPattern = (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      return "*"; // Full scan
+    }
+    
+    // Check if it's a prefix pattern (ends with *)
+    if (searchTerm.endsWith('*')) {
+      const prefix = searchTerm.slice(0, -1);
+      return prefix ? `${prefix}*` : "*";
+    }
+    
+    // For exact search, we'll use pattern search but filter client-side
+    return `*${searchTerm}*`;
+  };
 
   const fetchKeys = async (reset = false) => {
     if (loading) return;
@@ -47,8 +72,10 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
     setLoading(true);
     const currentCursor = reset ? "0" : cursor;
-    // Redis SCAN match pattern
-    const searchPattern = filter ? `*${filter}*` : "*";
+    
+    // Determine search strategy
+    const useExactSearch = filter && !filter.endsWith('*') && filter.trim() !== "";
+    const searchPattern = getSearchPattern(filter);
 
     try {
       const result = await invoke<ScanResult>("get_redis_keys", {
@@ -59,18 +86,144 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         db,
       });
 
+      let filteredKeys = result.keys;
+      
+      // If exact search, filter client-side
+      if (useExactSearch) {
+        filteredKeys = result.keys.filter((key: KeyDetail) => 
+          key.key === filter.trim()
+        );
+      }
+
       if (reset) {
-        setKeys(result.keys);
+        setKeys(filteredKeys);
       } else {
-        setKeys((prev) => [...prev, ...result.keys]);
+        setKeys((prev) => [...prev, ...filteredKeys]);
       }
 
       setCursor(result.cursor);
-      setHasMore(result.cursor !== "0");
+      setHasMore(result.cursor !== "0" && !useExactSearch);
     } catch (e) {
       console.error("Failed to fetch keys", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchComplexValues = async (reset = false) => {
+    const currentKeyItem = keys.find((k) => k.key === selectedKey);
+    if (!selectedKey || !currentKeyItem) return;
+    if (valueLoading) return;
+    if (!reset && !valueHasMore) return;
+
+    setValueLoading(true);
+    const currentCursor = reset ? "0" : valueCursor;
+    
+    // Determine search strategy for complex values
+    const useExactSearch = valueFilter && !valueFilter.endsWith('*') && valueFilter.trim() !== "";
+    const searchPattern = getSearchPattern(valueFilter);
+    const type = currentKeyItem.type;
+
+    try {
+      let result;
+      
+      if (type === "hash") {
+        result = await invoke<ValueScanResult>("scan_hash_values", {
+          connectionId,
+          key: selectedKey,
+          cursor: currentCursor,
+          count: 100,
+          pattern: searchPattern,
+          db,
+        });
+      } else if (type === "set") {
+        result = await invoke<ValueScanResult>("scan_set_members", {
+          connectionId,
+          key: selectedKey,
+          cursor: currentCursor,
+          count: 100,
+          pattern: searchPattern,
+          db,
+        });
+      } else if (type === "zset") {
+        result = await invoke<ValueScanResult>("scan_zset_members", {
+          connectionId,
+          key: selectedKey,
+          cursor: currentCursor,
+          count: 100,
+          pattern: searchPattern,
+          db,
+        });
+      } else {
+        return;
+      }
+
+      let filteredValues = result.values;
+      
+      // If exact search, filter client-side
+      if (useExactSearch) {
+        const searchTerm = valueFilter.trim();
+        if (type === "hash") {
+          // For hash, search in field names
+          filteredValues = [];
+          for (let i = 0; i < result.values.length; i += 2) {
+            const field: string = result.values[i];
+            if (field === searchTerm) {
+              filteredValues.push(field, result.values[i + 1]);
+            }
+          }
+        } else if (type === "set") {
+          // For set, search in member values
+          filteredValues = result.values.filter((value: string) => value === searchTerm);
+        } else if (type === "zset") {
+          // For zset, search in member names
+          filteredValues = [];
+          for (let i = 0; i < result.values.length; i += 2) {
+            const member: string = result.values[i];
+            if (member === searchTerm) {
+              filteredValues.push(member, result.values[i + 1]);
+            }
+          }
+        }
+      }
+
+      if (reset) {
+        setAllValues(filteredValues);
+      } else {
+        setAllValues((prev) => [...prev, ...filteredValues]);
+      }
+
+      setValueCursor(result.cursor);
+      setValueHasMore(result.cursor !== "0" && !useExactSearch);
+    } catch (e) {
+      console.error("Failed to fetch complex values", e);
+    } finally {
+      setValueLoading(false);
+    }
+  };
+
+  const fetchListValues = async (start = 0, end = 99) => {
+    const currentKeyItem = keys.find((k) => k.key === selectedKey);
+    if (!selectedKey || !currentKeyItem || currentKeyItem.type !== "list") return;
+    if (valueLoading) return;
+
+    setValueLoading(true);
+
+    try {
+      const result = await invoke<RedisResult>("scan_list_values", {
+        connectionId,
+        key: selectedKey,
+        start,
+        end,
+        db,
+      });
+      
+      setAllValues(result.output);
+      setValueHasMore(false);
+    } catch (e) {
+      console.error("Failed to fetch list values", e);
+    } finally {
+      setValueLoading(false);
     }
   };
 
@@ -88,7 +241,21 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  // Debounce value filter for complex types
+  useEffect(() => {
+    const currentKeyItem = keys.find((k) => k.key === selectedKey);
+    if (selectedKey && currentKeyItem && 
+        (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
+      const timer = setTimeout(() => {
+        fetchComplexValues(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueFilter, selectedKey]);
+
   const observerTarget = useRef<HTMLDivElement>(null);
+  const valueObserverTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -107,41 +274,62 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     return () => observer.disconnect();
   }, [hasMore, loading, fetchKeys]);
 
+  // Value scroll observer for complex types
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const currentKeyItem = keys.find((k) => k.key === selectedKey);
+        if (entries[0].isIntersecting && valueHasMore && !valueLoading && 
+            selectedKey && currentKeyItem && 
+            (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
+          fetchComplexValues(false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (valueObserverTarget.current) {
+      observer.observe(valueObserverTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [valueHasMore, valueLoading, fetchComplexValues, selectedKey]);
+
   const handleKeyClick = async (keyItem: KeyDetail) => {
     setSelectedKey(keyItem.key);
-    setValueLoading(true);
     setSelectedValue(null);
+    
+    // Reset scan state
+    setValueCursor("0");
+    setValueHasMore(true);
+    setValueFilter("");
+    setAllValues([]);
 
     const type = keyItem.type || "string";
 
-    try {
-      let cmd = "GET";
-      let args = [keyItem.key];
-
-      if (type === "hash") {
-        cmd = "HGETALL";
-      } else if (type === "list") {
-        cmd = "LRANGE";
-        args.push("0", "-1");
-      } else if (type === "set") {
-        cmd = "SMEMBERS";
-      } else if (type === "zset") {
-        cmd = "ZRANGE";
-        args.push("0", "-1", "WITHSCORES");
+    if (type === "string") {
+      // For string type, use original logic
+      setValueLoading(true);
+      try {
+        const valRes = await invoke<RedisResult>("execute_redis_command", {
+          connectionId,
+          command: "GET",
+          args: [keyItem.key],
+          db,
+        });
+        setSelectedValue(valRes.output);
+      } catch (error) {
+        console.error("Failed to fetch value", error);
+        setSelectedValue("Error fetching value");
+      } finally {
+        setValueLoading(false);
       }
-
-      const valRes = await invoke<RedisResult>("execute_redis_command", {
-        connectionId,
-        command: cmd,
-        args,
-        db,
-      });
-      setSelectedValue(valRes.output);
-    } catch (error) {
-      console.error("Failed to fetch value", error);
-      setSelectedValue("Error fetching value");
-    } finally {
-      setValueLoading(false);
+    } else if (type === "list") {
+      // For list type, use pagination
+      fetchListValues(0, 99);
+    } else {
+      // For hash, set, zset, use scan
+      fetchComplexValues(true);
     }
   };
 
@@ -240,7 +428,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                   className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
                 />
                 <Input
-                  placeholder={t("redis.filterKeys") || "Filter by Key Name..."}
+                  placeholder="Filter by Key Name... (empty: all, text: exact, prefix*: prefix)"
                   className="pl-8 h-9"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -383,6 +571,12 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                       <ValueViewer
                         value={selectedValue}
                         type={selectedKeyItem?.type}
+                        allValues={allValues}
+                        valueHasMore={valueHasMore}
+                        valueLoading={valueLoading}
+                        valueFilter={valueFilter}
+                        setValueFilter={setValueFilter}
+                        valueObserverTarget={valueObserverTarget}
                       />
                     </ScrollArea>
                   )}
@@ -403,134 +597,297 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   );
 }
 
-function ValueViewer({ value, type }: { value: any; type?: string }) {
-  if (value === null || value === undefined)
-    return (
-      <div className="text-muted-foreground italic">Null or Empty</div>
-    );
+function ValueViewer({ 
+  value, 
+  type, 
+  allValues, 
+  valueHasMore, 
+  valueLoading, 
+  valueFilter, 
+  setValueFilter, 
+  valueObserverTarget
+}: { 
+  value: any; 
+  type?: string;
+  allValues: any[];
+  valueHasMore: boolean;
+  valueLoading: boolean;
+  valueFilter: string;
+  setValueFilter: (filter: string) => void;
+  valueObserverTarget: React.RefObject<HTMLDivElement | null>;
+}) {
+  // For string type, use original logic
+  if (type === "string") {
+    if (value === null || value === undefined)
+      return (
+        <div className="text-muted-foreground italic">Null or Empty</div>
+      );
 
-  if (typeof value === "string") {
-    try {
-      const json = JSON.parse(value);
-      // Simple check if json is object or array
-      if (typeof json === "object" && json !== null) {
-        return <JsonDisplay data={json} />;
+    if (typeof value === "string") {
+      try {
+        const json = JSON.parse(value);
+        if (typeof json === "object" && json !== null) {
+          return <JsonDisplay data={json} />;
+        }
+        return (
+          <pre
+            className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
+          >
+            {value}
+          </pre>
+        );
+      } catch {
+        return (
+          <pre
+            className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
+          >
+            {value}
+          </pre>
+        );
       }
-      return (
-        <pre
-          className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-        >
-          {value}
-        </pre>
-      );
-    } catch {
-      return (
-        <pre
-          className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-        >
-          {value}
-        </pre>
-      );
     }
+
+    if (typeof value === "object") {
+      return <JsonDisplay data={value} />;
+    }
+
+    return (
+      <pre
+        className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
+      >
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
   }
 
-  if (Array.isArray(value)) {
-    if (type === "hash") {
-      // HGETALL returning array [k, v, k, v]
-      const pairs = [];
-      for (let i = 0; i < value.length; i += 2) {
-        pairs.push({ field: value[i], value: value[i + 1] });
-      }
-      return (
-        <div className="border rounded-md">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b">
-              <tr>
-                <th className="px-4 py-2 w-1/2">Field</th>
-                <th className="px-4 py-2 w-1/2">Value</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {pairs.map((p, i) => (
-                <tr key={i} className="hover:bg-muted/10">
-                  <td
-                    className="px-4 py-2 font-mono text-muted-foreground align-top"
-                  >
-                    {String(p.field)}
-                  </td>
-                  <td className="px-4 py-2 font-mono align-top break-all">
-                    {String(p.value)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-    if (type === "zset") {
-      // ZRANGE ... WITHSCORES returning array [member, score, member, score]
-      const items = [];
-      for (let i = 0; i < value.length; i += 2) {
-        items.push({ member: value[i], score: value[i + 1] });
-      }
-      return (
-        <div className="border rounded-md">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b">
-              <tr>
-                <th className="px-4 py-2 w-1/2">Member</th>
-                <th className="px-4 py-2 w-1/2">Score</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {items.map((item, i) => (
-                <tr key={i} className="hover:bg-muted/10">
-                  <td
-                    className="px-4 py-2 font-mono text-muted-foreground align-top break-all"
-                  >
-                    {String(item.member)}
-                  </td>
-                  <td className="px-4 py-2 font-mono align-top">
-                    {String(item.score)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
+  // For complex types (hash, set, zset, list), use scan logic
+  if (type === "hash") {
     return (
-      <div className="border rounded-md">
-        <div className="bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
-          {value.length} Items
+      <div className="flex flex-col h-full">
+        {/* Filter input */}
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search
+              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+            />
+            <Input
+              placeholder="Filter by field name... (empty: all, text: exact, prefix*: prefix)"
+              className="pl-8 h-9"
+              value={valueFilter}
+              onChange={(e) => setValueFilter(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-between items-center mt-2 px-1">
+            <span className="text-xs text-muted-foreground">
+              Total: {allValues.length / 2}
+              {valueHasMore ? "+" : ""}
+            </span>
+          </div>
         </div>
-        <div className="divide-y">
-          {value.map((item, i) => (
-            <div
-              key={i}
-              className="p-3 text-sm font-mono hover:bg-muted/30 break-all"
-            >
-              {Array.isArray(item) ? item.join(" : ") : String(item)}
+
+        {/* Hash table */}
+        <div className="flex-1 overflow-auto">
+          <div className="border rounded-md">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 w-1/2">Field</th>
+                  <th className="px-4 py-2 w-1/2">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {Array.from({ length: allValues.length / 2 }).map((_, i) => {
+                  const fieldIndex = i * 2;
+                  const valueIndex = i * 2 + 1;
+                  return (
+                    <tr key={i} className="hover:bg-muted/10">
+                      <td className="px-4 py-2 font-mono text-muted-foreground align-top">
+                        {String(allValues[fieldIndex])}
+                      </td>
+                      <td className="px-4 py-2 font-mono align-top break-all">
+                        {String(allValues[valueIndex])}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Load more sentinel */}
+          <div ref={valueObserverTarget} className="h-px w-full" />
+
+          {valueLoading && (
+            <div className="p-4 text-center text-muted-foreground text-xs">
+              Loading...
             </div>
-          ))}
+          )}
         </div>
       </div>
     );
   }
 
-  if (typeof value === "object") {
-    return <JsonDisplay data={value} />;
+  if (type === "set") {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Filter input */}
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search
+              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+            />
+            <Input
+              placeholder="Filter by member value... (empty: all, text: exact, prefix*: prefix)"
+              className="pl-8 h-9"
+              value={valueFilter}
+              onChange={(e) => setValueFilter(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-between items-center mt-2 px-1">
+            <span className="text-xs text-muted-foreground">
+              Total: {allValues.length}
+              {valueHasMore ? "+" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* Set members */}
+        <div className="flex-1 overflow-auto">
+          <div className="border rounded-md">
+            <div className="bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+              Members
+            </div>
+            <div className="divide-y">
+              {allValues.map((item, i) => (
+                <div
+                  key={i}
+                  className="p-3 text-sm font-mono hover:bg-muted/30 break-all"
+                >
+                  {String(item)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Load more sentinel */}
+          <div ref={valueObserverTarget} className="h-px w-full" />
+
+          {valueLoading && (
+            <div className="p-4 text-center text-muted-foreground text-xs">
+              Loading...
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
+  if (type === "zset") {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Filter input */}
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search
+              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+            />
+            <Input
+              placeholder="Filter by member value... (empty: all, text: exact, prefix*: prefix)"
+              className="pl-8 h-9"
+              value={valueFilter}
+              onChange={(e) => setValueFilter(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-between items-center mt-2 px-1">
+            <span className="text-xs text-muted-foreground">
+              Total: {allValues.length / 2}
+              {valueHasMore ? "+" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* ZSet members */}
+        <div className="flex-1 overflow-auto">
+          <div className="border rounded-md">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 w-3/5">Member</th>
+                  <th className="px-4 py-2 w-2/5">Score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {Array.from({ length: allValues.length / 2 }).map((_, i) => {
+                  const memberIndex = i * 2;
+                  const scoreIndex = i * 2 + 1;
+                  return (
+                    <tr key={i} className="hover:bg-muted/10">
+                      <td className="px-4 py-2 font-mono text-muted-foreground align-top break-all">
+                        {String(allValues[memberIndex])}
+                      </td>
+                      <td className="px-4 py-2 font-mono align-top">
+                        {String(allValues[scoreIndex])}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Load more sentinel */}
+          <div ref={valueObserverTarget} className="h-px w-full" />
+
+          {valueLoading && (
+            <div className="p-4 text-center text-muted-foreground text-xs">
+              Loading...
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "list") {
+    return (
+      <div className="flex flex-col h-full">
+        {/* List info */}
+        <div className="p-2 border-b">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-xs text-muted-foreground">
+              Total: {allValues.length} items
+            </span>
+          </div>
+        </div>
+
+        {/* List items */}
+        <div className="flex-1 overflow-auto">
+          <div className="border rounded-md">
+            <div className="bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
+              List Items (Index: Value)
+            </div>
+            <div className="divide-y">
+              {allValues.map((item, i) => (
+                <div
+                  key={i}
+                  className="p-3 text-sm font-mono hover:bg-muted/30 break-all"
+                >
+                  <span className="text-muted-foreground mr-2">[{i}]:</span>
+                  {String(item)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for unknown types
   return (
-    <pre
-      className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-    >
-      {JSON.stringify(value, null, 2)}
-    </pre>
+    <div className="text-muted-foreground italic">
+      Unsupported data type: {type}
+    </div>
   );
 }
 

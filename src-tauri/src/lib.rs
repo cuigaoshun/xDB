@@ -10,7 +10,7 @@ mod state;
 use commands::*;
 use mysql_manager::execute_sql;
 use sqlite_manager::execute_sqlite_sql;
-use redis_manager::{execute_redis_command, get_redis_keys, get_keys_details};
+use redis_manager::{execute_redis_command, get_redis_keys, get_keys_details, scan_hash_values, scan_set_members, scan_zset_members, scan_list_values};
 use memcached_manager::{get_memcached_keys, get_memcached_value, set_memcached_value, delete_memcached_key};
 use state::AppState;
 use tauri::Manager;
@@ -55,6 +55,10 @@ pub fn run() {
             execute_redis_command,
             get_redis_keys,
             get_keys_details,
+            scan_hash_values,
+            scan_set_members,
+            scan_zset_members,
+            scan_list_values,
             get_memcached_keys,
             get_memcached_value,
             set_memcached_value,
