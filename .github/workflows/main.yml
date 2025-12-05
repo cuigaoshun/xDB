@@ -5,10 +5,15 @@ on:
     tags:
       - 'app-v*'
 
+env:
+  # 全平台通用：禁止 openssl-sys 自动编译 OpenSSL，强制使用系统版本
+  OPENSSL_NO_VENDOR: 1
+
 jobs:
   publish-tauri:
     permissions:
       contents: write
+
     strategy:
       fail-fast: false
       matrix:
@@ -29,9 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ------------------------------
+      # ------------------------------------------------------------
       # Linux x86_64 依赖
-      # ------------------------------
+      # ------------------------------------------------------------
       - name: install dependencies (ubuntu x86)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -40,11 +45,13 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libssl-dev \
+            pkg-config \
             patchelf
 
-      # ------------------------------
+      # ------------------------------------------------------------
       # Linux ARM 依赖
-      # ------------------------------
+      # ------------------------------------------------------------
       - name: install dependencies (ubuntu arm64)
         if: matrix.platform == 'ubuntu-22.04-arm'
         run: |
@@ -54,11 +61,44 @@ jobs:
             libappindicator3-dev \
             xdg-utils \
             librsvg2-dev \
+            libssl-dev \
+            pkg-config \
             patchelf \
             gcc \
             g++
 
-      # node / pnpm
+      # ------------------------------------------------------------
+      # macOS OpenSSL
+      # ------------------------------------------------------------
+      - name: install OpenSSL (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install openssl@3
+          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------
+      # Windows OpenSSL via vcpkg
+      # ------------------------------------------------------------
+      - name: Setup vcpkg (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: lukka/run-vcpkg@v11
+        with:
+          setupOnly: true
+
+      - name: install OpenSSL (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          vcpkg install openssl:x64-windows
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows" >> $env:GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/lib" >> $env:GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/include" >> $env:GITHUB_ENV
+
+      # ------------------------------------------------------------
+      # Node / pnpm
+      # ------------------------------------------------------------
       - name: setup pnpm
         run: npm install -g pnpm
 
@@ -68,23 +108,28 @@ jobs:
           node-version: lts/*
           cache: 'pnpm'
 
+      # ------------------------------------------------------------
       # Rust
+      # ------------------------------------------------------------
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      # Rust cache
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      # pnpm install
+      # ------------------------------------------------------------
+      # Frontend install
+      # ------------------------------------------------------------
       - name: install frontend dependencies
         run: pnpm install
 
-      # Tauri build & release
+      # ------------------------------------------------------------
+      # Tauri build & publish
+      # ------------------------------------------------------------
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
