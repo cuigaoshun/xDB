@@ -40,7 +40,8 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            libssl-dev
 
       # ------------------------------
       # Linux ARM 依赖
@@ -56,7 +57,8 @@ jobs:
             librsvg2-dev \
             patchelf \
             gcc \
-            g++
+            g++ \
+            libssl-dev
 
       # node / pnpm
       - name: setup pnpm
@@ -84,10 +86,78 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install
 
+      # ------------------------------
+      # Install OpenSSL on macOS
+      # ------------------------------
+      - name: Install OpenSSL (macOS) and set env
+        if: matrix.platform == 'macos-latest'
+        run: |
+          set -e
+          # install openssl variants if not present
+          if ! brew list --formula | grep -q '^openssl@3$' && ! brew list --formula | grep -q '^openssl@1.1$' && ! brew list --formula | grep -q '^openssl$'; then
+            if brew info openssl@3 >/dev/null 2>&1; then
+              brew install openssl@3 || true
+            fi
+            if brew info openssl@1.1 >/dev/null 2>&1; then
+              brew install openssl@1.1 || true
+            fi
+            brew install openssl || true
+          fi
+          OPENSSL_PREFIX=$(brew --prefix openssl@3 2>/dev/null || brew --prefix openssl@1.1 2>/dev/null || brew --prefix openssl 2>/dev/null)
+          if [ -z "$OPENSSL_PREFIX" ]; then
+            echo "Failed to detect OpenSSL installation prefix"
+            exit 1
+          fi
+          echo "Found OpenSSL at: $OPENSSL_PREFIX"
+          echo "OPENSSL_DIR=$OPENSSL_PREFIX" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$OPENSSL_PREFIX/include" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$OPENSSL_PREFIX/lib" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$OPENSSL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      # ------------------------------
+      # Install OpenSSL on Windows
+      # ------------------------------
+      - name: Install OpenSSL (Windows) and set env
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          Write-Host "Check common OpenSSL install locations..."
+          $possibles = @(
+            "$env:ProgramFiles\OpenSSL-Win64",
+            "$env:ProgramFiles(x86)\OpenSSL-Win32",
+            "C:\OpenSSL-Win64",
+            "C:\OpenSSL-Win32",
+            "C:\Program Files\OpenSSL-Win64",
+            "C:\Program Files (x86)\OpenSSL-Win32"
+          )
+          $prefix = $possibles | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $prefix) {
+            Write-Host "No existing OpenSSL found, installing openssl.light via choco..."
+            choco install openssl.light -y --no-progress
+            # Wait a bit for choco install to finish and paths to be visible
+            Start-Sleep -Seconds 5
+            $prefix = $possibles | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $prefix) {
+            Write-Error "OpenSSL installation not found after choco install. Checked: $($possibles -join ', ')"
+            exit 1
+          }
+          Write-Host "Found OpenSSL at: $prefix"
+          Add-Content -Path $env:GITHUB_ENV -Value "OPENSSL_DIR=$prefix"
+          Add-Content -Path $env:GITHUB_ENV -Value "OPENSSL_INCLUDE_DIR=$prefix\include"
+          Add-Content -Path $env:GITHUB_ENV -Value "OPENSSL_LIB_DIR=$prefix\lib"
+          # Optionally set PKG_CONFIG_PATH if pkg-config is used under msys
+          Add-Content -Path $env:GITHUB_ENV -Value "PKG_CONFIG_PATH=$prefix\lib\pkgconfig`:$env:PKG_CONFIG_PATH"
+
       # Tauri build & release
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 以下 env 会在上面步骤写入 $GITHUB_ENV 后自动可用，但这里显式声明以防某些 runner 需要，值将来自环境
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          OPENSSL_INCLUDE_DIR: ${{ env.OPENSSL_INCLUDE_DIR }}
+          OPENSSL_LIB_DIR: ${{ env.OPENSSL_LIB_DIR }}
+          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
         with:
           tagName: app-v__VERSION__
           releaseName: 'App v__VERSION__'
