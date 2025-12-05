@@ -78,12 +78,14 @@ jobs:
           echo "OPENSSL_LIB_DIR=/usr/lib" >> $GITHUB_ENV
 
       # Windows
+      # Windows
       - name: install openssl (windows)
         if: matrix.platform == 'windows-latest'
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgArguments: >
-            install openssl:x64-windows
+        run: |
+          choco install openssl --forcex86 --yes
+          echo "OPENSSL_DIR=C:/Program Files (x86)/OpenSSL" >> $env:GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=C:/Program Files (x86)/OpenSSL/include" >> $env:GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=C:/Program Files (x86)/OpenSSL/lib" >> $env:GITHUB_ENV
 
       - name: set openssl env (windows)
         if: matrix.platform == 'windows-latest'
