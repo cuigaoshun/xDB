@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary } from "lucide-react";
@@ -18,6 +18,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppStore } from "@/store/useAppStore";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface ColumnInfo {
     name: string;
@@ -90,15 +91,18 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
   };
 
   // DDL related state
-  const [showDDL, setShowDDL] = useState(!!tableName);
+  const [showDDL, setShowDDL] = useState(false);
   const [ddl, setDdl] = useState<string>("");
   const [isLoadingDDL, setIsLoadingDDL] = useState(false);
 
+  const initialSqlExecuted = useRef(false);
+
   // If initialSql is provided (e.g. when opening a table), update state and run it
   useEffect(() => {
-      if (initialSql && !savedSql) {
+      if (initialSql && !savedSql && !initialSqlExecuted.current) {
           setSql(initialSql);
           executeSql(initialSql);
+          initialSqlExecuted.current = true;
       }
   }, [initialSql]);
 
@@ -113,11 +117,14 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
       if (!dbName || !tableName) return;
       
       setIsLoadingDDL(true);
+      const startTime = Date.now();
+      const sql = `SHOW CREATE TABLE \`${dbName}\`.\`${tableName}\``;
+
       try {
           // Use execute_sql to get create table statement
           const res = await invoke<SqlResult>("execute_sql", {
               connectionId,
-              sql: `SHOW CREATE TABLE \`${dbName}\`.\`${tableName}\``
+              sql
           });
           
           if (res.rows.length > 0) {
@@ -151,9 +158,24 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
           } else {
               setDdl("-- No results returned for SHOW CREATE TABLE");
           }
+
+          addCommandToConsole({
+            databaseType: 'mysql',
+            command: sql,
+            duration: Date.now() - startTime,
+            success: true
+          });
       } catch (err: any) {
           console.error("Failed to load DDL:", err);
           setDdl(`-- Failed to load DDL: ${typeof err === 'string' ? err : JSON.stringify(err)}`);
+
+          addCommandToConsole({
+            databaseType: 'mysql',
+            command: sql,
+            duration: Date.now() - startTime,
+            success: false,
+            error: typeof err === 'string' ? err : JSON.stringify(err)
+          });
       } finally {
           setIsLoadingDDL(false);
       }
@@ -166,15 +188,32 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
       setError(null);
       setResult(null);
 
+      const startTime = Date.now();
+
       try {
           const data = await invoke<SqlResult>("execute_sql", {
               connectionId,
               sql: query
           });
           setResult(data);
+
+          addCommandToConsole({
+            databaseType: 'mysql',
+            command: query,
+            duration: Date.now() - startTime,
+            success: true
+          });
       } catch (err: any) {
           console.error("Execute SQL failed:", err);
           setError(typeof err === 'string' ? err : JSON.stringify(err));
+
+          addCommandToConsole({
+            databaseType: 'mysql',
+            command: query,
+            duration: Date.now() - startTime,
+            success: false,
+            error: typeof err === 'string' ? err : JSON.stringify(err)
+          });
       } finally {
           setIsLoading(false);
       }

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 // Basic PHP Unserializer (Best Effort)
 function parsePhpSerialize(str: string): any {
@@ -82,15 +83,32 @@ export function MemcachedWorkspace({ name, connectionId }: { name: string; conne
     
     addToHistory(keyToSearch);
 
+    const startTime = Date.now();
+
     try {
       const val = await invoke<string>("get_memcached_value", {
         connectionId,
         key: keyToSearch,
       });
       setSelectedValue(val);
+      
+      addCommandToConsole({
+        databaseType: 'memcached',
+        command: `get ${keyToSearch}`,
+        duration: Date.now() - startTime,
+        success: true
+      });
     } catch (error) {
       console.error("Failed to fetch value", error);
       setSelectedValue("Error fetching value: " + error);
+
+      addCommandToConsole({
+        databaseType: 'memcached',
+        command: `get ${keyToSearch}`,
+        duration: Date.now() - startTime,
+        success: false,
+        error: String(error)
+      });
     } finally {
       setLoading(false);
     }
@@ -100,15 +118,32 @@ export function MemcachedWorkspace({ name, connectionId }: { name: string; conne
       if (!searchKey) return;
       if (!confirm(`Are you sure you want to delete key "${searchKey}"?`)) return;
       
+      const startTime = Date.now();
+
       try {
           await invoke("delete_memcached_key", {
               connectionId,
               key: searchKey
           });
           setSelectedValue("(deleted)");
+
+          addCommandToConsole({
+            databaseType: 'memcached',
+            command: `delete ${searchKey}`,
+            duration: Date.now() - startTime,
+            success: true
+          });
       } catch (error) {
           console.error("Failed to delete key", error);
           alert("Failed to delete key: " + error);
+
+          addCommandToConsole({
+            databaseType: 'memcached',
+            command: `delete ${searchKey}`,
+            duration: Date.now() - startTime,
+            success: false,
+            error: String(error)
+          });
       }
   };
 

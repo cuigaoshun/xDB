@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useEffect, useRef } from "react";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface RedisResult {
     output: any;
@@ -71,40 +72,90 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (!reset && !hasMore) return;
 
     setLoading(true);
-    const currentCursor = reset ? "0" : cursor;
     
     // Determine search strategy
     const useExactSearch = filter && !filter.endsWith('*') && filter.trim() !== "";
-    const searchPattern = getSearchPattern(filter);
+    const usePrefixSearch = filter && filter.endsWith('*') && filter.trim() !== "*";
+    
+    const startTime = Date.now();
+    let command = '';
 
     try {
-      const result = await invoke<ScanResult>("get_redis_keys", {
-        connectionId,
-        cursor: currentCursor,
-        count: 100,
-        pattern: searchPattern,
-        db,
-      });
-
-      let filteredKeys = result.keys;
-      
-      // If exact search, filter client-side
       if (useExactSearch) {
-        filteredKeys = result.keys.filter((key: KeyDetail) => 
-          key.key === filter.trim()
-        );
-      }
-
-      if (reset) {
-        setKeys(filteredKeys);
+        // Exact search: use EXISTS command
+        const searchTerm = filter.trim();
+        command = `EXISTS ${searchTerm}`;
+        
+        const result = await invoke<RedisResult>("execute_redis_command", {
+          connectionId,
+          command: "EXISTS",
+          args: [searchTerm],
+          db,
+        });
+        
+        // If key exists, get its details
+        if (result.output === 1) {
+          const keyDetails = await invoke<KeyDetail[]>("get_keys_details", {
+            connectionId,
+            keys: [searchTerm],
+            db,
+          });
+          setKeys(keyDetails);
+        } else {
+          setKeys([]);
+        }
+        
+        setHasMore(false);
+        
+        // Log command to console
+        addCommandToConsole({
+          databaseType: 'redis',
+          command,
+          duration: Date.now() - startTime,
+          success: true
+        });
       } else {
-        setKeys((prev) => [...prev, ...filteredKeys]);
-      }
+        // Full scan or prefix search: use SCAN
+        const currentCursor = reset ? "0" : cursor;
+        const searchPattern = getSearchPattern(filter);
+        command = `SCAN ${currentCursor} MATCH ${searchPattern} COUNT 100`;
+        
+        const result = await invoke<ScanResult>("get_redis_keys", {
+          connectionId,
+          cursor: currentCursor,
+          count: 100,
+          pattern: searchPattern,
+          db,
+        });
 
-      setCursor(result.cursor);
-      setHasMore(result.cursor !== "0" && !useExactSearch);
+        if (reset) {
+          setKeys(result.keys);
+        } else {
+          setKeys((prev) => [...prev, ...result.keys]);
+        }
+
+        setCursor(result.cursor);
+        setHasMore(result.cursor !== "0");
+        
+        // Log command to console
+        addCommandToConsole({
+          databaseType: 'redis',
+          command,
+          duration: Date.now() - startTime,
+          success: true
+        });
+      }
     } catch (e) {
       console.error("Failed to fetch keys", e);
+      
+      // Log error command
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: false,
+        error: e instanceof Error ? e.message : String(e)
+      });
     } finally {
       setLoading(false);
     }
@@ -123,11 +174,15 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     const useExactSearch = valueFilter && !valueFilter.endsWith('*') && valueFilter.trim() !== "";
     const searchPattern = getSearchPattern(valueFilter);
     const type = currentKeyItem.type;
+    
+    const startTime = Date.now();
+    let command = '';
 
     try {
       let result;
       
       if (type === "hash") {
+        command = `HSCAN ${selectedKey} ${currentCursor} MATCH ${searchPattern} COUNT 100`;
         result = await invoke<ValueScanResult>("scan_hash_values", {
           connectionId,
           key: selectedKey,
@@ -137,6 +192,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           db,
         });
       } else if (type === "set") {
+        command = `SSCAN ${selectedKey} ${currentCursor} MATCH ${searchPattern} COUNT 100`;
         result = await invoke<ValueScanResult>("scan_set_members", {
           connectionId,
           key: selectedKey,
@@ -146,6 +202,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           db,
         });
       } else if (type === "zset") {
+        command = `ZSCAN ${selectedKey} ${currentCursor} MATCH ${searchPattern} COUNT 100`;
         result = await invoke<ValueScanResult>("scan_zset_members", {
           connectionId,
           key: selectedKey,
@@ -195,8 +252,25 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
       setValueCursor(result.cursor);
       setValueHasMore(result.cursor !== "0" && !useExactSearch);
+      
+      // Log command to console
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: true
+      });
     } catch (e) {
       console.error("Failed to fetch complex values", e);
+      
+      // Log error command
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: false,
+        error: e instanceof Error ? e.message : String(e)
+      });
     } finally {
       setValueLoading(false);
     }
@@ -208,6 +282,9 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (valueLoading) return;
 
     setValueLoading(true);
+    
+    const startTime = Date.now();
+    const command = `LRANGE ${selectedKey} ${start} ${end}`;
 
     try {
       const result = await invoke<RedisResult>("scan_list_values", {
@@ -220,8 +297,25 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       
       setAllValues(result.output);
       setValueHasMore(false);
+      
+      // Log command to console
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: true
+      });
     } catch (e) {
       console.error("Failed to fetch list values", e);
+      
+      // Log error command
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: false,
+        error: e instanceof Error ? e.message : String(e)
+      });
     } finally {
       setValueLoading(false);
     }
@@ -236,7 +330,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchKeys(true);
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
@@ -248,7 +342,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
       const timer = setTimeout(() => {
         fetchComplexValues(true);
-      }, 300);
+      }, 500);
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,6 +404,8 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (type === "string") {
       // For string type, use original logic
       setValueLoading(true);
+      const startTime = Date.now();
+      const command = `GET ${keyItem.key}`;
       try {
         const valRes = await invoke<RedisResult>("execute_redis_command", {
           connectionId,
@@ -318,9 +414,26 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           db,
         });
         setSelectedValue(valRes.output);
+        
+        // Log command to console
+        addCommandToConsole({
+          databaseType: 'redis',
+          command,
+          duration: Date.now() - startTime,
+          success: true
+        });
       } catch (error) {
         console.error("Failed to fetch value", error);
         setSelectedValue("Error fetching value");
+        
+        // Log error command
+        addCommandToConsole({
+          databaseType: 'redis',
+          command,
+          duration: Date.now() - startTime,
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
       } finally {
         setValueLoading(false);
       }

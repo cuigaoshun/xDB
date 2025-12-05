@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "@/store/useAppStore";
 import { Textarea } from "@/components/ui/textarea";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 // 简单的 SqlResult 定义
 interface SqlResult {
@@ -26,6 +27,7 @@ export function SqliteWorkspace({ tabId, name: _name, connectionId, initialSql, 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const updateTab = useAppStore((state) => state.updateTab);
+  const initialSqlExecuted = useRef(false);
 
   // 当 sql 变化时，更新 store
   useEffect(() => {
@@ -35,18 +37,46 @@ export function SqliteWorkspace({ tabId, name: _name, connectionId, initialSql, 
       return () => clearTimeout(timer);
   }, [sql, tabId, updateTab]);
 
-  const runQuery = async () => {
+  // Initialize with initialSql if provided
+  useEffect(() => {
+      if (initialSql && !savedSql && !initialSqlExecuted.current) {
+          setSql(initialSql);
+          runQuery(initialSql);
+          initialSqlExecuted.current = true;
+      }
+  }, [initialSql]);
+
+  const runQuery = async (queryOverride?: string) => {
+    const sqlToRun = queryOverride || sql;
     setLoading(true);
     setError(null);
+    
+    const startTime = Date.now();
+
     try {
       const res = await invoke<SqlResult>("execute_sqlite_sql", {
         connectionId,
-        sql,
+        sql: sqlToRun,
       });
       setResult(res);
+      
+      addCommandToConsole({
+        databaseType: 'sqlite',
+        command: sqlToRun,
+        duration: Date.now() - startTime,
+        success: true
+      });
     } catch (err) {
       setError(String(err));
       setResult(null);
+
+      addCommandToConsole({
+        databaseType: 'sqlite',
+        command: sqlToRun,
+        duration: Date.now() - startTime,
+        success: false,
+        error: String(err)
+      });
     } finally {
       setLoading(false);
     }
@@ -56,7 +86,7 @@ export function SqliteWorkspace({ tabId, name: _name, connectionId, initialSql, 
     <div className="h-full flex flex-col">
       {/* Toolbar */}
       <div className="flex items-center gap-2 p-2 border-b bg-muted/10">
-        <Button size="sm" onClick={runQuery} disabled={loading} className="gap-1">
+        <Button size="sm" onClick={() => runQuery()} disabled={loading} className="gap-1">
           <Play className="w-4 h-4" /> Run
         </Button>
       </div>

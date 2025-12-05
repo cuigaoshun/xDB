@@ -11,6 +11,7 @@ import {
   FileCode
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface ConnectionTreeItemProps {
     connection: Connection;
@@ -95,6 +96,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             return;
         }
 
+        const startTime = Date.now();
+
         if (connection.db_type === 'redis') {
             try {
                 // Try to fetch real config
@@ -122,6 +125,13 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
                 const redisDbs = Array.from({ length: count }, (_, i) => i.toString());
                 setDatabases(redisDbs);
+
+                addCommandToConsole({
+                    databaseType: 'redis',
+                    command: 'CONFIG GET databases',
+                    duration: Date.now() - startTime,
+                    success: true
+                });
             } catch (err: any) {
                 const errorMsg = String(err);
                 if (errorMsg.toLowerCase().includes("failed to connect") || errorMsg.toLowerCase().includes("connection refused")) {
@@ -133,6 +143,14 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                     const redisDbs = Array.from({ length: 16 }, (_, i) => i.toString());
                     setDatabases(redisDbs);
                 }
+
+                addCommandToConsole({
+                    databaseType: 'redis',
+                    command: 'CONFIG GET databases',
+                    duration: Date.now() - startTime,
+                    success: false,
+                    error: errorMsg
+                });
             }
             return;
         }
@@ -151,10 +169,25 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 .filter(db => !SYSTEM_DBS.has(db.toLowerCase()));
                 
             setDatabases(dbs);
+
+            addCommandToConsole({
+                databaseType: 'mysql',
+                command: 'SHOW DATABASES',
+                duration: Date.now() - startTime,
+                success: true
+            });
         } catch (err) {
             console.error("Failed to load databases:", err);
             setError(String(err));
             setDatabases([]);
+
+            addCommandToConsole({
+                databaseType: 'mysql',
+                command: 'SHOW DATABASES',
+                duration: Date.now() - startTime,
+                success: false,
+                error: String(err)
+            });
         } finally {
             setIsLoadingDatabases(false);
         }
@@ -188,21 +221,27 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         newLoading.add(dbName);
         setLoadingTables(newLoading);
 
+        const startTime = Date.now();
+        let command = "";
+        const dbType = connection.db_type;
+
         try {
             let tableNames: string[] = [];
             
             if (connection.db_type === 'sqlite') {
+                command = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;";
                 const result = await invoke<SqlResult>('execute_sqlite_sql', {
                     connectionId: connection.id,
-                    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+                    sql: command
                 });
                 tableNames = result.rows
                     .map(row => Object.values(row)[0] as string)
                     .filter(Boolean);
             } else {
+                command = `SHOW TABLES FROM ${dbName}`;
                 const result = await invoke<SqlResult>('execute_sql', {
                     connectionId: connection.id,
-                    sql: `SHOW TABLES FROM ${dbName}`
+                    sql: command
                 });
                 
                 // Robustly parse result by taking the first value of each row
@@ -215,8 +254,23 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 ...prev,
                 [dbName]: tableNames
             }));
+
+            addCommandToConsole({
+                databaseType: dbType as any,
+                command: command,
+                duration: Date.now() - startTime,
+                success: true
+            });
         } catch (err) {
             console.error(`Failed to load tables for ${dbName}:`, err);
+            
+            addCommandToConsole({
+                databaseType: dbType as any,
+                command: command || `Load tables for ${dbName}`,
+                duration: Date.now() - startTime,
+                success: false,
+                error: String(err)
+            });
         } finally {
             const finishedLoading = new Set(loadingTables);
             finishedLoading.delete(dbName);

@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 import { 
   Database,
   ChevronLeft,
-  Home
+  Home,
+  Terminal
 } from "lucide-react";
 import {
   Tooltip,
@@ -18,9 +19,11 @@ import { ConnectionTreeItem } from "./ConnectionTree";
 interface ActivityBarProps {
     activeView: 'home' | 'connections';
     onViewChange: (view: 'home' | 'connections') => void;
+    consoleVisible: boolean;
+    onToggleConsole: () => void;
 }
 
-export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
+export function ActivityBar({ activeView, onViewChange, consoleVisible, onToggleConsole }: ActivityBarProps) {
     const { t } = useTranslation();
 
     return (
@@ -66,6 +69,25 @@ export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
              </div>
 
              <div className="mt-auto flex flex-col gap-4 w-full items-center">
+                 <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button 
+                                onClick={onToggleConsole}
+                                className={cn(
+                                    "p-2 rounded-md transition-colors hover:bg-slate-800 hover:text-white",
+                                    consoleVisible ? "bg-blue-600 text-white" : ""
+                                )}
+                            >
+                                <Terminal className="h-5 w-5" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="bg-slate-900 border-slate-700 text-white">
+                            <p>Toggle CLI Console</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
                  <SettingsMenu />
              </div>
         </div>

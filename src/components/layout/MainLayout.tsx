@@ -7,6 +7,7 @@ import { ConnectionManager } from "../workspace/ConnectionManager";
 import { useAppStore } from "@/store/useAppStore";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ActivityBar, ConnectionSidebar } from "./ActivityBar";
+import { CommandConsole } from "@/components/ui/CommandConsole";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,9 @@ export function MainLayout() {
   
   // Sidebar collapse state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Command console visibility state
+  const [consoleVisible, setConsoleVisible] = useState(false);
 
   // Auto-switch to 'connections' view when a tab is activated
   useEffect(() => {
@@ -41,88 +45,108 @@ export function MainLayout() {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex">
-       {/* 1. Activity Bar (Leftmost, slim) */}
-       <ActivityBar activeView={activeView} onViewChange={handleViewChange} />
-
-       {/* 2. Main Content Area */}
+    <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
        <div className="flex-1 flex overflow-hidden">
-            {activeView === 'home' ? (
-                <div className="flex-1">
-                     <ConnectionManager />
-                </div>
-            ) : (
-                <ResizablePanelGroup direction="horizontal">
-                    <ResizablePanel 
-                        defaultSize={20} 
-                        minSize={15} 
-                        maxSize={30} 
-                        className={cn(
-                            "min-w-[200px] transition-all duration-300 ease-in-out",
-                            sidebarCollapsed && "min-w-0 max-w-0 w-0 border-0"
-                        )}
-                        collapsible={true}
-                        onCollapse={() => setSidebarCollapsed(true)}
-                        onExpand={() => setSidebarCollapsed(false)}
-                    >
-                        <ConnectionSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-                    </ResizablePanel>
-                    
-                    {!sidebarCollapsed && <ResizableHandle />}
-                    
-                    <ResizablePanel defaultSize={80}>
-                        <div className="h-full flex flex-col bg-background">
-                            <TabBar />
-                            <div className="flex-1 overflow-hidden relative">
-                                {activeTab ? (
-                                    activeTab.type === 'mysql' ? (
-                                        <MysqlWorkspace 
-                                            key={activeTab.id} 
-                                            tabId={activeTab.id}
-                                            name={activeTab.title} 
-                                            connectionId={activeTab.connectionId}
-                                            initialSql={activeTab.initialSql}
-                                            savedSql={activeTab.currentSql}
-                                            dbName={activeTab.dbName}
-                                            tableName={activeTab.tableName}
-                                        />
-                                    ) : activeTab.type === 'redis' ? (
-                                        <RedisWorkspace 
-                                            key={activeTab.id} 
-                                            name={activeTab.title} 
-                                            connectionId={activeTab.connectionId} 
-                                            db={activeTab.dbName ? parseInt(activeTab.dbName) : 0}
-                                        />
-                                    ) : activeTab.type === 'memcached' ? (
-                                        <MemcachedWorkspace 
-                                            key={activeTab.id}
-                                            name={activeTab.title}
-                                            connectionId={activeTab.connectionId}
-                                        />
-                                    ) : activeTab.type === 'sqlite' ? (
-                                        <SqliteWorkspace 
-                                            key={activeTab.id}
-                                            tabId={activeTab.id}
-                                            name={activeTab.title}
-                                            connectionId={activeTab.connectionId}
-                                            initialSql={activeTab.initialSql}
-                                            savedSql={activeTab.currentSql}
-                                        />
-                                    ) : (
-                                         <div>Unsupported Type: {activeTab.type}</div>
-                                    )
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground bg-muted/5">
-                                        <div className="text-center">
-                                            <p>Select a tab or go Home to connect.</p>
+           {/* 1. Activity Bar (Leftmost, slim) */}
+           <ActivityBar 
+               activeView={activeView} 
+               onViewChange={handleViewChange} 
+               consoleVisible={consoleVisible}
+               onToggleConsole={() => setConsoleVisible(!consoleVisible)}
+           />
+
+           {/* 2. Main Content Area */}
+           <div className="flex-1 flex overflow-hidden">
+                {activeView === 'home' ? (
+                    <div className="flex-1">
+                         <ConnectionManager />
+                    </div>
+                ) : (
+                    <ResizablePanelGroup direction="horizontal">
+                        <ResizablePanel 
+                            defaultSize={20} 
+                            minSize={15} 
+                            maxSize={30} 
+                            className={cn(
+                                "min-w-[200px] transition-all duration-300 ease-in-out",
+                                sidebarCollapsed && "min-w-0 max-w-0 w-0 border-0"
+                            )}
+                            collapsible={true}
+                            onCollapse={() => setSidebarCollapsed(true)}
+                            onExpand={() => setSidebarCollapsed(false)}
+                        >
+                            <ConnectionSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+                        </ResizablePanel>
+                        
+                        {!sidebarCollapsed && <ResizableHandle />}
+                        
+                        <ResizablePanel defaultSize={80}>
+                            <ResizablePanelGroup direction="vertical">
+                                <ResizablePanel defaultSize={consoleVisible ? 70 : 100}>
+                                    <div className="h-full flex flex-col bg-background">
+                                        <TabBar />
+                                        <div className="flex-1 overflow-hidden relative">
+                                            {activeTab ? (
+                                                activeTab.type === 'mysql' ? (
+                                                    <MysqlWorkspace 
+                                                        key={activeTab.id} 
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title} 
+                                                        connectionId={activeTab.connectionId}
+                                                        initialSql={activeTab.initialSql}
+                                                        savedSql={activeTab.currentSql}
+                                                        dbName={activeTab.dbName}
+                                                        tableName={activeTab.tableName}
+                                                    />
+                                                ) : activeTab.type === 'redis' ? (
+                                                    <RedisWorkspace 
+                                                        key={activeTab.id} 
+                                                        name={activeTab.title} 
+                                                        connectionId={activeTab.connectionId} 
+                                                        db={activeTab.dbName ? parseInt(activeTab.dbName) : 0}
+                                                    />
+                                                ) : activeTab.type === 'memcached' ? (
+                                                    <MemcachedWorkspace 
+                                                        key={activeTab.id}
+                                                        name={activeTab.title}
+                                                        connectionId={activeTab.connectionId}
+                                                    />
+                                                ) : activeTab.type === 'sqlite' ? (
+                                                    <SqliteWorkspace 
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title} 
+                                                        connectionId={activeTab.connectionId}
+                                                        initialSql={activeTab.initialSql}
+                                                        savedSql={activeTab.currentSql}
+                                                        />
+                                                ) : (
+                                                     <div>Unsupported Type: {activeTab.type}</div>
+                                                )
+                                            ) : (
+                                                <div className="h-full flex items-center justify-center text-muted-foreground bg-muted/5">
+                                                    <div className="text-center">
+                                                        <p>Select a tab or go Home to connect.</p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
+                                </ResizablePanel>
+
+                                {consoleVisible && (
+                                    <>
+                                        <ResizableHandle />
+                                        <ResizablePanel defaultSize={30} minSize={10} maxSize={50}>
+                                            <CommandConsole />
+                                        </ResizablePanel>
+                                    </>
                                 )}
-                            </div>
-                        </div>
-                    </ResizablePanel>
-                </ResizablePanelGroup>
-            )}
+                            </ResizablePanelGroup>
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
+                )}
+           </div>
        </div>
     </div>
   );
