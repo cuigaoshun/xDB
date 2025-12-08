@@ -11,6 +11,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useEffect, useRef } from "react";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
+import { RedisHashViewer } from "../redis/RedisHashViewer";
+import { RedisSetViewer } from "../redis/RedisSetViewer";
+import { RedisZSetViewer } from "../redis/RedisZSetViewer";
+import { RedisListViewer } from "../redis/RedisListViewer";
+import { RedisStringViewer } from "../redis/RedisStringViewer";
 
 interface RedisResult {
     output: any;
@@ -697,14 +702,39 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                   ) : (
                     <ScrollArea className="flex-1 p-4">
                       <ValueViewer
+                        connectionId={connectionId}
+                        db={db}
+                        keyName={selectedKey || ""}
                         value={selectedValue}
                         type={selectedKeyItem?.type}
                         allValues={allValues}
-                        valueHasMore={valueHasMore}
-                        valueLoading={valueLoading}
-                        valueFilter={valueFilter}
-                        setValueFilter={setValueFilter}
-                        valueObserverTarget={valueObserverTarget}
+                        hasMore={valueHasMore}
+                        loading={valueLoading}
+                        filter={valueFilter}
+                        onFilterChange={setValueFilter}
+                        onRefresh={() => {
+                          const currentKeyItem = keys.find((k) => k.key === selectedKey);
+                          if (!selectedKey || !currentKeyItem) return;
+
+                          if (currentKeyItem.type === "string") {
+                            setValueLoading(true);
+                            invoke<RedisResult>("execute_redis_command", {
+                              connectionId,
+                              command: "GET",
+                              args: [selectedKey],
+                              db,
+                            }).then(valRes => {
+                              setSelectedValue(valRes.output);
+                            }).finally(() => {
+                              setValueLoading(false);
+                            });
+                          } else if (currentKeyItem.type === "list") {
+                            fetchListValues(0, 99);
+                          } else {
+                            fetchComplexValues(true);
+                          }
+                        }}
+                        observerTarget={valueObserverTarget}
                       />
                     </ScrollArea>
                   )}
@@ -726,305 +756,113 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 }
 
 function ValueViewer({ 
+  connectionId,
+  db,
+  keyName,
   value, 
   type, 
   allValues, 
-  valueHasMore, 
-  valueLoading, 
-  valueFilter, 
-  setValueFilter, 
-  valueObserverTarget
+  hasMore, 
+  loading, 
+  filter, 
+  onFilterChange, 
+  onRefresh,
+  observerTarget
 }: { 
+  connectionId: number;
+  db: number;
+  keyName: string;
   value: any; 
   type?: string;
   allValues: any[];
-  valueHasMore: boolean;
-  valueLoading: boolean;
-  valueFilter: string;
-  setValueFilter: (filter: string) => void;
-  valueObserverTarget: React.RefObject<HTMLDivElement | null>;
+  hasMore: boolean;
+  loading: boolean;
+  filter: string;
+  onFilterChange: (filter: string) => void;
+  onRefresh: () => void;
+  observerTarget: React.RefObject<HTMLDivElement | null>;
 }) {
-  // For string type, use original logic
+  if (!type) return <div className="text-muted-foreground italic p-4">Select a key to view details</div>;
+
   if (type === "string") {
-    if (value === null || value === undefined)
-      return (
-        <div className="text-muted-foreground italic">Null or Empty</div>
-      );
-
-    if (typeof value === "string") {
-      try {
-        const json = JSON.parse(value);
-        if (typeof json === "object" && json !== null) {
-          return <JsonDisplay data={json} />;
-        }
-        return (
-          <pre
-            className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-          >
-            {value}
-          </pre>
-        );
-      } catch {
-        return (
-          <pre
-            className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-          >
-            {value}
-          </pre>
-        );
-      }
-    }
-
-    if (typeof value === "object") {
-      return <JsonDisplay data={value} />;
-    }
-
     return (
-      <pre
-        className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border"
-      >
-        {JSON.stringify(value, null, 2)}
-      </pre>
+      <RedisStringViewer
+        connectionId={connectionId}
+        db={db}
+        keyName={keyName}
+        value={value}
+        onRefresh={onRefresh}
+      />
     );
   }
 
-  // For complex types (hash, set, zset, list), use scan logic
   if (type === "hash") {
     return (
-      <div className="flex flex-col h-full">
-        {/* Filter input */}
-        <div className="p-2 border-b">
-          <div className="relative">
-            <Search
-              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-            />
-            <Input
-              placeholder="Filter by field name... (empty: all, text: exact, prefix*: prefix)"
-              className="pl-8 h-9"
-              value={valueFilter}
-              onChange={(e) => setValueFilter(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-between items-center mt-2 px-1">
-            <span className="text-xs text-muted-foreground">
-              Total: {allValues.length / 2}
-              {valueHasMore ? "+" : ""}
-            </span>
-          </div>
-        </div>
-
-        {/* Hash table */}
-        <div className="flex-1 overflow-auto">
-          <div className="border rounded-md">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 w-1/2">Field</th>
-                  <th className="px-4 py-2 w-1/2">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {Array.from({ length: allValues.length / 2 }).map((_, i) => {
-                  const fieldIndex = i * 2;
-                  const valueIndex = i * 2 + 1;
-                  return (
-                    <tr key={i} className="hover:bg-muted/10">
-                      <td className="px-4 py-2 font-mono text-muted-foreground align-top">
-                        {String(allValues[fieldIndex])}
-                      </td>
-                      <td className="px-4 py-2 font-mono align-top break-all">
-                        {String(allValues[valueIndex])}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Load more sentinel */}
-          <div ref={valueObserverTarget} className="h-px w-full" />
-
-          {valueLoading && (
-            <div className="p-4 text-center text-muted-foreground text-xs">
-              Loading...
-            </div>
-          )}
-        </div>
-      </div>
+      <RedisHashViewer
+        connectionId={connectionId}
+        db={db}
+        keyName={keyName}
+        data={allValues}
+        loading={loading}
+        hasMore={hasMore}
+        filter={filter}
+        onFilterChange={onFilterChange}
+        onRefresh={onRefresh}
+        observerTarget={observerTarget}
+      />
     );
   }
 
   if (type === "set") {
     return (
-      <div className="flex flex-col h-full">
-        {/* Filter input */}
-        <div className="p-2 border-b">
-          <div className="relative">
-            <Search
-              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-            />
-            <Input
-              placeholder="Filter by member value... (empty: all, text: exact, prefix*: prefix)"
-              className="pl-8 h-9"
-              value={valueFilter}
-              onChange={(e) => setValueFilter(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-between items-center mt-2 px-1">
-            <span className="text-xs text-muted-foreground">
-              Total: {allValues.length}
-              {valueHasMore ? "+" : ""}
-            </span>
-          </div>
-        </div>
-
-        {/* Set members */}
-        <div className="flex-1 overflow-auto">
-          <div className="border rounded-md">
-            <div className="bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
-              Members
-            </div>
-            <div className="divide-y">
-              {allValues.map((item, i) => (
-                <div
-                  key={i}
-                  className="p-3 text-sm font-mono hover:bg-muted/30 break-all"
-                >
-                  {String(item)}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Load more sentinel */}
-          <div ref={valueObserverTarget} className="h-px w-full" />
-
-          {valueLoading && (
-            <div className="p-4 text-center text-muted-foreground text-xs">
-              Loading...
-            </div>
-          )}
-        </div>
-      </div>
+      <RedisSetViewer
+        connectionId={connectionId}
+        db={db}
+        keyName={keyName}
+        data={allValues}
+        loading={loading}
+        hasMore={hasMore}
+        filter={filter}
+        onFilterChange={onFilterChange}
+        onRefresh={onRefresh}
+        observerTarget={observerTarget}
+      />
     );
   }
 
   if (type === "zset") {
     return (
-      <div className="flex flex-col h-full">
-        {/* Filter input */}
-        <div className="p-2 border-b">
-          <div className="relative">
-            <Search
-              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-            />
-            <Input
-              placeholder="Filter by member value... (empty: all, text: exact, prefix*: prefix)"
-              className="pl-8 h-9"
-              value={valueFilter}
-              onChange={(e) => setValueFilter(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-between items-center mt-2 px-1">
-            <span className="text-xs text-muted-foreground">
-              Total: {allValues.length / 2}
-              {valueHasMore ? "+" : ""}
-            </span>
-          </div>
-        </div>
-
-        {/* ZSet members */}
-        <div className="flex-1 overflow-auto">
-          <div className="border rounded-md">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground bg-muted/30 font-medium uppercase border-b sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 w-3/5">Member</th>
-                  <th className="px-4 py-2 w-2/5">Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {Array.from({ length: allValues.length / 2 }).map((_, i) => {
-                  const memberIndex = i * 2;
-                  const scoreIndex = i * 2 + 1;
-                  return (
-                    <tr key={i} className="hover:bg-muted/10">
-                      <td className="px-4 py-2 font-mono text-muted-foreground align-top break-all">
-                        {String(allValues[memberIndex])}
-                      </td>
-                      <td className="px-4 py-2 font-mono align-top">
-                        {String(allValues[scoreIndex])}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Load more sentinel */}
-          <div ref={valueObserverTarget} className="h-px w-full" />
-
-          {valueLoading && (
-            <div className="p-4 text-center text-muted-foreground text-xs">
-              Loading...
-            </div>
-          )}
-        </div>
-      </div>
+      <RedisZSetViewer
+        connectionId={connectionId}
+        db={db}
+        keyName={keyName}
+        data={allValues}
+        loading={loading}
+        hasMore={hasMore}
+        filter={filter}
+        onFilterChange={onFilterChange}
+        onRefresh={onRefresh}
+        observerTarget={observerTarget}
+      />
     );
   }
 
   if (type === "list") {
     return (
-      <div className="flex flex-col h-full">
-        {/* List info */}
-        <div className="p-2 border-b">
-          <div className="flex justify-between items-center px-1">
-            <span className="text-xs text-muted-foreground">
-              Total: {allValues.length} items
-            </span>
-          </div>
-        </div>
-
-        {/* List items */}
-        <div className="flex-1 overflow-auto">
-          <div className="border rounded-md">
-            <div className="bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground border-b">
-              List Items (Index: Value)
-            </div>
-            <div className="divide-y">
-              {allValues.map((item, i) => (
-                <div
-                  key={i}
-                  className="p-3 text-sm font-mono hover:bg-muted/30 break-all"
-                >
-                  <span className="text-muted-foreground mr-2">[{i}]:</span>
-                  {String(item)}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <RedisListViewer
+        connectionId={connectionId}
+        db={db}
+        keyName={keyName}
+        data={allValues}
+        loading={loading}
+        onRefresh={onRefresh}
+      />
     );
   }
 
-  // Fallback for unknown types
   return (
-    <div className="text-muted-foreground italic">
+    <div className="text-muted-foreground italic p-4">
       Unsupported data type: {type}
     </div>
-  );
-}
-
-function JsonDisplay({ data }: { data: any }) {
-  return (
-    <pre
-      className="font-mono text-sm whitespace-pre-wrap break-all bg-muted/30 p-4 rounded border text-green-600"
-    >
-      {JSON.stringify(data, null, 2)}
-    </pre>
   );
 }
