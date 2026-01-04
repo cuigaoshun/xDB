@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import {
@@ -597,6 +598,13 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         return <Type className="h-3 w-3 text-gray-500" />;
     };
 
+    // Helper to determine if formatter button should be shown
+    const shouldShowFormatter = (typeName: string, value: string) => {
+        const type = typeName.toUpperCase();
+        // Show formatter for text-based types
+        return type.includes("CHAR") || type.includes("TEXT") || type.includes("JSON");
+    };
+
     const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const connectionName = connection?.name || name;
 
@@ -851,7 +859,47 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                             {row[col.name] === null ? (
                                                                                 <span className="text-muted-foreground italic">NULL</span>
                                                                             ) : (
-                                                                                String(row[col.name])
+                                                                                <TextFormatterWrapper
+                                                                                    content={String(row[col.name])}
+                                                                                    onSave={tableName && primaryKeys.length > 0 ? async (newValue) => {
+                                                                                        const whereClause = generateWhereClause(row);
+                                                                                        const valueStr = newValue === null ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
+                                                                                        const updateSql = `UPDATE \`${dbName}\`.\`${tableName}\` SET \`${col.name}\` = ${valueStr} WHERE ${whereClause}`;
+                                                                                        const startTime = Date.now();
+                                                                                        try {
+                                                                                            await invoke("execute_sql", {
+                                                                                                connectionId,
+                                                                                                sql: updateSql
+                                                                                            });
+                                                                                            addCommandToConsole({
+                                                                                                databaseType: 'mysql',
+                                                                                                command: updateSql,
+                                                                                                duration: Date.now() - startTime,
+                                                                                                success: true
+                                                                                            });
+                                                                                            // Update local data
+                                                                                            const updatedRows = [...result.rows];
+                                                                                            updatedRows[rowIdx] = { ...updatedRows[rowIdx], [col.name]: newValue };
+                                                                                            setResult({ ...result, rows: updatedRows });
+                                                                                            setOriginalRows(updatedRows);
+                                                                                        } catch (err: any) {
+                                                                                            console.error("Update failed:", err);
+                                                                                            addCommandToConsole({
+                                                                                                databaseType: 'mysql',
+                                                                                                command: updateSql,
+                                                                                                duration: 0,
+                                                                                                success: false,
+                                                                                                error: typeof err === 'string' ? err : JSON.stringify(err)
+                                                                                            });
+                                                                                        }
+                                                                                    } : undefined}
+                                                                                    readonly={!tableName || primaryKeys.length === 0}
+                                                                                    title="Format value"
+                                                                                >
+                                                                                    <div className="flex items-center gap-2 cursor-context-menu">
+                                                                                        <span className="flex-1 truncate">{String(row[col.name])}</span>
+                                                                                    </div>
+                                                                                </TextFormatterWrapper>
                                                                             )}
                                                                         </div>
                                                                     )}

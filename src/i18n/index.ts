@@ -43,7 +43,16 @@ const resources = {
         "name_required": "Name is required",
         "host_required": "Host is required",
         "port_invalid": "Port must be a valid number > 0",
-        "path_required": "Database path is required"
+        "path_required": "Database path is required",
+        "rightClickToFormat": "Right-click to Format/View",
+        "format": "Format",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "textFormatter": "Text Formatter",
+        "viewFormatted": "View Formatted",
+        "quickFormat": "Quick Format",
+        "formatTransform": "Format / Transform",
+        "originalData": "Original Data"
       },
       "menu": {
         "file": "File",
@@ -149,7 +158,16 @@ const resources = {
         "name_required": "请输入连接名称",
         "host_required": "请输入主机地址",
         "port_invalid": "端口必须是有效的正整数",
-        "path_required": "请输入数据库路径"
+        "path_required": "请输入数据库路径",
+        "rightClickToFormat": "右键点击可进行格式化/查看",
+        "format": "格式",
+        "copy": "复制",
+        "copied": "已复制!",
+        "textFormatter": "文本格式化器",
+        "viewFormatted": "查看格式化",
+        "quickFormat": "快速格式化",
+        "formatTransform": "格式化 / 转换",
+        "originalData": "原始数据"
       },
       "menu": {
         "home": "首页",

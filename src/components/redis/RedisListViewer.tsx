@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import {
   Table,
   TableBody,
@@ -48,7 +49,7 @@ export function RedisListViewer({
   const { t } = useTranslation();
   const [inlineEditIndex, setInlineEditIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({ position: "tail", value: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +63,7 @@ export function RedisListViewer({
         args: [keyName, index.toString(), value],
         db,
       });
-      
+
       onRefresh();
       handleCancelEdit();
     } catch (error) {
@@ -92,7 +93,7 @@ export function RedisListViewer({
         args: [keyName, newItem.value],
         db,
       });
-      
+
       onRefresh();
       setIsAddDialogOpen(false);
       setNewItem({ position: "tail", value: "" });
@@ -105,7 +106,7 @@ export function RedisListViewer({
 
   const handleDelete = async (value: string) => {
     if (!confirm(t("redis.deleteConfirm"))) return;
-    
+
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -124,7 +125,7 @@ export function RedisListViewer({
       {/* Toolbar */}
       <div className="p-2 border-b flex justify-between items-center gap-2">
         <div className="text-xs text-muted-foreground px-2">
-            {t("redis.total")}: {data.length}
+          {t("redis.total")}: {data.length}
         </div>
         <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1">
           <Plus className="h-4 w-4" /> {t("redis.addItem")}
@@ -158,7 +159,17 @@ export function RedisListViewer({
                         autoFocus
                       />
                     ) : (
-                      String(val)
+                      <TextFormatterWrapper
+                        content={String(val)}
+                        onSave={async (newValue) => {
+                          await handleSave(i, newValue);
+                        }}
+                        title="Format value"
+                      >
+                        <div className="flex items-start gap-2 cursor-context-menu">
+                          <span className="flex-1">{String(val)}</span>
+                        </div>
+                      </TextFormatterWrapper>
                     )}
                   </TableCell>
                   <TableCell className="text-right align-top">
@@ -215,7 +226,7 @@ export function RedisListViewer({
             )}
           </TableBody>
         </Table>
-        
+
         {loading && (
           <div className="p-4 text-center text-muted-foreground text-xs">
             {t("redis.loading")}
@@ -260,7 +271,7 @@ export function RedisListViewer({
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button 
+            <Button
               onClick={handleAdd}
               disabled={!newItem.value || isSubmitting}
             >

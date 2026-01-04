@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import {
   Table,
   TableBody,
@@ -181,7 +182,15 @@ export function RedisZSetViewer({
                         className="min-h-[80px] font-mono text-xs"
                       />
                     ) : (
-                      item.member
+                      <TextFormatterWrapper
+                        content={item.member}
+                        readonly
+                        title="View formatted"
+                      >
+                        <div className="flex items-start gap-2 cursor-context-menu">
+                          <span className="flex-1">{item.member}</span>
+                        </div>
+                      </TextFormatterWrapper>
                     )}
                   </TableCell>
                   <TableCell className="font-mono text-xs align-top text-blue-600 dark:text-blue-400">

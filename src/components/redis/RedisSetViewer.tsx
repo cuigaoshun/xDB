@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import {
   Table,
   TableBody,
@@ -51,7 +52,7 @@ export function RedisSetViewer({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newMember, setNewMember] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Inline edit state
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -65,7 +66,7 @@ export function RedisSetViewer({
         args: [keyName, newMember],
         db,
       });
-      
+
       onRefresh();
       setIsAddDialogOpen(false);
       setNewMember("");
@@ -78,7 +79,7 @@ export function RedisSetViewer({
 
   const handleDelete = async (member: string) => {
     if (!confirm(t('redis.deleteConfirm'))) return;
-    
+
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -107,7 +108,7 @@ export function RedisSetViewer({
       handleCancelEdit();
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
       // SREM old
@@ -124,7 +125,7 @@ export function RedisSetViewer({
         args: [keyName, newMemberVal],
         db,
       });
-      
+
       onRefresh();
       handleCancelEdit();
     } catch (error) {
@@ -148,7 +149,7 @@ export function RedisSetViewer({
           />
         </div>
         <div className="text-xs text-muted-foreground">
-            {t('redis.total')}: {data.length}{hasMore ? "+" : ""}
+          {t('redis.total')}: {data.length}{hasMore ? "+" : ""}
         </div>
         <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1">
           <Plus className="h-4 w-4" /> {t('redis.addMember')}
@@ -179,7 +180,15 @@ export function RedisSetViewer({
                         autoFocus
                       />
                     ) : (
-                      memberStr
+                      <TextFormatterWrapper
+                        content={memberStr}
+                        readonly
+                        title="View formatted"
+                      >
+                        <div className="flex items-start gap-2 cursor-context-menu">
+                          <span className="flex-1">{memberStr}</span>
+                        </div>
+                      </TextFormatterWrapper>
                     )}
                   </TableCell>
                   <TableCell className="text-right align-top">
@@ -205,7 +214,7 @@ export function RedisSetViewer({
                       </div>
                     ) : (
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <Button
+                        <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
@@ -236,9 +245,9 @@ export function RedisSetViewer({
             )}
           </TableBody>
         </Table>
-        
+
         <div ref={observerTarget} className="h-px w-full" />
-        
+
         {loading && (
           <div className="p-4 text-center text-muted-foreground text-xs">
             {t('redis.loading')}
@@ -268,7 +277,7 @@ export function RedisSetViewer({
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button 
+            <Button
               onClick={handleAdd}
               disabled={!newMember || isSubmitting}
             >

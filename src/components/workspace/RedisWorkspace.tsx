@@ -766,7 +766,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                       Loading value...
                     </div>
                   ) : (
-                    <ScrollArea className="flex-1 p-4">
+                    <div className="flex-1 min-h-0">
                       <ValueViewer
                         connectionId={connectionId}
                         db={db}
@@ -802,7 +802,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                         }}
                         observerTarget={valueObserverTarget}
                       />
-                    </ScrollArea>
+                    </div>
                   )}
                 </div>
               </div>

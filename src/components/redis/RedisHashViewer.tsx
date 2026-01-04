@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import {
   Table,
   TableBody,
@@ -69,7 +70,7 @@ export function RedisHashViewer({
         args: [keyName, field, value],
         db,
       });
-      
+
       onRefresh();
       setInlineEditField(null);
       setEditValue("");
@@ -94,7 +95,7 @@ export function RedisHashViewer({
 
   const handleDelete = async (field: string) => {
     if (!confirm(t('redis.deleteConfirm'))) return;
-    
+
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -122,7 +123,7 @@ export function RedisHashViewer({
           />
         </div>
         <div className="text-xs text-muted-foreground">
-            {t('redis.total')}: {pairs.length}{hasMore ? "+" : ""}
+          {t('redis.total')}: {pairs.length}{hasMore ? "+" : ""}
         </div>
         <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1">
           <Plus className="h-4 w-4" /> {t('redis.addField')}
@@ -156,30 +157,40 @@ export function RedisHashViewer({
                         autoFocus
                       />
                     ) : (
-                      pair.value
+                      <TextFormatterWrapper
+                        content={pair.value}
+                        onSave={async (newValue) => {
+                          await handleSave(pair.field, newValue);
+                        }}
+                        title="Format value"
+                      >
+                        <div className="flex items-start gap-2 cursor-context-menu">
+                          <span className="flex-1">{pair.value}</span>
+                        </div>
+                      </TextFormatterWrapper>
                     )}
                   </TableCell>
                   <TableCell className="text-right align-top">
                     {isEditing ? (
-                       <div className="flex justify-end gap-1">
-                         <Button
-                           variant="ghost"
-                           size="icon"
-                           className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                           onClick={() => handleSave(pair.field, editValue)}
-                           disabled={isSubmitting}
-                         >
-                           <Check className="h-3.5 w-3.5" />
-                         </Button>
-                         <Button
-                           variant="ghost"
-                           size="icon"
-                           className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                           onClick={handleCancelEdit}
-                         >
-                           <X className="h-3.5 w-3.5" />
-                         </Button>
-                       </div>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleSave(pair.field, editValue)}
+                          disabled={isSubmitting}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={handleCancelEdit}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -213,9 +224,9 @@ export function RedisHashViewer({
             )}
           </TableBody>
         </Table>
-        
+
         <div ref={observerTarget} className="h-px w-full" />
-        
+
         {loading && (
           <div className="p-4 text-center text-muted-foreground text-xs">
             {t('redis.loading')}
@@ -254,7 +265,7 @@ export function RedisHashViewer({
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button 
+            <Button
               onClick={() => handleSave(newField.field, newField.value)}
               disabled={!newField.field || isSubmitting}
             >
