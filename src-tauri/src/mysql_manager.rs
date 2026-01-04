@@ -2,12 +2,12 @@ use crate::db::DbState;
 use crate::models::Connection;
 use crate::state::AppState;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
 use sqlx::{Column, MySqlPool, Row, TypeInfo};
-use tauri::{State, command};
-use rust_decimal::Decimal;
+use tauri::{command, State};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ColumnInfo {
@@ -94,52 +94,93 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
         // 根据类型动态获取值
         let value: Value = match type_name {
             "BOOLEAN" | "TINYINT" => {
-                 if let Ok(v) = row.try_get::<bool, _>(i) {
-                     Value::Bool(v)
-                 } else {
-                     row.try_get::<i8, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null)
-                 }
-            },
-            "TINYINT UNSIGNED" => row.try_get::<u8, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "SMALLINT" => row.try_get::<i16, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "SMALLINT UNSIGNED" => row.try_get::<u16, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "INT" | "INTEGER" => row.try_get::<i32, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "INT UNSIGNED" | "INTEGER UNSIGNED" => row.try_get::<u32, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "BIGINT" => row.try_get::<i64, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "BIGINT UNSIGNED" => row.try_get::<u64, _>(i).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "FLOAT" => row.try_get::<f32, _>(i).map(|v| Value::from(v)).unwrap_or(Value::Null),
-            "DOUBLE" | "REAL" => row.try_get::<f64, _>(i).map(|v| Value::from(v)).unwrap_or(Value::Null),
+                if let Ok(v) = row.try_get::<bool, _>(i) {
+                    Value::Bool(v)
+                } else {
+                    row.try_get::<i8, _>(i)
+                        .map(|v| Value::Number(v.into()))
+                        .unwrap_or(Value::Null)
+                }
+            }
+            "TINYINT UNSIGNED" => row
+                .try_get::<u8, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "SMALLINT" => row
+                .try_get::<i16, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "SMALLINT UNSIGNED" => row
+                .try_get::<u16, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "INT" | "INTEGER" => row
+                .try_get::<i32, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "INT UNSIGNED" | "INTEGER UNSIGNED" => row
+                .try_get::<u32, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "BIGINT" => row
+                .try_get::<i64, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "BIGINT UNSIGNED" => row
+                .try_get::<u64, _>(i)
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "FLOAT" => row
+                .try_get::<f32, _>(i)
+                .map(|v| Value::from(v))
+                .unwrap_or(Value::Null),
+            "DOUBLE" | "REAL" => row
+                .try_get::<f64, _>(i)
+                .map(|v| Value::from(v))
+                .unwrap_or(Value::Null),
             "DECIMAL" | "NEWDECIMAL" => {
                 if let Ok(v) = row.try_get::<Decimal, _>(i) {
                     Value::String(v.to_string())
                 } else {
-                    row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
+                    row.try_get::<String, _>(i)
+                        .map(Value::String)
+                        .unwrap_or(Value::Null)
                 }
-            },
-            "VARCHAR" | "CHAR" | "TEXT" | "TINYTEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" => {
-                row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
-            },
+            }
+            "VARCHAR" | "CHAR" | "TEXT" | "TINYTEXT" | "MEDIUMTEXT" | "LONGTEXT" | "ENUM" => row
+                .try_get::<String, _>(i)
+                .map(Value::String)
+                .unwrap_or(Value::Null),
             "DATETIME" | "TIMESTAMP" => {
                 if let Ok(v) = row.try_get::<NaiveDateTime, _>(i) {
                     Value::String(v.to_string())
                 } else if let Ok(v) = row.try_get::<DateTime<Utc>, _>(i) {
                     Value::String(v.to_string())
                 } else {
-                    row.try_get::<String, _>(i).map(Value::String).unwrap_or(Value::Null)
+                    row.try_get::<String, _>(i)
+                        .map(Value::String)
+                        .unwrap_or(Value::Null)
                 }
-            },
-            "DATE" => {
-                row.try_get::<NaiveDate, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
-            },
-            "TIME" => {
-                row.try_get::<NaiveTime, _>(i).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null)
-            },
-            _ => {
-                 match row.try_get::<String, _>(i) {
-                     Ok(v) => Value::String(v),
-                     Err(_) => Value::Null
-                 }
             }
+            "DATE" => row
+                .try_get::<NaiveDate, _>(i)
+                .map(|v| Value::String(v.to_string()))
+                .unwrap_or(Value::Null),
+            "TIME" => row
+                .try_get::<NaiveTime, _>(i)
+                .map(|v| Value::String(v.to_string()))
+                .unwrap_or(Value::Null),
+            "VARBINARY" | "BINARY" | "BLOB" | "TINYBLOB" | "MEDIUMBLOB" | "LONGBLOB" => {
+                if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
+                    Value::String(String::from_utf8_lossy(&v).to_string())
+                } else {
+                    Value::Null
+                }
+            }
+            _ => match row.try_get::<String, _>(i) {
+                Ok(v) => Value::String(v),
+                Err(_) => Value::Null,
+            },
         };
 
         json_row.insert(name.to_string(), value);
@@ -159,7 +200,11 @@ pub async fn execute_sql(
 
     // 判断是查询还是执行
     let sql_upper = sql.trim().to_uppercase();
-    if sql_upper.starts_with("SELECT") || sql_upper.starts_with("SHOW") || sql_upper.starts_with("DESCRIBE") || sql_upper.starts_with("EXPLAIN") {
+    if sql_upper.starts_with("SELECT")
+        || sql_upper.starts_with("SHOW")
+        || sql_upper.starts_with("DESCRIBE")
+        || sql_upper.starts_with("EXPLAIN")
+    {
         let rows = sqlx::query(&sql)
             .fetch_all(&pool)
             .await
@@ -180,7 +225,7 @@ pub async fn execute_sql(
         for row in rows {
             result_rows.push(row_to_json(&row));
         }
-        
+
         Ok(SqlResult {
             columns,
             rows: result_rows,
