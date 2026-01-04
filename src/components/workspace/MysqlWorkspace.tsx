@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
-import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Edit, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,7 +56,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     // 编辑状态
     const [editingCell, setEditingCell] = useState<{ rowIdx: number, colName: string, isNewRow: boolean } | null>(null);
     const [editValue, setEditValue] = useState<string>('');
-    const [originalRows, setOriginalRows] = useState<Record<string, any>[]>([]);
+    const [, setOriginalRows] = useState<Record<string, any>[]>([]);
 
     // 新增行状态
     const [newRows, setNewRows] = useState<Record<string, any>[]>([]);
