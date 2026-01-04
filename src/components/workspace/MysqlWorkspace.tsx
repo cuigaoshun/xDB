@@ -47,7 +47,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const { theme } = useTheme();
     const updateTab = useAppStore(state => state.updateTab);
 
-    const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users LIMIT 100;");
+    const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users");
     const [result, setResult] = useState<SqlResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -118,8 +118,19 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     // If initialSql is provided (e.g. when opening a table), update state and run it
     useEffect(() => {
         if (initialSql && !savedSql && !initialSqlExecuted.current) {
-            setSql(initialSql);
-            executeSql(initialSql);
+            // 移除可能存在的默认 LIMIT 子句（主要用于显示）
+            let displaySql = initialSql.trim();
+            if (displaySql.endsWith(';')) {
+                displaySql = displaySql.slice(0, -1).trim();
+            }
+            const limitRegex = /\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?$/i;
+            displaySql = displaySql.replace(limitRegex, '');
+            displaySql += ';';
+
+            setSql(displaySql);
+            // 自动应用分页限制，避免默认显示太多
+            const processedSql = autoAddLimit(displaySql, pageSize, 0);
+            executeSql(processedSql);
             initialSqlExecuted.current = true;
         }
     }, [initialSql]);
@@ -133,7 +144,10 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
     // 辅助函数：自动为 SELECT 语句添加 LIMIT 和 OFFSET
     const autoAddLimit = (query: string, limit: number, offset: number): string => {
-        const trimmedQuery = query.trim();
+        let trimmedQuery = query.trim();
+        if (trimmedQuery.endsWith(';')) {
+            trimmedQuery = trimmedQuery.slice(0, -1).trim();
+        }
         const upperQuery = trimmedQuery.toUpperCase();
 
         // 只处理 SELECT 语句
@@ -147,11 +161,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         processedQuery = processedQuery.replace(limitRegex, '');
 
         // 添加新的 LIMIT 和 OFFSET
-        if (offset > 0) {
-            return `${processedQuery} LIMIT ${limit} OFFSET ${offset}`;
-        } else {
-            return `${processedQuery} LIMIT ${limit}`;
-        }
+        return offset > 0
+            ? `${processedQuery} LIMIT ${limit} OFFSET ${offset};`
+            : `${processedQuery} LIMIT ${limit};`;
     };
 
     // 检测表的主键
@@ -556,8 +568,14 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     };
 
     const handleExecute = () => {
+        // 去除末尾分号以便正确添加 LIMIT
+        let sqlToExecute = sql.trim();
+        if (sqlToExecute.endsWith(';')) {
+            sqlToExecute = sqlToExecute.slice(0, -1).trim();
+        }
+
         // 自动为 SELECT 语句添加 LIMIT
-        const processedSql = autoAddLimit(sql, pageSize, currentPage * pageSize);
+        const processedSql = autoAddLimit(sqlToExecute, pageSize, currentPage * pageSize);
         executeSql(processedSql);
     };
 
@@ -636,30 +654,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                         </>
                     )}
 
-                    {/* LIMIT 控制 */}
-                    <div className="flex items-center gap-2 ml-4">
-                        <span className="text-xs text-muted-foreground">LIMIT:</span>
-                        <Input
-                            type="number"
-                            value={pageSizeInput}
-                            onChange={(e) => setPageSizeInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handlePageSizeChange();
-                                }
-                            }}
-                            className="w-20 h-7 text-xs"
-                            min="1"
-                        />
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={handlePageSizeChange}
-                            className="h-7 px-2"
-                        >
-                            <Check className="h-3 w-3" />
-                        </Button>
-                    </div>
+                    {/* 数据操作按钮 */}
                 </div>
 
                 {/* Right Side Toolbar Actions */}
@@ -890,6 +885,34 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                         下一页
                                                         <ChevronRight className="h-3 w-3" />
                                                     </Button>
+
+                                                    <div className="h-4 w-[1px] bg-border mx-2"></div>
+
+                                                    {/* LIMIT 控制 */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-muted-foreground">Limit:</span>
+                                                        <Input
+                                                            type="number"
+                                                            value={pageSizeInput}
+                                                            onChange={(e) => setPageSizeInput(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    handlePageSizeChange();
+                                                                }
+                                                            }}
+                                                            className="w-16 h-7 text-xs"
+                                                            min="1"
+                                                        />
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={handlePageSizeChange}
+                                                            className="h-7 w-7 p-0"
+                                                            title="应用 Limit"
+                                                        >
+                                                            <Check className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     显示 {currentPage * pageSize + 1} - {currentPage * pageSize + result.rows.length} 条
