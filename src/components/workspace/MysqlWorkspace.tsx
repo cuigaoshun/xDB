@@ -598,12 +598,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         return <Type className="h-3 w-3 text-gray-500" />;
     };
 
-    // Helper to determine if formatter button should be shown
-    const shouldShowFormatter = (typeName: string, value: string) => {
-        const type = typeName.toUpperCase();
-        // Show formatter for text-based types
-        return type.includes("CHAR") || type.includes("TEXT") || type.includes("JSON");
-    };
 
     const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const connectionName = connection?.name || name;
