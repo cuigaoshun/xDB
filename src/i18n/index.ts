@@ -94,7 +94,16 @@ const resources = {
         "tail": "Tail (RPUSH)",
         "enterField": "Enter field name",
         "enterValue": "Enter value",
-        "enterMember": "Enter member value"
+        "enterMember": "Enter member value",
+        "addNewKey": "Add New Key",
+        "keyNameRequired": "Key name is required",
+        "failedToCreate": "Failed to create key",
+        "enterKeyName": "Enter key name",
+        "enterScore": "Enter score",
+        "enterInitialMember": "Enter initial member value",
+        "selectType": "Select type",
+        "element": "Element",
+        "sortedSet": "Sorted Set"
       }
     }
   },
@@ -192,7 +201,16 @@ const resources = {
         "tail": "尾部 (RPUSH)",
         "enterField": "输入字段名",
         "enterValue": "输入值",
-        "enterMember": "输入成员值"
+        "enterMember": "输入成员值",
+        "addNewKey": "添加新键",
+        "keyNameRequired": "请输入键名",
+        "failedToCreate": "创建键失败",
+        "enterKeyName": "输入键名",
+        "enterScore": "输入分数",
+        "enterInitialMember": "输入初始成员值",
+        "selectType": "选择类型",
+        "element": "元素",
+        "sortedSet": "ZSet"
       }
     }
   }
@@ -206,7 +224,7 @@ i18n
     fallbackLng: 'zh', // 默认中文
     lng: 'zh', // 强制默认中文
     interpolation: {
-      escapeValue: false 
+      escapeValue: false
     }
   });
 

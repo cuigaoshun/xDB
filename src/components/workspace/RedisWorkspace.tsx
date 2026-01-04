@@ -16,26 +16,27 @@ import { RedisSetViewer } from "../redis/RedisSetViewer";
 import { RedisZSetViewer } from "../redis/RedisZSetViewer";
 import { RedisListViewer } from "../redis/RedisListViewer";
 import { RedisStringViewer } from "../redis/RedisStringViewer";
+import { RedisAddKeyDialog } from "../redis/RedisAddKeyDialog";
 
 interface RedisResult {
-    output: any;
+  output: any;
 }
 
 interface KeyDetail {
-    key: string;
-    type: string;
-    ttl: number;
-    length: number | null; 
+  key: string;
+  type: string;
+  ttl: number;
+  length: number | null;
 }
 
 interface ValueScanResult {
-    cursor: string;
-    values: any[];
+  cursor: string;
+  values: any[];
 }
 
 interface ScanResult {
-    cursor: string;
-    keys: KeyDetail[];
+  cursor: string;
+  keys: KeyDetail[];
 }
 
 export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; connectionId: number; db?: number }) {
@@ -45,11 +46,12 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   const [hasMore, setHasMore] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  
+  const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = useState(false);
+
   // Details for the selected key (value content)
   const [selectedValue, setSelectedValue] = useState<any>(null);
   const [valueLoading, setValueLoading] = useState(false);
-  
+
   // Scan state for complex data types
   const [valueCursor, setValueCursor] = useState<string>("0");
   const [valueHasMore, setValueHasMore] = useState(true);
@@ -61,13 +63,13 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (!searchTerm.trim()) {
       return "*"; // Full scan
     }
-    
+
     // Check if it's a prefix pattern (ends with *)
     if (searchTerm.endsWith('*')) {
       const prefix = searchTerm.slice(0, -1);
       return prefix ? `${prefix}*` : "*";
     }
-    
+
     // For exact search, we'll use pattern search but filter client-side
     return `*${searchTerm}*`;
   };
@@ -77,11 +79,11 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (!reset && !hasMore) return;
 
     setLoading(true);
-    
+
     // Determine search strategy
     const useExactSearch = filter && !filter.endsWith('*') && filter.trim() !== "";
-      filter && filter.endsWith('*') && filter.trim() !== "*";
-      const startTime = Date.now();
+    filter && filter.endsWith('*') && filter.trim() !== "*";
+    const startTime = Date.now();
     let command = '';
 
     try {
@@ -89,14 +91,14 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         // Exact search: use EXISTS command
         const searchTerm = filter.trim();
         command = `EXISTS ${searchTerm}`;
-        
+
         const result = await invoke<RedisResult>("execute_redis_command", {
           connectionId,
           command: "EXISTS",
           args: [searchTerm],
           db,
         });
-        
+
         // If key exists, get its details
         if (result.output === 1) {
           const keyDetails = await invoke<KeyDetail[]>("get_keys_details", {
@@ -108,9 +110,9 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         } else {
           setKeys([]);
         }
-        
+
         setHasMore(false);
-        
+
         // Log command to console
         addCommandToConsole({
           databaseType: 'redis',
@@ -123,7 +125,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         const currentCursor = reset ? "0" : cursor;
         const searchPattern = getSearchPattern(filter);
         command = `SCAN ${currentCursor} MATCH ${searchPattern} COUNT 100`;
-        
+
         const result = await invoke<ScanResult>("get_redis_keys", {
           connectionId,
           cursor: currentCursor,
@@ -140,7 +142,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
         setCursor(result.cursor);
         setHasMore(result.cursor !== "0");
-        
+
         // Log command to console
         addCommandToConsole({
           databaseType: 'redis',
@@ -151,7 +153,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       }
     } catch (e) {
       console.error("Failed to fetch keys", e);
-      
+
       // Log error command
       addCommandToConsole({
         databaseType: 'redis',
@@ -173,18 +175,18 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
     setValueLoading(true);
     const currentCursor = reset ? "0" : valueCursor;
-    
+
     // Determine search strategy for complex values
     const useExactSearch = valueFilter && !valueFilter.endsWith('*') && valueFilter.trim() !== "";
     const searchPattern = getSearchPattern(valueFilter);
     const type = currentKeyItem.type;
-    
+
     const startTime = Date.now();
     let command = '';
 
     try {
       let result;
-      
+
       if (type === "hash") {
         command = `HSCAN ${selectedKey} ${currentCursor} MATCH ${searchPattern} COUNT 100`;
         result = await invoke<ValueScanResult>("scan_hash_values", {
@@ -220,7 +222,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       }
 
       let filteredValues = result.values;
-      
+
       // If exact search, filter client-side
       if (useExactSearch) {
         const searchTerm = valueFilter.trim();
@@ -256,7 +258,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
       setValueCursor(result.cursor);
       setValueHasMore(result.cursor !== "0" && !useExactSearch);
-      
+
       // Log command to console
       addCommandToConsole({
         databaseType: 'redis',
@@ -266,7 +268,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       });
     } catch (e) {
       console.error("Failed to fetch complex values", e);
-      
+
       // Log error command
       addCommandToConsole({
         databaseType: 'redis',
@@ -286,7 +288,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     if (valueLoading) return;
 
     setValueLoading(true);
-    
+
     const startTime = Date.now();
     const command = `LRANGE ${selectedKey} ${start} ${end}`;
 
@@ -298,10 +300,10 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         end,
         db,
       });
-      
+
       setAllValues(result.output);
       setValueHasMore(false);
-      
+
       // Log command to console
       addCommandToConsole({
         databaseType: 'redis',
@@ -311,7 +313,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       });
     } catch (e) {
       console.error("Failed to fetch list values", e);
-      
+
       // Log error command
       addCommandToConsole({
         databaseType: 'redis',
@@ -358,8 +360,8 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   // Debounce value filter for complex types
   useEffect(() => {
     const currentKeyItem = keys.find((k) => k.key === selectedKey);
-    if (selectedKey && currentKeyItem && 
-        (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
+    if (selectedKey && currentKeyItem &&
+      (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
       const timer = setTimeout(() => {
         fetchComplexValues(true);
       }, 500);
@@ -393,9 +395,9 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     const observer = new IntersectionObserver(
       (entries) => {
         const currentKeyItem = keys.find((k) => k.key === selectedKey);
-        if (entries[0].isIntersecting && valueHasMore && !valueLoading && 
-            selectedKey && currentKeyItem && 
-            (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
+        if (entries[0].isIntersecting && valueHasMore && !valueLoading &&
+          selectedKey && currentKeyItem &&
+          (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset")) {
           fetchComplexValues(false);
         }
       },
@@ -412,7 +414,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   const handleKeyClick = async (keyItem: KeyDetail) => {
     setSelectedKey(keyItem.key);
     setSelectedValue(null);
-    
+
     // Reset scan state
     setValueCursor("0");
     setValueHasMore(true);
@@ -434,7 +436,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           db,
         });
         setSelectedValue(valRes.output);
-        
+
         // Log command to console
         addCommandToConsole({
           databaseType: 'redis',
@@ -445,7 +447,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       } catch (error) {
         console.error("Failed to fetch value", error);
         setSelectedValue("Error fetching value");
-        
+
         // Log error command
         addCommandToConsole({
           databaseType: 'redis',
@@ -544,7 +546,11 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           >
             <Terminal className="w-4 h-4" />
           </Button>
-          <Button size="sm" className="h-8 gap-1 ml-2">
+          <Button
+            size="sm"
+            className="h-8 gap-1 ml-2"
+            onClick={() => setIsAddKeyDialogOpen(true)}
+          >
             <Plus className="w-4 h-4" /> Key
           </Button>
         </div>
@@ -581,9 +587,8 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                 {keys.map((key) => (
                   <div
                     key={key.key}
-                    className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 transition-colors gap-3 ${
-                      selectedKey === key.key ? "bg-accent" : ""
-                    }`}
+                    className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 transition-colors gap-3 ${selectedKey === key.key ? "bg-accent" : ""
+                      }`}
                     onClick={() => handleKeyClick(key)}
                   >
                     <Badge
@@ -751,28 +756,35 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+      <RedisAddKeyDialog
+        open={isAddKeyDialogOpen}
+        onOpenChange={setIsAddKeyDialogOpen}
+        connectionId={connectionId}
+        db={db}
+        onSuccess={() => fetchKeys(true)}
+      />
     </div>
   );
 }
 
-function ValueViewer({ 
+function ValueViewer({
   connectionId,
   db,
   keyName,
-  value, 
-  type, 
-  allValues, 
-  hasMore, 
-  loading, 
-  filter, 
-  onFilterChange, 
+  value,
+  type,
+  allValues,
+  hasMore,
+  loading,
+  filter,
+  onFilterChange,
   onRefresh,
   observerTarget
-}: { 
+}: {
   connectionId: number;
   db: number;
   keyName: string;
-  value: any; 
+  value: any;
   type?: string;
   allValues: any[];
   hasMore: boolean;
