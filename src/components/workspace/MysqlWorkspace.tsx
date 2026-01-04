@@ -597,13 +597,22 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         return <Type className="h-3 w-3 text-gray-500" />;
     };
 
+    const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
+    const connectionName = connection?.name || name;
+
     return (
         <div className="h-full flex flex-col bg-background">
             {/* Toolbar */}
             <div className="border-b p-2 flex gap-2 items-center bg-muted/5 justify-between">
                 <div className="flex gap-2 items-center">
-                    <div className="text-sm font-medium px-3 py-1 bg-muted/20 rounded border border-muted">
-                        {name}
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-muted/20 rounded border border-muted shadow-sm">
+                        <span className="text-sm font-semibold text-foreground whitespace-nowrap">{connectionName}</span>
+                        {dbName && (
+                            <>
+                                <div className="h-3 w-[1px] bg-border mx-1"></div>
+                                <span className="text-sm text-muted-foreground whitespace-nowrap">{dbName}</span>
+                            </>
+                        )}
                     </div>
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
                     <Button
