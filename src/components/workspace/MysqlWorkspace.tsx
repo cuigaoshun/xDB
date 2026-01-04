@@ -40,15 +40,16 @@ interface MysqlWorkspaceProps {
     savedSql?: string;
     dbName?: string;
     tableName?: string;
+    savedResult?: SqlResult;
 }
 
-export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql, dbName, tableName }: MysqlWorkspaceProps) {
+export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql, dbName, tableName, savedResult }: MysqlWorkspaceProps) {
     const { t } = useTranslation();
     const { theme } = useTheme();
     const updateTab = useAppStore(state => state.updateTab);
 
     const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users");
-    const [result, setResult] = useState<SqlResult | null>(null);
+    const [result, setResult] = useState<SqlResult | null>(savedResult || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -72,10 +73,10 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     // Sync SQL changes to global store (debounced)
     useEffect(() => {
         const timer = setTimeout(() => {
-            updateTab(tabId, { currentSql: sql });
+            updateTab(tabId, { currentSql: sql, savedResult: result });
         }, 500);
         return () => clearTimeout(timer);
-    }, [sql, tabId, updateTab]);
+    }, [sql, result, tabId, updateTab]);
 
     // Determine effective theme for syntax highlighter
     const [isDark, setIsDark] = useState(true);
@@ -731,7 +732,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                             <Input
                                                                                 value={editValue}
                                                                                 onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="h-7 text-xs"
+                                                                                className="h-7 text-xs min-w-[200px]"
                                                                                 autoFocus
                                                                                 onKeyDown={(e) => {
                                                                                     if (e.key === 'Enter') handleCellSubmit();

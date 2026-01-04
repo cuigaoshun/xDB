@@ -24,13 +24,14 @@ export interface Tab {
   currentSql?: string;
   dbName?: string;
   tableName?: string;
+  savedResult?: any;
 }
 
 interface AppState {
   connections: Connection[];
   tabs: Tab[];
   activeTabId: string | null;
-  
+
   setConnections: (connections: Connection[]) => void;
   addTab: (tab: Omit<Tab, 'active'>) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
@@ -41,7 +42,7 @@ interface AppState {
   closeTabsToLeft: (id: string) => void;
   closeAllTabs: () => void;
   setActiveTab: (id: string) => void;
-  
+
   addConnection: (conn: Connection) => void;
   removeConnection: (id: number) => void;
   updateConnection: (conn: Connection) => void;
@@ -70,11 +71,11 @@ export const useAppStore = create<AppState>((set) => ({
   })),
 
   replaceTab: (oldId, newTab) => set((state) => {
-      const newTabs = state.tabs.map(t => t.id === oldId ? newTab : t);
-      return {
-          tabs: newTabs,
-          activeTabId: newTab.id // Switch to new tab
-      };
+    const newTabs = state.tabs.map(t => t.id === oldId ? newTab : t);
+    return {
+      tabs: newTabs,
+      activeTabId: newTab.id // Switch to new tab
+    };
   }),
 
   closeTab: (id) => set((state) => {
@@ -95,47 +96,47 @@ export const useAppStore = create<AppState>((set) => ({
   closeOtherTabs: (id) => set((state) => {
     const tabToKeep = state.tabs.find(t => t.id === id);
     return {
-        tabs: tabToKeep ? [tabToKeep] : [],
-        activeTabId: tabToKeep ? tabToKeep.id : null
+      tabs: tabToKeep ? [tabToKeep] : [],
+      activeTabId: tabToKeep ? tabToKeep.id : null
     };
   }),
 
   closeTabsToRight: (id) => set((state) => {
-      const index = state.tabs.findIndex(t => t.id === id);
-      if (index === -1) return {};
-      
-      const newTabs = state.tabs.slice(0, index + 1);
-      
-      // If active tab was removed (was to the right), set active to the current tab
-      // Actually, if active tab is preserved, keep it. If not, set to id.
-      // But if we close to right, the current tab `id` is definitely preserved.
-      // If active tab was one of the closed ones, switch to `id`.
-      let newActiveId = state.activeTabId;
-      if (!newTabs.find(t => t.id === state.activeTabId)) {
-          newActiveId = id;
-      }
+    const index = state.tabs.findIndex(t => t.id === id);
+    if (index === -1) return {};
 
-      return {
-          tabs: newTabs,
-          activeTabId: newActiveId
-      };
+    const newTabs = state.tabs.slice(0, index + 1);
+
+    // If active tab was removed (was to the right), set active to the current tab
+    // Actually, if active tab is preserved, keep it. If not, set to id.
+    // But if we close to right, the current tab `id` is definitely preserved.
+    // If active tab was one of the closed ones, switch to `id`.
+    let newActiveId = state.activeTabId;
+    if (!newTabs.find(t => t.id === state.activeTabId)) {
+      newActiveId = id;
+    }
+
+    return {
+      tabs: newTabs,
+      activeTabId: newActiveId
+    };
   }),
 
   closeTabsToLeft: (id) => set((state) => {
-      const index = state.tabs.findIndex(t => t.id === id);
-      if (index === -1) return {};
+    const index = state.tabs.findIndex(t => t.id === id);
+    if (index === -1) return {};
 
-      const newTabs = state.tabs.slice(index);
-      
-      let newActiveId = state.activeTabId;
-      if (!newTabs.find(t => t.id === state.activeTabId)) {
-          newActiveId = id;
-      }
+    const newTabs = state.tabs.slice(index);
 
-      return {
-          tabs: newTabs,
-          activeTabId: newActiveId
-      };
+    let newActiveId = state.activeTabId;
+    if (!newTabs.find(t => t.id === state.activeTabId)) {
+      newActiveId = id;
+    }
+
+    return {
+      tabs: newTabs,
+      activeTabId: newActiveId
+    };
   }),
 
   closeAllTabs: () => set({ tabs: [], activeTabId: null }),
@@ -149,7 +150,7 @@ export const useAppStore = create<AppState>((set) => ({
   removeConnection: (id) => set((state) => ({
     connections: state.connections.filter(c => c.id !== id)
   })),
-  
+
   updateConnection: (conn) => set((state) => ({
     connections: state.connections.map(c => c.id === conn.id ? conn : c)
   }))

@@ -1,4 +1,4 @@
-import { Search, Terminal, RefreshCw, Plus, Copy, X, Trash2, Info } from "lucide-react";
+import { Search, Plus, X, Trash2, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,15 @@ import { RedisZSetViewer } from "../redis/RedisZSetViewer";
 import { RedisListViewer } from "../redis/RedisListViewer";
 import { RedisStringViewer } from "../redis/RedisStringViewer";
 import { RedisAddKeyDialog } from "../redis/RedisAddKeyDialog";
+import { useAppStore } from "@/store/useAppStore";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface RedisResult {
   output: any;
@@ -39,24 +48,45 @@ interface ScanResult {
   keys: KeyDetail[];
 }
 
-export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; connectionId: number; db?: number }) {
-  const [keys, setKeys] = useState<KeyDetail[]>([]);
+export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult }: { tabId: string; name: string; connectionId: number; db?: number; savedResult?: any }) {
+  const [keys, setKeys] = useState<KeyDetail[]>(savedResult?.keys || []);
   const [filter, setFilter] = useState("");
-  const [cursor, setCursor] = useState<string>("0");
-  const [hasMore, setHasMore] = useState(true);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string>(savedResult?.cursor || "0");
+  const [hasMore, setHasMore] = useState(savedResult?.hasMore ?? true);
+  const [selectedKey, setSelectedKey] = useState<string | null>(savedResult?.selectedKey || null);
   const [loading, setLoading] = useState(false);
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Details for the selected key (value content)
-  const [selectedValue, setSelectedValue] = useState<any>(null);
+  const [selectedValue, setSelectedValue] = useState<any>(savedResult?.selectedValue || null);
   const [valueLoading, setValueLoading] = useState(false);
 
   // Scan state for complex data types
-  const [valueCursor, setValueCursor] = useState<string>("0");
+  const [valueCursor, setValueCursor] = useState<string>(savedResult?.valueCursor || "0");
   const [valueHasMore, setValueHasMore] = useState(true);
   const [valueFilter, setValueFilter] = useState<string>("");
-  const [allValues, setAllValues] = useState<any[]>([]);
+  const [allValues, setAllValues] = useState<any[]>(savedResult?.allValues || []);
+
+  const updateTab = useAppStore(state => state.updateTab);
+
+  // Sync state to global store
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateTab(tabId, {
+        savedResult: {
+          keys,
+          cursor,
+          hasMore,
+          selectedKey,
+          selectedValue,
+          allValues,
+          valueCursor
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [keys, cursor, hasMore, selectedKey, selectedValue, allValues, valueCursor, tabId, updateTab]);
 
   // Generate search pattern based on input
   const getSearchPattern = (searchTerm: string) => {
@@ -80,9 +110,7 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
     setLoading(true);
 
-    // Determine search strategy
     const useExactSearch = filter && !filter.endsWith('*') && filter.trim() !== "";
-    filter && filter.endsWith('*') && filter.trim() !== "*";
     const startTime = Date.now();
     let command = '';
 
@@ -164,6 +192,41 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteKey = async () => {
+    if (!selectedKey) return;
+
+    setIsDeleteDialogOpen(false);
+    const startTime = Date.now();
+    const command = `DEL ${selectedKey}`;
+    try {
+      await invoke("execute_redis_command", {
+        connectionId,
+        command: "DEL",
+        args: [selectedKey],
+        db,
+      });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
+      setSelectedKey(null);
+      fetchKeys(true);
+    } catch (error) {
+      console.error("Failed to delete key", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 
@@ -335,9 +398,11 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
     const curr = { connectionId, db, filter, initialized: true };
     propsRef.current = curr;
 
-    // Case 1: Initial mount - Immediate fetch
+    // Case 1: Initial mount - Immediate fetch if no saved data
     if (!prev.initialized) {
-      fetchKeys(true);
+      if (!savedResult) {
+        fetchKeys(true);
+      }
       return;
     }
 
@@ -349,6 +414,12 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
 
     // Case 3: Filter changed - Debounced fetch
     if (prev.filter !== curr.filter) {
+      // If it's a prefix search (ends with *), don't auto-fetch, wait for manual refresh
+      // "如果是key-*的搜素，点击刷新按钮的时候再scan"
+      if (curr.filter.endsWith('*')) {
+        return;
+      }
+
       const timer = setTimeout(() => {
         fetchKeys(true);
       }, 500);
@@ -376,7 +447,8 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
+        const isPrefixSearch = filter && filter.endsWith("*");
+        if (entries[0].isIntersecting && hasMore && !loading && !isPrefixSearch) {
           fetchKeys(false);
         }
       },
@@ -528,25 +600,6 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         </div>
         <div className="flex gap-1">
           <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8"
-            onClick={() => fetchKeys(true)}
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-            />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8"
-            title="CLI"
-          >
-            <Terminal className="w-4 h-4" />
-          </Button>
-          <Button
             size="sm"
             className="h-8 gap-1 ml-2"
             onClick={() => setIsAddKeyDialogOpen(true)}
@@ -578,6 +631,21 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                   Total: {keys.length}
                   {hasMore ? "+" : ""}
                 </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-[11px] font-medium"
+                  onClick={() => {
+                    const isPrefixSearch = filter && filter.endsWith('*');
+                    if (isPrefixSearch && keys.length > 0 && cursor !== "0") {
+                      fetchKeys(false);
+                    } else {
+                      fetchKeys(true);
+                    }
+                  }}
+                >
+                  {loading ? "Scanning..." : "Scan More"}
+                </Button>
               </div>
             </div>
 
@@ -658,16 +726,9 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
-                      title="Copy Key"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       className="h-8 w-8 hover:text-destructive"
                       title="Delete Key"
+                      onClick={() => setIsDeleteDialogOpen(true)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -763,6 +824,25 @@ export function RedisWorkspace({ name, connectionId, db = 0 }: { name: string; c
         db={db}
         onSuccess={() => fetchKeys(true)}
       />
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the key <span className="font-mono font-bold text-foreground">{selectedKey}</span>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteKey}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
