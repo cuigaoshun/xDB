@@ -90,7 +90,15 @@ export function MainLayout() {
                                             <TabBar />
                                             <div className="flex-1 overflow-hidden relative">
                                                 {activeTab ? (
-                                                    activeTab.type === 'mysql' ? (
+                                                    activeTab.tabType === 'table-schema' && activeTab.schemaInfo ? (
+                                                        <TableSchemaTab
+                                                            key={activeTab.id}
+                                                            tabId={activeTab.id}
+                                                            connectionId={activeTab.connectionId}
+                                                            dbName={activeTab.schemaInfo.dbName}
+                                                            tableName={activeTab.schemaInfo.tableName}
+                                                        />
+                                                    ) : activeTab.type === 'mysql' ? (
                                                         <MysqlWorkspace
                                                             key={activeTab.id}
                                                             tabId={activeTab.id}
@@ -131,14 +139,7 @@ export function MainLayout() {
                                                             tableName={activeTab.tableName}
                                                             savedResult={activeTab.savedResult}
                                                         />
-                                                    ) : activeTab.tabType === 'table-schema' && activeTab.schemaInfo ? (
-                                                        <TableSchemaTab
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            connectionId={activeTab.connectionId}
-                                                            dbName={activeTab.schemaInfo.dbName}
-                                                            tableName={activeTab.schemaInfo.tableName}
-                                                        />
+
                                                     ) : (
                                                         <div>{t('common.unsupportedType')}: {activeTab.type}</div>
                                                     )
