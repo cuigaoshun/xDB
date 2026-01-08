@@ -23,7 +23,7 @@ export function ConnectionManager() {
     const { t } = useTranslation();
     const connections = useAppStore((state) => state.connections);
     const setConnections = useAppStore((state) => state.setConnections);
-    const addTab = useAppStore((state) => state.addTab);
+
 
     const [searchTerm, setSearchTerm] = useState("");
     const [isNewConnOpen, setIsNewConnOpen] = useState(false);
@@ -53,22 +53,20 @@ export function ConnectionManager() {
         (conn.host && conn.host.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    const setActiveTab = useAppStore(state => state.setActiveTab);
+    const setExpandedConnectionId = useAppStore(state => state.setExpandedConnectionId);
+    const tabs = useAppStore(state => state.tabs);
+
     const handleConnect = (conn: Connection) => {
         // 查找是否已存在该连接的任何tab（包括表tab）
-        const tabs = useAppStore.getState().tabs;
         const connTab = tabs.find(t => t.connectionId === conn.id);
 
         if (connTab) {
             // 如果已存在任何与该连接相关的tab，直接跳转
-            useAppStore.getState().setActiveTab(connTab.id);
+            setActiveTab(connTab.id);
         } else {
-            // 否则创建新tab
-            addTab({
-                id: `conn-${conn.id}`,
-                title: conn.name,
-                type: conn.db_type,
-                connectionId: conn.id,
-            });
+            // 否则仅展开侧边栏（不创建新tab），setExpandedConnectionId 会自动切换到 connections 视图
+            setExpandedConnectionId(conn.id);
         }
     };
 

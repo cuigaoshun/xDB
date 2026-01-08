@@ -59,9 +59,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const [editValue, setEditValue] = useState<string>('');
     const [, setOriginalRows] = useState<Record<string, any>[]>([]);
 
-    // 新增行状态
-    const [newRows, setNewRows] = useState<Record<string, any>[]>([]);
-    const [selectedRowIndices, setSelectedRowIndices] = useState<number[]>([]);
 
     // 分页状态
     const [currentPage, setCurrentPage] = useState(0);
@@ -337,18 +334,36 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         }
     };
 
+    // 新增行状态
+    const [newRows, setNewRows] = useState<Record<string, any>[]>([]);
+    const [selectedRowIndices, setSelectedRowIndices] = useState<number[]>([]);
     // 添加新行
-    const handleAddNewRow = () => {
-        // 如果有result和列信息，直接添加
-        if (result && result.columns && result.columns.length > 0) {
+    const handleAddNewRow = async () => {
+        let cols = result?.columns;
+
+        // 如果没有列信息且有表名，尝试抓取一次结构
+        if ((!cols || cols.length === 0) && dbName && tableName) {
+            try {
+                const schemaSql = `SELECT * FROM \`${dbName}\`.\`${tableName}\` LIMIT 0`;
+                const res = await invoke<SqlResult>("execute_sql", {
+                    connectionId,
+                    sql: schemaSql
+                });
+                cols = res.columns;
+                if (cols && cols.length > 0) {
+                    setResult(res);
+                }
+            } catch (err) {
+                console.error("Failed to fetch table structure for adding row:", err);
+            }
+        }
+
+        if (cols && cols.length > 0) {
             const emptyRow: Record<string, any> = {};
-            result.columns.forEach(col => {
+            cols.forEach(col => {
                 emptyRow[col.name] = null;
             });
             setNewRows([...newRows, emptyRow]);
-        } else if (dbName && tableName) {
-            // 如果没有列信息，先执行查询
-            handleExecute();
         }
     };
 

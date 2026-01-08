@@ -39,6 +39,8 @@ interface AppState {
   connections: Connection[];
   tabs: Tab[];
   activeTabId: string | null;
+  activeView: 'home' | 'connections';
+  expandedConnectionId: number | null;
 
   setConnections: (connections: Connection[]) => void;
   addTab: (tab: Omit<Tab, 'active'>) => void;
@@ -50,6 +52,8 @@ interface AppState {
   closeTabsToLeft: (id: string) => void;
   closeAllTabs: () => void;
   setActiveTab: (id: string) => void;
+  setActiveView: (view: 'home' | 'connections') => void;
+  setExpandedConnectionId: (id: number | null) => void;
 
   addConnection: (conn: Connection) => void;
   removeConnection: (id: number) => void;
@@ -60,17 +64,20 @@ export const useAppStore = create<AppState>((set) => ({
   connections: [],
   tabs: [],
   activeTabId: null,
+  activeView: 'home',
+  expandedConnectionId: null,
 
   setConnections: (connections) => set({ connections }),
 
   addTab: (newTab) => set((state) => {
     const existingTab = state.tabs.find(t => t.id === newTab.id);
     if (existingTab) {
-      return { activeTabId: newTab.id };
+      return { activeTabId: newTab.id, activeView: 'connections' };
     }
     return {
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id,
+      activeView: 'connections',
     };
   }),
 
@@ -82,7 +89,8 @@ export const useAppStore = create<AppState>((set) => ({
     const newTabs = state.tabs.map(t => t.id === oldId ? newTab : t);
     return {
       tabs: newTabs,
-      activeTabId: newTab.id // Switch to new tab
+      activeTabId: newTab.id, // Switch to new tab
+      activeView: 'connections'
     };
   }),
 
@@ -149,7 +157,11 @@ export const useAppStore = create<AppState>((set) => ({
 
   closeAllTabs: () => set({ tabs: [], activeTabId: null }),
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => set({ activeTabId: id, activeView: 'connections' }),
+
+  setActiveView: (view) => set({ activeView: view }),
+
+  setExpandedConnectionId: (id) => set({ expandedConnectionId: id, activeView: 'connections' }),
 
   addConnection: (conn) => set((state) => ({
     connections: [conn, ...state.connections]

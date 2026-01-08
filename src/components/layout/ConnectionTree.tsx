@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Connection, useAppStore } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +37,8 @@ interface SqlResult {
 export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTable, filterTerm }: ConnectionTreeItemProps) {
     const { t } = useTranslation();
     const addTab = useAppStore(state => state.addTab);
+    const setExpandedConnectionId = useAppStore(state => state.setExpandedConnectionId);
+    const globalExpandedId = useAppStore(state => state.expandedConnectionId);
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [databases, setDatabases] = useState<string[]>([]);
@@ -78,17 +80,31 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         return dbTables.filter(t => isMatch(t));
     };
 
+    // Sync from global expanded ID
+    useEffect(() => {
+        if (globalExpandedId === connection.id && !isExpanded) {
+            setIsExpanded(true);
+            if (databases.length === 0) {
+                loadDatabases();
+            }
+        }
+    }, [globalExpandedId, connection.id, isExpanded, databases.length]);
+
     const toggleExpand = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
         if (!isExpanded) {
             setIsExpanded(true);
+            setExpandedConnectionId(connection.id);
             // Load databases if not loaded yet (for supported types)
             if ((connection.db_type === 'mysql' || connection.db_type === 'redis' || connection.db_type === 'sqlite') && databases.length === 0) {
                 await loadDatabases();
             }
         } else {
             setIsExpanded(false);
+            if (globalExpandedId === connection.id) {
+                setExpandedConnectionId(null);
+            }
         }
     };
 
@@ -98,6 +114,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         // 只展开，不折叠
         if (!isExpanded) {
             setIsExpanded(true);
+            setExpandedConnectionId(connection.id);
             // Load databases if not loaded yet (for supported types)
             if ((connection.db_type === 'mysql' || connection.db_type === 'redis' || connection.db_type === 'sqlite') && databases.length === 0) {
                 await loadDatabases();

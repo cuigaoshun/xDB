@@ -344,28 +344,30 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
         <div className="h-full flex flex-col bg-background">
             {/* Header */}
             <div className="p-3 border-b bg-muted/10">
-                <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2">
-                        <Database className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-semibold">{t('mysql.tableStructure')}: {tableName}</span>
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
+                        <Database className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-sm font-semibold whitespace-nowrap shrink-0">{t('mysql.tableStructure')}:</span>
+                            <span className="text-sm font-semibold truncate shrink" title={tableName}>{tableName}</span>
+                            {tableComment && (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap truncate ml-2" title={tableComment}>
+                                    ({tableComment})
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={loadSchema}
                         disabled={isLoading}
-                        className="h-7"
+                        className="h-7 whitespace-nowrap shrink-0"
                     >
                         <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
                         {t('mysql.refreshSchema')}
                     </Button>
                 </div>
-                {tableComment && (
-                    <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <span className="font-medium">{t('mysql.tableComment', '表注释')}:</span>
-                        <span className="truncate">{tableComment}</span>
-                    </div>
-                )}
             </div>
 
             {/* Content */}

@@ -10,31 +10,23 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ActivityBar, ConnectionSidebar } from "./ActivityBar";
 import { CommandConsole } from "@/components/ui/CommandConsole";
 import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function MainLayout() {
     const { t } = useTranslation();
     const activeTabId = useAppStore((state) => state.activeTabId);
     const tabs = useAppStore((state) => state.tabs);
+    const activeView = useAppStore((state) => state.activeView);
+    const setActiveView = useAppStore((state) => state.setActiveView);
 
     const activeTab = tabs.find(t => t.id === activeTabId);
-
-    // View state: 'home' (Connection Manager) or 'connections' (Workspaces)
-    const [activeView, setActiveView] = useState<'home' | 'connections'>('home');
 
     // Sidebar collapse state
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     // Command console visibility state
     const [consoleVisible, setConsoleVisible] = useState(false);
-
-    // Auto-switch to 'connections' view when a tab is activated
-    useEffect(() => {
-        if (activeTabId) {
-            setActiveView('connections');
-        }
-    }, [activeTabId]);
 
     const handleViewChange = (view: 'home' | 'connections') => {
         if (view === activeView && view === 'connections') {

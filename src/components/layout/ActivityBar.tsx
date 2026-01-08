@@ -112,13 +112,17 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
 
     const [searchTerm, setSearchTerm] = useState("");
 
+    const setExpandedConnectionId = useAppStore(state => state.setExpandedConnectionId);
+
     // If a connection is already open in a tab, switch to it. Otherwise just expand (don't create tab)
     const handleConnectionClick = (conn: Connection) => {
-        const existingTab = tabs.find(t => t.connectionId === conn.id && !t.id.startsWith('table-'));
+        const existingTab = tabs.find(t => t.connectionId === conn.id);
         if (existingTab) {
             setActiveTab(existingTab.id);
+        } else {
+            // 不再自动创建tab，只展开数据库列表
+            setExpandedConnectionId(conn.id);
         }
-        // 不再自动创建tab，只展开数据库列表（由ConnectionTree组件处理）
     };
 
     const handleTableSelect = (conn: Connection, db: string, table: string) => {
