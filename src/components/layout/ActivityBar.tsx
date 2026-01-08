@@ -120,8 +120,19 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
         if (existingTab) {
             setActiveTab(existingTab.id);
         } else {
-            // 不再自动创建tab，只展开数据库列表
-            setExpandedConnectionId(conn.id);
+            // 对于不支持树状展开的类型（如 Memcached, Postgres），直接打开 tab
+            if (conn.db_type === 'memcached' || conn.db_type === 'postgres') {
+                const tabId = `connection-${conn.id}`;
+                addTab({
+                    id: tabId,
+                    title: conn.name,
+                    type: conn.db_type,
+                    connectionId: conn.id,
+                });
+            } else {
+                // 不再自动创建tab，只展开数据库列表
+                setExpandedConnectionId(conn.id);
+            }
         }
     };
 

@@ -65,8 +65,21 @@ export function ConnectionManager() {
             // 如果已存在任何与该连接相关的tab，直接跳转
             setActiveTab(connTab.id);
         } else {
-            // 否则仅展开侧边栏（不创建新tab），setExpandedConnectionId 会自动切换到 connections 视图
-            setExpandedConnectionId(conn.id);
+            // 对于不支持侧边栏树的类型，直接创建新 tab
+            if (conn.db_type === 'memcached' || conn.db_type === 'postgres') {
+                // 使用 AppStore 的 addTab 方法 (这里需要从 store 获取)
+                // 由于这里没有直接导出 addTab，我们需要从 useAppStore 获取
+                // 下面通过 useAppStore.getState().addTab 来调用，或者我们在组件内通过 hook 获取
+                useAppStore.getState().addTab({
+                    id: `connection-${conn.id}`,
+                    title: conn.name,
+                    type: conn.db_type,
+                    connectionId: conn.id,
+                });
+            } else {
+                // 否则仅展开侧边栏（不创建新tab），setExpandedConnectionId 会自动切换到 connections 视图
+                setExpandedConnectionId(conn.id);
+            }
         }
     };
 
