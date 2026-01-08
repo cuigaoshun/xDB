@@ -27,11 +27,19 @@ async fn get_or_create_pool(
     app_state: &State<'_, AppState>,
     db_state: &State<'_, DbState>,
     connection_id: i64,
+    db_name: Option<String>,
 ) -> Result<MySqlPool, String> {
+    // 构建缓存键：如果有 db_name，则是 "id:db_name"，否则只是 "id"
+    let cache_key = if let Some(ref db) = db_name {
+        format!("{}:{}", connection_id, db)
+    } else {
+        connection_id.to_string()
+    };
+
     // 1. 先检查缓存中是否已有连接池
     {
         let pools = app_state.pools.lock().await;
-        if let Some(pool) = pools.get(&connection_id) {
+        if let Some(pool) = pools.get(&cache_key) {
             // 简单的健康检查，如果连接已关闭则需要重新创建
             if !pool.is_closed() {
                 return Ok(pool.clone());
@@ -61,11 +69,11 @@ async fn get_or_create_pool(
     let port = connection.port.unwrap_or(3306);
     let username = connection.username.unwrap_or_else(|| "root".to_string());
     let password = connection.password.unwrap_or_default();
-    let database = connection.database.unwrap_or_default();
+    let database_to_use = db_name.or(connection.database).unwrap_or_default();
 
     let url = format!(
         "mysql://{}:{}@{}:{}/{}",
-        username, password, host, port, database
+        username, password, host, port, database_to_use
     );
 
     // 4. 创建连接池
@@ -77,7 +85,7 @@ async fn get_or_create_pool(
 
     // 5. 存入缓存
     let mut pools = app_state.pools.lock().await;
-    pools.insert(connection_id, pool.clone());
+    pools.insert(cache_key, pool.clone());
 
     Ok(pool)
 }
@@ -204,8 +212,18 @@ pub async fn execute_sql(
     db_state: State<'_, DbState>,
     connection_id: i64,
     sql: String,
+    db_name: Option<String>,
 ) -> Result<SqlResult, String> {
-    let pool = get_or_create_pool(&app_state, &db_state, connection_id).await?;
+    // Use the db_name to get/create a pool connected to that specific DB
+    let pool = get_or_create_pool(&app_state, &db_state, connection_id, db_name.clone()).await?;
+    
+    // Explicitly acquire connection? 
+    // Actually, if the POOL is already connected to the right DB, we don't need to manually acquire and USE.
+    // However, execute_sql normally used `pool` directly.
+    // Let's use `pool` directly unless we really want a transaction or something.
+    // But wait, user queries might affect session state? usually fine.
+    
+    // No need to USE db;
 
     // 判断是查询还是执行
     let sql_upper = sql.trim().to_uppercase();

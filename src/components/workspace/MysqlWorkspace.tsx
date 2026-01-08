@@ -292,7 +292,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             const startTime = Date.now();
             await invoke("execute_sql", {
                 connectionId,
-                sql: updateSql
+                sql: updateSql,
+                dbName
             });
 
             addCommandToConsole({
@@ -345,7 +346,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                 const startTime = Date.now();
                 await invoke("execute_sql", {
                     connectionId,
-                    sql: deleteSql
+                    sql: deleteSql,
+                    dbName
                 });
 
                 addCommandToConsole({
@@ -391,7 +393,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                 const schemaSql = `SELECT * FROM \`${dbName}\`.\`${tableName}\` LIMIT 0`;
                 const res = await invoke<SqlResult>("execute_sql", {
                     connectionId,
-                    sql: schemaSql
+                    sql: schemaSql,
+                    dbName
                 });
 
                 if (res.columns && res.columns.length > 0) {
@@ -401,7 +404,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                     // 如果 LIMIT 0 不行（极少见），尝试 DESCRIBE
                     const describeRes = await invoke<SqlResult>("execute_sql", {
                         connectionId,
-                        sql: `DESCRIBE \`${dbName}\`.\`${tableName}\``
+                        sql: `DESCRIBE \`${dbName}\`.\`${tableName}\``,
+                        dbName
                     });
                     // DESCRIBE 返回的是行，我们需要转换成 columns 结构
                     if (describeRes.rows && describeRes.rows.length > 0) {
@@ -495,7 +499,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             const startTime = Date.now();
             await invoke("execute_sql", {
                 connectionId,
-                sql: insertSql
+                sql: insertSql,
+                dbName
             });
 
             addCommandToConsole({
@@ -633,7 +638,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         try {
             const data = await invoke<SqlResult>("execute_sql", {
                 connectionId,
-                sql: query
+                sql: query,
+                dbName
             });
             setResult(data);
             setOriginalRows(data.rows);
