@@ -339,14 +339,17 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
     // 添加新行
     const handleAddNewRow = () => {
-        if (!result) return;
-
-        const emptyRow: Record<string, any> = {};
-        result.columns.forEach(col => {
-            emptyRow[col.name] = null;
-        });
-
-        setNewRows([...newRows, emptyRow]);
+        // 如果有result和列信息，直接添加
+        if (result && result.columns && result.columns.length > 0) {
+            const emptyRow: Record<string, any> = {};
+            result.columns.forEach(col => {
+                emptyRow[col.name] = null;
+            });
+            setNewRows([...newRows, emptyRow]);
+        } else if (dbName && tableName) {
+            // 如果没有列信息，先执行查询
+            handleExecute();
+        }
     };
 
     // 复制选中的行
@@ -850,7 +853,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                                 e.stopPropagation();
                                                                                 tableName && primaryKeys.length > 0 && handleCellEdit(rowIdx, col.name, row[col.name], false);
                                                                             }}
-                                                                            title={tableName && primaryKeys.length === 0 ? "无主键，无法编辑" : "双击编辑"}
                                                                         >
                                                                             {row[col.name] === null ? (
                                                                                 <span className="text-muted-foreground italic">NULL</span>

@@ -54,12 +54,22 @@ export function ConnectionManager() {
     );
 
     const handleConnect = (conn: Connection) => {
-        addTab({
-            id: `conn-${conn.id}`,
-            title: conn.name,
-            type: conn.db_type,
-            connectionId: conn.id,
-        });
+        // 查找是否已存在该连接的任何tab（包括表tab）
+        const tabs = useAppStore.getState().tabs;
+        const connTab = tabs.find(t => t.connectionId === conn.id);
+
+        if (connTab) {
+            // 如果已存在任何与该连接相关的tab，直接跳转
+            useAppStore.getState().setActiveTab(connTab.id);
+        } else {
+            // 否则创建新tab
+            addTab({
+                id: `conn-${conn.id}`,
+                title: conn.name,
+                type: conn.db_type,
+                connectionId: conn.id,
+            });
+        }
     };
 
     const handleCreate = async (data: Omit<Connection, 'id' | 'created_at'>) => {

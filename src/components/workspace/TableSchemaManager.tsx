@@ -26,6 +26,7 @@ interface ColumnInfo {
     Key: string;
     Default: string | null;
     Extra: string;
+    Comment: string;
 }
 
 interface IndexInfo {
@@ -54,6 +55,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
     const { t } = useTranslation();
     const [columns, setColumns] = useState<ColumnInfo[]>([]);
     const [indexes, setIndexes] = useState<IndexInfo[]>([]);
+    const [tableComment, setTableComment] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -106,6 +108,25 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
             });
 
             setIndexes(indexesResult.rows || []);
+
+            // 加载表注释
+            const tableStatusQuery = `SHOW TABLE STATUS FROM \`${dbName}\` WHERE Name = '${tableName}'`;
+            const startTime3 = Date.now();
+            const tableStatusResult = await invoke<any>('execute_sql', {
+                connectionId,
+                sql: tableStatusQuery
+            });
+
+            addCommandToConsole({
+                databaseType: 'mysql',
+                command: tableStatusQuery,
+                duration: Date.now() - startTime3,
+                success: true
+            });
+
+            if (tableStatusResult.rows && tableStatusResult.rows.length > 0) {
+                setTableComment(tableStatusResult.rows[0].Comment || '');
+            }
         } catch (err: any) {
             console.error("Failed to load schema:", err);
             setError(typeof err === 'string' ? err : JSON.stringify(err));
@@ -322,21 +343,29 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
     return (
         <div className="h-full flex flex-col bg-background">
             {/* Header */}
-            <div className="p-3 border-b bg-muted/10 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold">{t('mysql.tableStructure')}: {tableName}</span>
+            <div className="p-3 border-b bg-muted/10">
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                        <Database className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-semibold">{t('mysql.tableStructure')}: {tableName}</span>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={loadSchema}
+                        disabled={isLoading}
+                        className="h-7"
+                    >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                        {t('mysql.refreshSchema')}
+                    </Button>
                 </div>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={loadSchema}
-                    disabled={isLoading}
-                    className="h-7"
-                >
-                    <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-                    {t('mysql.refreshSchema')}
-                </Button>
+                {tableComment && (
+                    <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <span className="font-medium">{t('mysql.tableComment', '表注释')}:</span>
+                        <span className="truncate">{tableComment}</span>
+                    </div>
+                )}
             </div>
 
             {/* Content */}
@@ -376,6 +405,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                             <TableHead className="w-[100px]">{t('mysql.key')}</TableHead>
                                             <TableHead className="w-[150px]">{t('mysql.defaultValue')}</TableHead>
                                             <TableHead className="w-[120px]">{t('mysql.extra')}</TableHead>
+                                            <TableHead className="w-[200px]">{t('mysql.comment', '注释')}</TableHead>
                                             <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -413,6 +443,9 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                                 <TableCell className="text-xs text-muted-foreground">
                                                     {col.Extra || '-'}
                                                 </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {col.Comment || '-'}
+                                                </TableCell>
                                                 <TableCell>
                                                     <div className="flex gap-1">
                                                         <Button
@@ -440,7 +473,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                         ))}
                                         {columns.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
+                                                <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
                                                     {t('mysql.noColumns')}
                                                 </TableCell>
                                             </TableRow>

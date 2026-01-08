@@ -93,10 +93,15 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     };
 
     // Also expand when selecting the connection
-    const handleSelect = (e: React.MouseEvent) => {
+    const handleSelect = async (e: React.MouseEvent) => {
         onSelect(connection);
+        // 只展开，不折叠
         if (!isExpanded) {
-            toggleExpand(e);
+            setIsExpanded(true);
+            // Load databases if not loaded yet (for supported types)
+            if ((connection.db_type === 'mysql' || connection.db_type === 'redis' || connection.db_type === 'sqlite') && databases.length === 0) {
+                await loadDatabases();
+            }
         }
     };
 
@@ -352,7 +357,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             });
         }
     };
-// Other types (postgres) might not support tree view yet
+    // Other types (postgres) might not support tree view yet
     if (connection.db_type !== 'mysql' && connection.db_type !== 'redis' && connection.db_type !== 'sqlite') {
         // Simple filter for non-supported types
         if (filterTerm && !isMatch(connection.name)) return null;
@@ -434,24 +439,41 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                     ) : (
                         filteredDatabases.map(db => (
                             <div key={db} className="flex flex-col">
-                                <div
-                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
-                                    onClick={(e) => toggleDatabaseExpand(db, e)}
-                                >
-                                    {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && (
-                                        <button className="p-0.5">
-                                            {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                        </button>
-                                    )}
-
-                                    <Database className={cn(
-                                        "h-3 w-3 shrink-0",
-                                        connection.db_type === 'redis' ? "text-red-400/70" : "text-yellow-500/70"
-                                    )} />
-                                    <span className="truncate">
-                                        {connection.db_type === 'redis' ? `DB ${db}` : db}
-                                    </span>
-                                </div>
+                                {/* 为MySQL和SQLite数据库添加右键菜单 */}
+                                {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? (
+                                    <ContextMenu>
+                                        <ContextMenuTrigger>
+                                            <div
+                                                className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
+                                                onClick={(e) => toggleDatabaseExpand(db, e)}
+                                            >
+                                                <button className="p-0.5">
+                                                    {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                                </button>
+                                                <Database className="h-3 w-3 shrink-0 text-yellow-500/70" />
+                                                <span className="truncate">{db}</span>
+                                            </div>
+                                        </ContextMenuTrigger>
+                                        <ContextMenuContent>
+                                            <ContextMenuItem onClick={() => handleCreateTable(db)}>
+                                                {t('mysql.createTable')}
+                                            </ContextMenuItem>
+                                        </ContextMenuContent>
+                                    </ContextMenu>
+                                ) : (
+                                    <div
+                                        className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
+                                        onClick={(e) => toggleDatabaseExpand(db, e)}
+                                    >
+                                        <Database className={cn(
+                                            "h-3 w-3 shrink-0",
+                                            connection.db_type === 'redis' ? "text-red-400/70" : "text-yellow-500/70"
+                                        )} />
+                                        <span className="truncate">
+                                            {connection.db_type === 'redis' ? `DB ${db}` : db}
+                                        </span>
+                                    </div>
+                                )}
 
                                 {/* Tables List (MySQL & SQLite) */}
                                 {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && expandedDatabases.has(db) && (

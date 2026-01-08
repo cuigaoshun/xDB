@@ -112,19 +112,13 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
 
     const [searchTerm, setSearchTerm] = useState("");
 
-    // If a connection is already open in a tab, switch to it. Otherwise open new tab.
+    // If a connection is already open in a tab, switch to it. Otherwise just expand (don't create tab)
     const handleConnectionClick = (conn: Connection) => {
         const existingTab = tabs.find(t => t.connectionId === conn.id && !t.id.startsWith('table-'));
         if (existingTab) {
             setActiveTab(existingTab.id);
-        } else {
-            addTab({
-                id: `conn-${conn.id}`,
-                title: conn.name,
-                type: conn.db_type,
-                connectionId: conn.id,
-            });
         }
+        // 不再自动创建tab，只展开数据库列表（由ConnectionTree组件处理）
     };
 
     const handleTableSelect = (conn: Connection, db: string, table: string) => {
@@ -170,9 +164,24 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
 
         // Check if we can reuse the current active tab
         const activeTab = tabs.find(t => t.id === activeTabId);
+
+        // 检查当前SQL是否为默认模式
+        const isDefaultSqlPattern = (sql: string | undefined) => {
+            if (!sql) return true;
+            // 移除空格和分号进行比较
+            const cleanSql = sql.trim().replace(/;\s*$/, '').replace(/\s+/g, ' ');
+            // 匹配默认SQL模式: SELECT * FROM `db`.`table` 或 SELECT * FROM "table"
+            const mysqlPattern = /^SELECT \* FROM `[^`]+`\.`[^`]+`$/i;
+            const sqlitePattern = /^SELECT \* FROM "[^"]+"$/i;
+            const genericPattern = /^SELECT \* FROM [^\s]+$/i;
+            return mysqlPattern.test(cleanSql) || sqlitePattern.test(cleanSql) || genericPattern.test(cleanSql);
+        };
+
         const isReusable = activeTab &&
             (activeTab.type === 'mysql' || activeTab.type === 'sqlite') &&
-            (!activeTab.currentSql || activeTab.currentSql === activeTab.initialSql);
+            (!activeTab.currentSql ||
+                activeTab.currentSql === activeTab.initialSql ||
+                isDefaultSqlPattern(activeTab.currentSql));
 
         const newTab = {
             id: tabId,
