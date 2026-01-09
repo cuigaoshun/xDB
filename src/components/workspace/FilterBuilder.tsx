@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, FolderPlus, X } from "lucide-react";
+import { Plus, Trash2, FolderPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -163,7 +163,7 @@ export function FilterBuilder({ columns, onChange, initialState }: FilterBuilder
         }
     };
 
-    const renderNode = (node: FilterNode, depth = 0, isLast = false) => {
+    const renderNode = (node: FilterNode, depth = 0, _isLast = false) => {
         if (node.id === 'root') {
             return (
                 <div className="flex flex-col gap-2">

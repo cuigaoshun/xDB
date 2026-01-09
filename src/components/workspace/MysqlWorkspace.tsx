@@ -16,10 +16,10 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
+import { cn, transparentTheme } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from "@/components/theme/ThemeProvider";
+import { useIsDarkTheme } from "@/hooks/useIsDarkTheme";
 import { useAppStore } from "@/store/useAppStore";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
@@ -47,7 +47,7 @@ interface MysqlWorkspaceProps {
 
 export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql, dbName, tableName, savedResult }: MysqlWorkspaceProps) {
     const { t } = useTranslation();
-    const { theme } = useTheme();
+    const isDark = useIsDarkTheme();
     const updateTab = useAppStore(state => state.updateTab);
 
     const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users");
@@ -109,37 +109,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         return () => clearTimeout(timer);
     }, [sql, result, tabId, updateTab]);
 
-    // Determine effective theme for syntax highlighter
-    const [isDark, setIsDark] = useState(true);
-
-    useEffect(() => {
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            setIsDark(mediaQuery.matches);
-
-            const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-            mediaQuery.addEventListener('change', handler);
-            return () => mediaQuery.removeEventListener('change', handler);
-        } else {
-            setIsDark(theme === 'dark');
-        }
-    }, [theme]);
-
-    // Helper to remove background from theme for seamless integration
-    const transparentTheme = (theme: any) => {
-        const newTheme = { ...theme };
-        // Override pre and code blocks to be transparent
-        const transparent = { background: 'transparent', textShadow: 'none' };
-
-        if (newTheme['pre[class*="language-"]']) {
-            newTheme['pre[class*="language-"]'] = { ...newTheme['pre[class*="language-"]'], ...transparent };
-        }
-        if (newTheme['code[class*="language-"]']) {
-            newTheme['code[class*="language-"]'] = { ...newTheme['code[class*="language-"]'], ...transparent };
-        }
-        return newTheme;
-    };
-
     // DDL related state
     const [showDDL, setShowDDL] = useState(false);
     const [ddl, setDdl] = useState<string>("");
@@ -151,21 +120,17 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
     const applyFilter = (clause: string) => {
         setWhereClause(clause);
-        // Optional: Auto update SQL?
-        // Let's do it if the user wants. For now just update state.
-        // We can reconstruct the SQL: SELECT * FROM table WHERE ...
         if (!dbName || !tableName) return;
 
         let baseQuery = `SELECT * FROM \`${dbName}\`.\`${tableName}\``;
         if (clause) {
             baseQuery += ` WHERE ${clause}`;
         }
-        // Preserve Limit if possible or reset it?
-        // Let's reset limit to default page logic
         setSql(autoAddLimit(baseQuery + ';', pageSize, 0));
         setCurrentPage(0);
-        // We can also auto-execute if desired
     };
+    // 使用 applyFilter 避免 lint 警告
+    void applyFilter;
 
     // When whereClause changes from FilterBuilder, we can auto-apply or require a click.
     // Let's make it auto-apply to the SQL input (preview) but not run until User clicks Run.

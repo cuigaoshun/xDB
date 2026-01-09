@@ -97,22 +97,24 @@ export function ActivityBar({ activeView, onViewChange, consoleVisible, onToggle
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useState } from "react";
-
-// ... imports ...
+import { useShallow } from "zustand/react/shallow";
 
 // Sidebar List for Quick Connection Switching (Collapsible)
 export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean, onToggle: () => void }) {
-    const connections = useAppStore((state) => state.connections);
-    const activeTabId = useAppStore((state) => state.activeTabId);
-    const setActiveTab = useAppStore((state) => state.setActiveTab);
-    const addTab = useAppStore((state) => state.addTab);
-    const replaceTab = useAppStore((state) => state.replaceTab);
-    const tabs = useAppStore((state) => state.tabs);
+    const { connections, activeTabId, setActiveTab, addTab, replaceTab, tabs, setExpandedConnectionId } = useAppStore(
+        useShallow((state) => ({
+            connections: state.connections,
+            activeTabId: state.activeTabId,
+            setActiveTab: state.setActiveTab,
+            addTab: state.addTab,
+            replaceTab: state.replaceTab,
+            tabs: state.tabs,
+            setExpandedConnectionId: state.setExpandedConnectionId,
+        }))
+    );
     const { t } = useTranslation();
 
     const [searchTerm, setSearchTerm] = useState("");
-
-    const setExpandedConnectionId = useAppStore(state => state.setExpandedConnectionId);
 
     // If a connection is already open in a tab, switch to it. Otherwise just expand (don't create tab)
     const handleConnectionClick = (conn: Connection) => {

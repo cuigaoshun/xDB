@@ -22,6 +22,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { CreateTableDialog } from "@/components/workspace/CreateTableDialog";
 
+// 系统数据库列表（移到组件外部避免重复创建）
+const SYSTEM_DBS = new Set(['information_schema', 'mysql', 'performance_schema', 'sys']);
+
 interface ConnectionTreeItemProps {
     connection: Connection;
     isActive: boolean;
@@ -52,9 +55,6 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     // Create table dialog state
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
     const [createTableDbName, setCreateTableDbName] = useState<string>('');
-
-    // System databases to exclude
-    const SYSTEM_DBS = new Set(['information_schema', 'mysql', 'performance_schema', 'sys']);
 
     // Auto-expand if filter matches something inside (and we have data)
     // This is tricky with lazy loading. We only filter what we have.
@@ -109,7 +109,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     };
 
     // Also expand when selecting the connection
-    const handleSelect = async (e: React.MouseEvent) => {
+    const handleSelect = async (_e: React.MouseEvent) => {
         onSelect(connection);
         // 只展开，不折叠
         if (!isExpanded) {

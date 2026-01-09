@@ -9,7 +9,8 @@ const resources = {
         "name": "NeoDB"
       },
       "sidebar": {
-        "connections": "Connections"
+        "connections": "Connections",
+        "explorer": "Explorer"
       },
       "common": {
         "noActiveConnection": "No Active Connection",
@@ -100,6 +101,7 @@ const resources = {
         "combineLogic": "Combine top-level items with:"
       },
       "menu": {
+        "home": "Home",
         "file": "File",
         "newConnection": "New Connection",
         "exit": "Exit",
