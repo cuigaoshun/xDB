@@ -103,6 +103,51 @@ async fn get_redis_connection_with_retry(client: &redis::Client) -> Result<redis
         .map_err(|e| format!("Failed to get Redis connection: {}", e))
 }
 
+// 辅助函数：从 pipeline 结果解析 KeyDetail
+fn parse_key_details_from_pipeline(keys: &[String], results: &[redis::Value]) -> Vec<KeyDetail> {
+    keys.iter().enumerate().map(|(i, key)| {
+        let type_val = &results[i * 3];
+        let ttl_val = &results[i * 3 + 1];
+        let mem_val = &results[i * 3 + 2];
+
+        let type_str: String = String::from_redis_value(type_val).unwrap_or_else(|_| "unknown".to_string());
+        let ttl: i64 = i64::from_redis_value(ttl_val).unwrap_or(-1);
+        let memory: Option<i64> = Option::<i64>::from_redis_value(mem_val).ok().flatten();
+
+        KeyDetail {
+            key: key.clone(),
+            r#type: type_str,
+            ttl,
+            length: memory,
+        }
+    }).collect()
+}
+
+// 辅助函数：通用的 SCAN 类命令执行
+async fn execute_scan_command(
+    con: &mut redis::aio::MultiplexedConnection,
+    scan_cmd: &str,
+    key: &str,
+    cursor: &str,
+    pattern: &str,
+    count: usize,
+) -> Result<ValueScanResult, String> {
+    let mut cmd = redis::cmd(scan_cmd);
+    cmd.arg(key).arg(cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
+
+    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
+        .query_async(con)
+        .await
+        .map_err(|e| format!("Redis {} failed: {}", scan_cmd, e))?;
+
+    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
+
+    Ok(ValueScanResult {
+        cursor: next_cursor,
+        values: json_values,
+    })
+}
+
 #[command]
 pub async fn execute_redis_command(
     app_state: State<'_, AppState>,
@@ -156,8 +201,7 @@ pub async fn get_redis_keys(
         .map_err(|e| format!("Redis scan failed: {}", e))?;
         
     // Fetch details pipeline if we have keys
-    let mut details = Vec::new();
-    if !key_strings.is_empty() {
+    let details = if !key_strings.is_empty() {
         let mut pipe = redis::pipe();
         for key in &key_strings {
             pipe.cmd("TYPE").arg(key);
@@ -168,23 +212,10 @@ pub async fn get_redis_keys(
         let results: Vec<redis::Value> = pipe.query_async(&mut con).await
             .map_err(|e| format!("Pipeline failed: {}", e))?;
             
-        for (i, key) in key_strings.iter().enumerate() {
-            let type_val = &results[i * 3];
-            let ttl_val = &results[i * 3 + 1];
-            let mem_val = &results[i * 3 + 2];
-
-            let type_str: String = String::from_redis_value(type_val).unwrap_or_else(|_| "unknown".to_string());
-            let ttl: i64 = i64::from_redis_value(ttl_val).unwrap_or(-1);
-            let memory: Option<i64> = Option::<i64>::from_redis_value(mem_val).ok().flatten();
-
-            details.push(KeyDetail {
-                key: key.clone(),
-                r#type: type_str,
-                ttl,
-                length: memory,
-            });
-        }
-    }
+        parse_key_details_from_pipeline(&key_strings, &results)
+    } else {
+        Vec::new()
+    };
 
     Ok(ScanResult {
         cursor: next_cursor,
@@ -208,7 +239,6 @@ pub async fn get_keys_details(
     let mut con = get_redis_connection_with_retry(&client).await?;
 
     let mut pipe = redis::pipe();
-    
     for key in &keys {
         pipe.cmd("TYPE").arg(key);
         pipe.cmd("TTL").arg(key);
@@ -218,25 +248,7 @@ pub async fn get_keys_details(
     let results: Vec<redis::Value> = pipe.query_async(&mut con).await
         .map_err(|e| format!("Pipeline failed: {}", e))?;
 
-    let mut details = Vec::new();
-    for (i, key) in keys.iter().enumerate() {
-        let type_val = &results[i * 3];
-        let ttl_val = &results[i * 3 + 1];
-        let mem_val = &results[i * 3 + 2];
-
-        let type_str: String = String::from_redis_value(type_val).unwrap_or_else(|_| "unknown".to_string());
-        let ttl: i64 = i64::from_redis_value(ttl_val).unwrap_or(-1);
-        let memory: Option<i64> = Option::<i64>::from_redis_value(mem_val).ok().flatten();
-
-        details.push(KeyDetail {
-            key: key.clone(),
-            r#type: type_str,
-            ttl,
-            length: memory,
-        });
-    }
-
-    Ok(details)
+    Ok(parse_key_details_from_pipeline(&keys, &results))
 }
 
 #[command]
@@ -252,24 +264,7 @@ pub async fn scan_hash_values(
 ) -> Result<ValueScanResult, String> {
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
     let mut con = get_redis_connection_with_retry(&client).await?;
-
-    let count = count.unwrap_or(100);
-    let pattern = pattern.unwrap_or_else(|| "*".to_string());
-
-    let mut cmd = redis::cmd("HSCAN");
-    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
-
-    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
-        .query_async(&mut con)
-        .await
-        .map_err(|e| format!("Redis HSCAN failed: {}", e))?;
-
-    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
-
-    Ok(ValueScanResult {
-        cursor: next_cursor,
-        values: json_values,
-    })
+    execute_scan_command(&mut con, "HSCAN", &key, &cursor, &pattern.unwrap_or_else(|| "*".to_string()), count.unwrap_or(100)).await
 }
 
 #[command]
@@ -285,24 +280,7 @@ pub async fn scan_set_members(
 ) -> Result<ValueScanResult, String> {
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
     let mut con = get_redis_connection_with_retry(&client).await?;
-
-    let count = count.unwrap_or(100);
-    let pattern = pattern.unwrap_or_else(|| "*".to_string());
-
-    let mut cmd = redis::cmd("SSCAN");
-    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
-
-    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
-        .query_async(&mut con)
-        .await
-        .map_err(|e| format!("Redis SSCAN failed: {}", e))?;
-
-    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
-
-    Ok(ValueScanResult {
-        cursor: next_cursor,
-        values: json_values,
-    })
+    execute_scan_command(&mut con, "SSCAN", &key, &cursor, &pattern.unwrap_or_else(|| "*".to_string()), count.unwrap_or(100)).await
 }
 
 #[command]
@@ -318,24 +296,7 @@ pub async fn scan_zset_members(
 ) -> Result<ValueScanResult, String> {
     let client = get_or_create_redis_client(&app_state, &db_state, connection_id, db).await?;
     let mut con = get_redis_connection_with_retry(&client).await?;
-
-    let count = count.unwrap_or(100);
-    let pattern = pattern.unwrap_or_else(|| "*".to_string());
-
-    let mut cmd = redis::cmd("ZSCAN");
-    cmd.arg(&key).arg(&cursor).arg("MATCH").arg(pattern).arg("COUNT").arg(count);
-
-    let (next_cursor, values): (String, Vec<redis::Value>) = cmd
-        .query_async(&mut con)
-        .await
-        .map_err(|e| format!("Redis ZSCAN failed: {}", e))?;
-
-    let json_values: Vec<JsonValue> = values.into_iter().map(redis_value_to_json).collect();
-
-    Ok(ValueScanResult {
-        cursor: next_cursor,
-        values: json_values,
-    })
+    execute_scan_command(&mut con, "ZSCAN", &key, &cursor, &pattern.unwrap_or_else(|| "*".to_string()), count.unwrap_or(100)).await
 }
 
 #[command]

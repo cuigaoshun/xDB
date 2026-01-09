@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use sqlx::FromRow;
 use chrono::NaiveDateTime;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ColumnInfo {
+    pub name: String,
+    pub type_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SqlResult {
+    pub columns: Vec<ColumnInfo>,
+    pub rows: Vec<Map<String, Value>>,
+    pub affected_rows: u64,
+}
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Connection {

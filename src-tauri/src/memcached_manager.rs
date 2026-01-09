@@ -26,7 +26,6 @@ fn get_memcached_url(connection: &Connection) -> String {
 // Ideally we should store it in AppState but the crate's Client might not be Clone or Send/Sync the way we want?
 // memcache::Client is Send + Sync.
 fn get_or_create_client(
-    _app_state: &AppState,
     db_state: &DbState,
     connection_id: i64,
 ) -> Result<Client, String> {
@@ -54,18 +53,17 @@ fn get_or_create_client(
 
 #[command]
 pub async fn get_memcached_keys(
-    app_state: State<'_, AppState>,
+    _app_state: State<'_, AppState>,
     db_state: State<'_, DbState>,
     connection_id: i64,
     filter: Option<String>,
 ) -> Result<Vec<MemcachedKey>, String> {
     // Since memcache ops are blocking, we use spawn_blocking
-    let app_state_cloned = app_state.inner().clone();
     let db_state_cloned = db_state.inner().clone();
     
     // Check connection first using memcache crate
     tauri::async_runtime::spawn_blocking(move || {
-        let client = get_or_create_client(&app_state_cloned, &db_state_cloned, connection_id)?;
+        let client = get_or_create_client(&db_state_cloned, connection_id)?;
         // Simple connectivity check
         client.stats().map_err(|e| format!("Failed to get stats: {}", e))?;
         Ok::<(), String>(())
@@ -169,16 +167,15 @@ async fn list_keys_via_tcp(db_state: &State<'_, DbState>, connection_id: i64) ->
 
 #[command]
 pub async fn get_memcached_value(
-    app_state: State<'_, AppState>,
+    _app_state: State<'_, AppState>,
     db_state: State<'_, DbState>,
     connection_id: i64,
     key: String,
 ) -> Result<String, String> {
-    let app_state_cloned = app_state.inner().clone();
     let db_state_cloned = db_state.inner().clone();
     
     let value = tauri::async_runtime::spawn_blocking(move || {
-        let client = get_or_create_client(&app_state_cloned, &db_state_cloned, connection_id)?;
+        let client = get_or_create_client(&db_state_cloned, connection_id)?;
         // Use Vec<u8> to get raw bytes
         let val: Option<Vec<u8>> = client.get(&key).map_err(|e| e.to_string())?;
         
@@ -227,18 +224,17 @@ pub async fn get_memcached_value(
 
 #[command]
 pub async fn set_memcached_value(
-    app_state: State<'_, AppState>,
+    _app_state: State<'_, AppState>,
     db_state: State<'_, DbState>,
     connection_id: i64,
     key: String,
     value: String,
     ttl: u32,
 ) -> Result<(), String> {
-    let app_state_cloned = app_state.inner().clone();
     let db_state_cloned = db_state.inner().clone();
     
     tauri::async_runtime::spawn_blocking(move || {
-        let client = get_or_create_client(&app_state_cloned, &db_state_cloned, connection_id)?;
+        let client = get_or_create_client(&db_state_cloned, connection_id)?;
         client.set(&key, value, ttl).map_err(|e| e.to_string())?;
         Ok::<_, String>(())
     }).await.map_err(|e| e.to_string())??;
@@ -248,16 +244,15 @@ pub async fn set_memcached_value(
 
 #[command]
 pub async fn delete_memcached_key(
-    app_state: State<'_, AppState>,
+    _app_state: State<'_, AppState>,
     db_state: State<'_, DbState>,
     connection_id: i64,
     key: String,
 ) -> Result<(), String> {
-    let app_state_cloned = app_state.inner().clone();
     let db_state_cloned = db_state.inner().clone();
     
     tauri::async_runtime::spawn_blocking(move || {
-        let client = get_or_create_client(&app_state_cloned, &db_state_cloned, connection_id)?;
+        let client = get_or_create_client(&db_state_cloned, connection_id)?;
         client.delete(&key).map_err(|e| e.to_string())?;
         Ok::<_, String>(())
     }).await.map_err(|e| e.to_string())??;

@@ -1,26 +1,12 @@
 use crate::db::DbState;
-use crate::models::Connection;
+use crate::models::{ColumnInfo, Connection, SqlResult};
 use crate::state::AppState;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
 use sqlx::{Column, MySqlPool, Row, TypeInfo};
 use tauri::{command, State};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ColumnInfo {
-    pub name: String,
-    pub type_name: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SqlResult {
-    pub columns: Vec<ColumnInfo>,
-    pub rows: Vec<Map<String, Value>>,
-    pub affected_rows: u64,
-}
 
 // 辅助函数：获取或创建 MySQL 连接池
 async fn get_or_create_pool(

@@ -173,11 +173,11 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             : `${processedQuery} LIMIT ${limit}; `;
     };
 
-    // 检测表的主键
-    const detectPrimaryKeys = async () => {
+    // 检测表的主键，返回主键数组
+    const detectPrimaryKeys = async (): Promise<string[]> => {
         if (!dbName || !tableName) {
             setPrimaryKeys([]);
-            return;
+            return [];
         }
 
         try {
@@ -189,9 +189,11 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
             const keys = res.rows.map(row => row.COLUMN_NAME as string);
             setPrimaryKeys(keys);
+            return keys;
         } catch (err) {
             console.error("Failed to detect primary keys:", err);
             setPrimaryKeys([]);
+            return [];
         }
     };
 
@@ -624,22 +626,19 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
             // 如果是表查询,检测主键
             if (dbName && tableName) {
-                await detectPrimaryKeys();
+                const keys = await detectPrimaryKeys();
 
-                // 判断是否可编辑
-                // 需要延迟一下以确保 primaryKeys 状态已更新
-                setTimeout(() => {
-                    if (primaryKeys.length > 0 && isSingleTableQuery(query)) {
-                        setIsEditable(true);
-                        setEditDisabledReason('');
-                    } else if (primaryKeys.length === 0) {
-                        setIsEditable(false);
-                        setEditDisabledReason('表没有主键,无法编辑');
-                    } else {
-                        setIsEditable(false);
-                        setEditDisabledReason('多表查询不支持直接编辑,请使用 UPDATE 语句');
-                    }
-                }, 100);
+                // 直接使用返回的主键数组判断是否可编辑
+                if (keys.length > 0 && isSingleTableQuery(query)) {
+                    setIsEditable(true);
+                    setEditDisabledReason('');
+                } else if (keys.length === 0) {
+                    setIsEditable(false);
+                    setEditDisabledReason('表没有主键,无法编辑');
+                } else {
+                    setIsEditable(false);
+                    setEditDisabledReason('多表查询不支持直接编辑,请使用 UPDATE 语句');
+                }
             } else if (!isSingleTableQuery(query)) {
                 setIsEditable(false);
                 setEditDisabledReason('多表查询不支持直接编辑,请使用 UPDATE 语句');

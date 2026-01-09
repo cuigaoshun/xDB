@@ -10,12 +10,18 @@ pub struct AppState {
     pub redis_clients: Arc<Mutex<HashMap<String, redis::Client>>>,
 }
 
-impl AppState {
-    pub fn new() -> Self {
+impl Default for AppState {
+    fn default() -> Self {
         Self {
             pools: Arc::new(Mutex::new(HashMap::new())),
             sqlite_pools: Arc::new(Mutex::new(HashMap::new())),
             redis_clients: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+}
+
+impl AppState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
