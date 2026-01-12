@@ -22,6 +22,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn, transparentTheme } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -907,15 +913,17 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                     <div className="h-full flex flex-col gap-0">
 
                                         <div className="border rounded-md bg-background overflow-auto flex-1">
-                                            <Table>
+                                            <Table style={{ tableLayout: 'fixed' }}>
                                                 <TableHeader className="sticky top-0 bg-muted/50">
                                                     <TableRow>
                                                         {result.columns.map((col, i) => (
-                                                            <TableHead key={i} className="whitespace-nowrap max-w-[250px]">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="font-semibold text-foreground">{col.name}</span>
-                                                                    {getColumnTypeIcon(col.type_name)}
-                                                                    <span className="text-xs text-muted-foreground lowercase">({col.type_name})</span>
+                                                            <TableHead key={i} className="whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-1 flex-1 min-w-0 truncate">
+                                                                        <span className="font-semibold text-foreground truncate">{col.name}</span>
+                                                                        {getColumnTypeIcon(col.type_name)}
+                                                                        <span className="text-xs text-muted-foreground lowercase truncate">({col.type_name})</span>
+                                                                    </div>
                                                                     {/* 筛选下拉菜单 */}
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild>
@@ -923,14 +931,14 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                                 variant="ghost"
                                                                                 size="sm"
                                                                                 className={cn(
-                                                                                    "h-5 w-5 p-0 ml-1",
+                                                                                    "h-5 w-5 p-0 ml-1 flex-shrink-0",
                                                                                     inlineFilters[col.name] && "text-blue-600"
                                                                                 )}
                                                                             >
                                                                                 <Filter className="h-3 w-3" />
                                                                             </Button>
                                                                         </DropdownMenuTrigger>
-                                                                        <DropdownMenuContent align="start" className="w-48 max-h-60 overflow-auto">
+                                                                        <DropdownMenuContent align="end" className="w-48 max-h-60 overflow-auto">
                                                                             <DropdownMenuItem
                                                                                 onClick={() => setInlineFilters(prev => ({ ...prev, [col.name]: '' }))}
                                                                                 className="text-xs"
@@ -970,13 +978,13 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                     {newRows.map((row, rowIdx) => (
                                                         <TableRow key={`new-${rowIdx}`} className="bg-blue-50/50 dark:bg-blue-950/20">
                                                             {result.columns.map((col, colIdx) => (
-                                                                <TableCell key={colIdx} className="whitespace-nowrap max-w-[300px]">
+                                                                <TableCell key={colIdx} className="whitespace-nowrap w-[200px] min-w-[200px]">
                                                                     {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && editingCell?.isNewRow ? (
-                                                                        <div className="relative">
+                                                                        <div className="relative w-[168px]">
                                                                             <Input
                                                                                 value={editValue}
                                                                                 onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="h-7 text-xs w-full pr-14"
+                                                                                className="h-7 text-xs w-[168px] pr-14"
                                                                                 autoFocus
                                                                                 onKeyDown={(e) => {
                                                                                     if (e.key === 'Enter') handleCellSubmit();
@@ -993,16 +1001,23 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                             </div>
                                                                         </div>
                                                                     ) : (
-                                                                        <div
-                                                                            className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded truncate"
-                                                                            onDoubleClick={() => handleCellEdit(rowIdx, col.name, row[col.name], true)}
-                                                                        >
-                                                                            {row[col.name] === null || row[col.name] === '' ? (
-                                                                                <span className="text-muted-foreground italic">NULL</span>
-                                                                            ) : (
-                                                                                typeof row[col.name] === 'object' ? JSON.stringify(row[col.name]) : String(row[col.name])
-                                                                            )}
-                                                                        </div>
+                                                                        <ContextMenu>
+                                                                            <ContextMenuTrigger asChild>
+                                                                                <div className="truncate cursor-context-menu">
+                                                                                    {row[col.name] === null || row[col.name] === '' ? (
+                                                                                        <span className="text-muted-foreground italic">NULL</span>
+                                                                                    ) : (
+                                                                                        typeof row[col.name] === 'object' ? JSON.stringify(row[col.name]) : String(row[col.name])
+                                                                                    )}
+                                                                                </div>
+                                                                            </ContextMenuTrigger>
+                                                                            <ContextMenuContent>
+                                                                                <ContextMenuItem onClick={() => handleCellEdit(rowIdx, col.name, row[col.name], true)}>
+                                                                                    <Pencil className="h-3 w-3 mr-2" />
+                                                                                    {t('common.edit', '编辑')}
+                                                                                </ContextMenuItem>
+                                                                            </ContextMenuContent>
+                                                                        </ContextMenu>
                                                                     )}
                                                                 </TableCell>
                                                             ))}
@@ -1059,13 +1074,13 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                 }}
                                                             >
                                                                 {result.columns.map((col, colIdx) => (
-                                                                    <TableCell key={colIdx} className="whitespace-nowrap max-w-[300px]">
+                                                                    <TableCell key={colIdx} className="whitespace-nowrap w-[200px] min-w-[200px]">
                                                                         {editingCell?.rowIdx === originalRowIdx && editingCell?.colName === col.name && !editingCell?.isNewRow ? (
-                                                                            <div className="relative">
+                                                                            <div className="relative w-[168px]">
                                                                                 <Input
                                                                                     value={editValue}
                                                                                     onChange={(e) => setEditValue(e.target.value)}
-                                                                                    className="h-7 text-xs w-full pr-14"
+                                                                                    className="h-7 text-xs w-[168px] pr-14"
                                                                                     autoFocus
                                                                                     onKeyDown={(e) => {
                                                                                         if (e.key === 'Enter') handleCellSubmit();
@@ -1083,7 +1098,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                             </div>
                                                                         ) : (
                                                                             <div
-                                                                                className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded truncate"
+                                                                                className="truncate"
                                                                             >
                                                                                 {row[col.name] === null ? (
                                                                                     <span className="text-muted-foreground italic">NULL</span>
@@ -1108,7 +1123,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                                                 });
                                                                                                 // Update local data
                                                                                                 const updatedRows = [...result.rows];
-                                                                                                updatedRows[rowIdx] = { ...updatedRows[rowIdx], [col.name]: newValue };
+                                                                                                updatedRows[originalRowIdx] = { ...updatedRows[originalRowIdx], [col.name]: newValue };
                                                                                                 setResult({ ...result, rows: updatedRows });
                                                                                                 setOriginalRows(updatedRows);
                                                                                             } catch (err: any) {

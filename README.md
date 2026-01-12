@@ -1,6 +1,6 @@
 # xDB
 
-<img src="public/app-icon.svg" width="128" align="right" />
+<img src="public/app-icon.png" width="128" align="right" />
 
 **xDB** 是一款基于 Tauri v2 和 React 构建的现代化、极速、跨平台数据库管理枢纽。它旨在打破不同数据库之间的界限，为开发者提供一个全能（Cross-engine）且优雅的操控台。
 
