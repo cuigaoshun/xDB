@@ -863,7 +863,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             </div>
 
             {showFilter && (filterColumns.length > 0 || isLoadingFilterColumns) && (
-                <div className="p-2 bg-muted/20">
+                <div className="px-4 py-1 bg-muted/20">
                     <FilterBuilder
                         columns={filterColumns}
                         onChange={setWhereClause}
@@ -886,7 +886,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                     <ResizablePanel defaultSize={showDDL ? 70 : 100} minSize={30}>
                         <div className="h-full flex flex-col">
                             {/* Query Area */}
-                            <div className="h-1/3 p-4 bg-background">
+                            <div className="h-1/3 px-4 py-1 bg-background">
                                 <Textarea
                                     value={sql}
                                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSql(e.target.value)}
@@ -896,7 +896,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                             </div>
 
                             {/* Result Area */}
-                            <div className="flex-1 overflow-auto p-4">
+                            <div className="flex-1 overflow-auto px-4 py-1">
                                 {error && (
                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap">
                                         Error: {error}

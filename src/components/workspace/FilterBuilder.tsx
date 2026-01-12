@@ -308,6 +308,22 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState }: Fi
                                 <Trash2 className="h-3 w-3" />
                             </Button>
                         </div>
+
+                        {/* Logic operator selector (shown after each item, not for last item) */}
+                        {!isLast && siblings.length > 1 && (
+                            <Select
+                                value={node.nextLogic || 'AND'}
+                                onValueChange={(val) => updateNode(node.id, { nextLogic: val as LogicOperator })}
+                            >
+                                <SelectTrigger className="w-[70px] h-6 text-xs bg-muted/50 border-dashed ml-2">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="AND">AND</SelectItem>
+                                    <SelectItem value="OR">OR</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
 
                     {node.type === 'group' && node.children && node.children.length > 0 && (
@@ -319,30 +335,12 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState }: Fi
                         </div>
                     )}
                 </div>
-
-                {/* Logic operator selector between siblings (not shown for last item) */}
-                {!isLast && siblings.length > 1 && (
-                    <div className="flex items-center pl-4 py-1">
-                        <Select
-                            value={node.nextLogic || 'AND'}
-                            onValueChange={(val) => updateNode(node.id, { nextLogic: val as LogicOperator })}
-                        >
-                            <SelectTrigger className="w-[55px] h-6 text-xs bg-muted/50 border-dashed">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="AND">AND</SelectItem>
-                                <SelectItem value="OR">OR</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
             </div>
         );
     };
 
     return (
-        <div className="p-4 border rounded bg-background/50">
+        <div className="py-1 bg-background/50">
             {renderNode(root)}
         </div>
     );
