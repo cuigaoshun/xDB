@@ -4,6 +4,7 @@ import { RedisWorkspace } from "../workspace/RedisWorkspace";
 import { MemcachedWorkspace } from "../workspace/MemcachedWorkspace";
 import { SqliteWorkspace } from "../workspace/SqliteWorkspace";
 import { TableSchemaTab } from "../workspace/TableSchemaTab";
+import { DatabaseTablesTab } from "../workspace/DatabaseTablesTab";
 import { ConnectionManager } from "../workspace/ConnectionManager";
 import { SettingsPage } from "../settings/SettingsPage";
 import { useAppStore } from "@/store/useAppStore";
@@ -94,6 +95,14 @@ export function MainLayout() {
                                                             connectionId={activeTab.connectionId}
                                                             dbName={activeTab.schemaInfo.dbName}
                                                             tableName={activeTab.schemaInfo.tableName}
+                                                        />
+                                                    ) : activeTab.tabType === 'database-tables' && activeTab.databaseTablesInfo ? (
+                                                        <DatabaseTablesTab
+                                                            key={activeTab.id}
+                                                            tabId={activeTab.id}
+                                                            connectionId={activeTab.connectionId}
+                                                            dbName={activeTab.databaseTablesInfo.dbName}
+                                                            dbType={activeTab.type}
                                                         />
                                                     ) : activeTab.type === 'mysql' ? (
                                                         <MysqlWorkspace

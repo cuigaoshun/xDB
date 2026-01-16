@@ -14,7 +14,7 @@ export interface Connection {
   created_at?: string;
 }
 
-export type TabType = 'connection' | 'query' | 'table-schema';
+export type TabType = 'connection' | 'query' | 'table-schema' | 'database-tables';
 
 export interface Tab {
   id: string;
@@ -32,6 +32,10 @@ export interface Tab {
   schemaInfo?: {
     dbName: string;
     tableName: string;
+  };
+  // 数据库表列表专用字段
+  databaseTablesInfo?: {
+    dbName: string;
   };
 }
 

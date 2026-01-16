@@ -252,6 +252,21 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 await loadTables(dbName);
             }
         }
+
+        // 打开数据库表列表 Tab
+        if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
+            const tabId = `db-tables-${connection.id}-${dbName}`;
+            addTab({
+                id: tabId,
+                title: dbName,
+                type: connection.db_type,
+                tabType: 'database-tables',
+                connectionId: connection.id,
+                databaseTablesInfo: {
+                    dbName
+                }
+            });
+        }
     };
 
     const loadTables = async (dbName: string) => {
