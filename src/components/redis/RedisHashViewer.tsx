@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
+
 import { confirm } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

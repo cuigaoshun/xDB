@@ -65,7 +65,7 @@ export function RedisListViewer({
         args: [keyName, index.toString(), value],
         db,
       });
-      addCommandToConsole(`LSET ${keyName} ${index} "${value}"`);
+      addCommandToConsole({ command: `LSET ${keyName} ${index} "${value}"`, databaseType: "redis" });
 
       onRefresh();
       handleCancelEdit();
@@ -96,7 +96,7 @@ export function RedisListViewer({
         args: [keyName, newItem.value],
         db,
       });
-      addCommandToConsole(`${command} ${keyName} "${newItem.value}"`);
+      addCommandToConsole({ command: `${command} ${keyName} "${newItem.value}"`, databaseType: "redis" });
 
       onRefresh();
       setIsAddDialogOpen(false);
@@ -135,6 +135,7 @@ export function RedisListViewer({
       await invoke("execute_redis_command", {
         connectionId,
         command: "LREM",
+        args: [keyName, "1", String(valueToDelete)],
         db,
       });
       onRefresh();
@@ -230,7 +231,7 @@ export function RedisListViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(String(val))}
+                          onClick={() => handleDelete(i)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
