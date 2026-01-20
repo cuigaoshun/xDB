@@ -122,7 +122,7 @@ export function MainLayout() {
                                                             tabId={activeTab.id}
                                                             name={activeTab.title}
                                                             connectionId={activeTab.connectionId}
-                                                            db={activeTab.dbName ? parseInt(activeTab.dbName) : 0}
+                                                            db={activeTab.redisDbInfo?.db ?? (activeTab.dbName ? parseInt(activeTab.dbName) : 0)}
                                                             savedResult={activeTab.savedResult}
                                                         />
                                                     ) : activeTab.type === 'memcached' ? (

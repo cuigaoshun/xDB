@@ -235,9 +235,19 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
-        // For Redis, clicking a DB just selects it (opens tab)
+        // For Redis, clicking a DB creates a new tab
         if (connection.db_type === 'redis') {
-            onSelectTable?.(connection, dbName, ""); // Table name empty for Redis
+            const tabId = `redis-db-${connection.id}-${dbName}`;
+            addTab({
+                id: tabId,
+                title: `DB ${dbName} - ${connection.name}`,
+                type: 'redis',
+                tabType: 'redis-db',
+                connectionId: connection.id,
+                redisDbInfo: {
+                    db: parseInt(dbName)
+                }
+            });
             return;
         }
 

@@ -709,7 +709,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                         {key.key}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end text-[10px] text-muted-foreground min-w-[60px]">
+                    <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
                       <span>{formatTTL(key.ttl)}</span>
                       <span>{formatSize(key.length)}</span>
                     </div>

@@ -14,7 +14,7 @@ export interface Connection {
   created_at?: string;
 }
 
-export type TabType = 'connection' | 'query' | 'table-schema' | 'database-tables';
+export type TabType = 'connection' | 'query' | 'table-schema' | 'database-tables' | 'redis-db';
 
 export interface Tab {
   id: string;
@@ -36,6 +36,10 @@ export interface Tab {
   // 数据库表列表专用字段
   databaseTablesInfo?: {
     dbName: string;
+  };
+  // Redis数据库专用字段
+  redisDbInfo?: {
+    db: number;
   };
 }
 
