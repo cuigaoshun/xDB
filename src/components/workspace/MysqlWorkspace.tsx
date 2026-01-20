@@ -142,7 +142,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const [isLoadingDDL, setIsLoadingDDL] = useState(false);
 
     // Filter related state
-    const [showFilter, setShowFilter] = useState(!!tableName); // 有表名时默认打开筛选器
     const [, setWhereClause] = useState("");
     const [filterColumns, setFilterColumns] = useState<ColumnInfo[]>([]);
     const [isLoadingFilterColumns, setIsLoadingFilterColumns] = useState(false);
@@ -213,9 +212,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         }
     }, [showDDL, dbName, tableName]);
 
-    // Load filter columns when filter is opened and columns are not loaded
+    // Load filter columns when table is available and columns are not loaded
     useEffect(() => {
-        if (showFilter && filterColumns.length === 0 && dbName && tableName && !isLoadingFilterColumns) {
+        if (tableName && filterColumns.length === 0 && dbName && !isLoadingFilterColumns) {
             setIsLoadingFilterColumns(true);
             const loadColumns = async () => {
                 try {
@@ -240,7 +239,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             };
             loadColumns();
         }
-    }, [showFilter, dbName, tableName]);
+    }, [dbName, tableName]);
 
     // 辅助函数：自动为 SELECT 语句添加 LIMIT 和 OFFSET
     const autoAddLimit = (query: string, limit: number, offset: number): string => {
@@ -909,6 +908,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             {/* Toolbar */}
             <div className="p-2 flex gap-2 items-center bg-muted/30 justify-between">
                 <div className="flex gap-2 items-center">
+                    {/* 连接信息 */}
                     <div className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded">
                         <span className="text-sm font-semibold text-foreground whitespace-nowrap">{connectionName}</span>
                         {dbName && (
@@ -924,56 +924,18 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                             </>
                         )}
                     </div>
+
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
-                    {tableName && (
-                        <Button
-                            variant={showFilter ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={async () => {
-                                const newShowFilter = !showFilter;
-                                setShowFilter(newShowFilter);
-                                // 如果要显示筛选器但没有列信息，尝试获取
-                                if (newShowFilter && filterColumns.length === 0 && dbName && tableName) {
-                                    setIsLoadingFilterColumns(true);
-                                    try {
-                                        // 使用 SHOW COLUMNS 获取列信息
-                                        const schemaSql = `SHOW COLUMNS FROM \`${dbName}\`.\`${tableName}\``;
-                                        const res = await invoke<SqlResult>("execute_sql", {
-                                            connectionId,
-                                            sql: schemaSql,
-                                            dbName
-                                        });
-                                        if (res.rows && res.rows.length > 0) {
-                                            // SHOW COLUMNS 返回 Field, Type, Null, Key, Default, Extra
-                                            const cols: ColumnInfo[] = res.rows.map(row => ({
-                                                name: (row.Field || row.field || Object.values(row)[0]) as string,
-                                                type_name: (row.Type || row.type || Object.values(row)[1] || 'text') as string
-                                            }));
-                                            setFilterColumns(cols);
-                                        }
-                                    } catch (err) {
-                                        console.error("Failed to fetch columns for filter:", err);
-                                    } finally {
-                                        setIsLoadingFilterColumns(false);
-                                    }
-                                }
-                            }}
-                            disabled={isLoadingFilterColumns}
-                            title={t('common.filter', 'Filter')}
-                            className={cn("mr-1", showFilter && "bg-muted")}
-                        >
-                            {isLoadingFilterColumns ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Filter className="h-4 w-4 mr-1" />}
-                            {t('common.filter', 'Filter')}
-                        </Button>
-                    )}
+
+                    {/* 运行按钮 */}
                     <Button
                         size="sm"
                         onClick={handleExecute}
                         disabled={isLoading}
-                        className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                        className="bg-green-600 hover:bg-green-700 text-white gap-1"
                     >
                         {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                        {t('common.run', 'Run')}
+                        {t('common.run', '执行')}
                     </Button>
 
                     {/* 数据操作按钮 */}
@@ -985,10 +947,10 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                 variant="outline"
                                 onClick={handleAddNewRow}
                                 disabled={!isEditable}
-                                className="gap-2"
+                                className="gap-1.5"
                                 title={!isEditable ? editDisabledReason : t('common.add', '新增')}
                             >
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-3.5 w-3.5" />
                                 {t('common.add', '新增')}
                             </Button>
                             <Button
@@ -997,9 +959,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                 onClick={handleCopyRow}
                                 disabled={!isEditable || selectedRowIndices.length === 0}
                                 title={!isEditable ? editDisabledReason : t('common.duplicate', '复制') + ` ${selectedRowIndices.length} ` + t('common.items', '条')}
-                                className="gap-2"
+                                className="gap-1.5"
                             >
-                                <Copy className="h-3 w-3" />
+                                <Copy className="h-3.5 w-3.5" />
                                 {t('common.duplicate', '复制')} {selectedRowIndices.length > 0 && `(${selectedRowIndices.length})`}
                             </Button>
                             <Button
@@ -1007,10 +969,10 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                 variant="outline"
                                 onClick={handleRowDelete}
                                 disabled={!isEditable || selectedRowIndices.length === 0}
-                                className="gap-2 text-red-600 hover:text-red-700"
+                                className="gap-1.5 text-red-600 hover:text-red-700"
                                 title={!isEditable ? editDisabledReason : t('common.delete', '删除') + ` ${selectedRowIndices.length} ` + t('common.items', '条')}
                             >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-3.5 w-3.5" />
                                 {t('common.delete', '删除')} {selectedRowIndices.length > 0 && `(${selectedRowIndices.length})`}
                             </Button>
 
@@ -1021,9 +983,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                         size="sm"
                                         onClick={handleSubmitChanges}
                                         disabled={isLoading}
-                                        className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                        className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                                     >
-                                        {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                                         {t('common.submitChanges', '提交修改')}
                                     </Button>
                                     <Button
@@ -1031,9 +993,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                         variant="outline"
                                         onClick={handleCancelChanges}
                                         disabled={isLoading}
-                                        className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
                                     >
-                                        <X className="h-3 w-3" />
+                                        <X className="h-3.5 w-3.5" />
                                         {t('common.cancel', '取消')}
                                     </Button>
                                 </>
@@ -1059,8 +1021,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                 </div>
             </div>
 
-            {showFilter && (filterColumns.length > 0 || isLoadingFilterColumns) && (
-                <div className="px-4 py-1 bg-muted/20">
+            {/* 筛选器 - 有表名时始终显示 */}
+            {tableName && (filterColumns.length > 0 || isLoadingFilterColumns) && (
+                <div className="px-4 py-1 bg-muted/20 border-b">
                     <FilterBuilder
                         columns={filterColumns}
                         primaryKeys={primaryKeys}

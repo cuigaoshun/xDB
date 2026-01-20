@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, FolderPlus, Play, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, FolderPlus, Filter, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -257,14 +257,15 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                     {onExecute && (
                                         <Button
                                             size="sm"
+                                            variant="outline"
                                             onClick={() => {
                                                 const whereClause = generateWhereClause(root);
                                                 const orderByClause = orderByField ? `${orderByField} ${orderByDirection}` : '';
                                                 onExecute(whereClause, orderByClause);
                                             }}
-                                            className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
+                                            className="text-xs h-7"
                                         >
-                                            <Play className="h-3 w-3 mr-1" /> {t('common.apply', '应用')}
+                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', '应用筛选')}
                                         </Button>
                                     )}
                                 </>
@@ -310,14 +311,15 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                     {onExecute && (
                                         <Button
                                             size="sm"
+                                            variant="outline"
                                             onClick={() => {
                                                 const whereClause = generateWhereClause(root);
                                                 const orderByClause = orderByField ? `${orderByField} ${orderByDirection}` : '';
                                                 onExecute(whereClause, orderByClause);
                                             }}
-                                            className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
+                                            className="text-xs h-7"
                                         >
-                                            <Play className="h-3 w-3 mr-1" /> {t('common.apply', '应用')}
+                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', '应用筛选')}
                                         </Button>
                                     )}
                                 </>
