@@ -399,7 +399,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         const tabId = `query-${connection.id}-${dbName}-${Date.now()}`;
         const initialSql = tableName
             ? `SELECT * FROM \`${dbName}\`.\`${tableName}\`;`
-            : `-- ${t('mysql.newQueryTab', '新建查询')}\nSELECT * FROM \`${dbName}\`.table_name;`;
+            : `-- ${t('mysql.newQueryTab', '新建查询')}`;
         addTab({
             id: tabId,
             title: tableName ? `${tableName} - Query` : `${dbName} - Query`,

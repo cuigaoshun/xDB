@@ -131,6 +131,14 @@ export function SqliteWorkspace({ tabId, name, connectionId, initialSql, savedSq
             displaySql += ';';
 
             setSql(displaySql);
+
+            // 如果只是注释，不自动执行
+            const isJustComments = displaySql.trim().split('\n').every(line => line.trim().startsWith('--') || line.trim() === '');
+            if (isJustComments) {
+                initialSqlExecuted.current = true;
+                return;
+            }
+
             // 自动应用分页限制，避免默认显示太多
             const processedSql = autoAddLimit(displaySql, pageSize, 0);
             executeSql(processedSql);

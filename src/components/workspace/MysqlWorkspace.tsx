@@ -167,6 +167,13 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
             setSql(displaySql);
 
+            // 如果只是注释，不自动执行
+            const isJustComments = displaySql.trim().split('\n').every(line => line.trim().startsWith('--') || line.trim().startsWith('#') || line.trim() === '');
+            if (isJustComments) {
+                initialSqlExecuted.current = true;
+                return;
+            }
+
             // 先检测主键，然后应用排序和分页
             const executeInitialQuery = async () => {
                 if (dbName && tableName) {
