@@ -102,7 +102,7 @@ export function RedisStringViewer({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="raw" className="text-xs font-semibold">
-                {t('redis.originalData', 'Original Data')}
+                {t('common.originalData', 'Original Data')}
               </SelectItem>
               {availableFormats.filter(f => f !== 'raw').map((format) => (
                 <SelectItem key={format} value={format} className="text-xs">
