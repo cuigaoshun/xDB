@@ -96,41 +96,6 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         }
     }, [globalExpandedId, connection.id, isExpanded, databases.length]);
 
-    // 搜索时自动展开
-    useEffect(() => {
-        if (!filterTerm) return;
-
-        // 1. 如果有匹配的数据库或表，展开连接节点
-        const hasMatchingDb = databases.some(db => isMatch(db));
-        const hasMatchingTable = Object.values(tables).some(dbTables => dbTables && dbTables.some(t => isMatch(t.name)));
-
-        if ((hasMatchingDb || hasMatchingTable) && !isExpanded) {
-            setIsExpanded(true);
-            // 如果还没加载数据库，加载它们
-            if (databases.length === 0) {
-                loadDatabases();
-            }
-        }
-
-        // 2. 如果数据库包含匹配的表，展开数据库节点
-        const newExpandedDbs = new Set(expandedDatabases);
-        let changed = false;
-
-        databases.forEach(db => {
-            const dbTables = tables[db];
-            if (dbTables && dbTables.some(t => isMatch(t.name))) {
-                if (!newExpandedDbs.has(db)) {
-                    newExpandedDbs.add(db);
-                    changed = true;
-                }
-            }
-        });
-
-        if (changed) {
-            setExpandedDatabases(newExpandedDbs);
-        }
-    }, [filterTerm, databases, tables, isExpanded]);
-
     const toggleExpand = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
@@ -285,89 +250,6 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 loadingDatabasesRef.current.loading = false;
             }
         }
-
-        // MySQL: 异步预加载所有表到缓存
-        if (connection.db_type === 'mysql') {
-            preloadAllTables();
-        }
-    };
-
-    // 预加载所有数据库的所有表（用于搜索和快速导航）
-    const preloadAllTables = async () => {
-        if (connection.db_type !== 'mysql') return;
-
-        const startTime = Date.now();
-        const sql = `
-            SELECT 
-                TABLE_SCHEMA,
-                TABLE_NAME
-            FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
-            ORDER BY TABLE_SCHEMA, TABLE_NAME
-        `;
-
-        try {
-            const result = await invoke<SqlResult>('execute_sql', {
-                connectionId: connection.id,
-                sql: sql
-            });
-
-            // 按数据库分组
-            const tablesByDb: Record<string, TableInfo[]> = {};
-            result.rows.forEach(row => {
-                const schemaKey = Object.keys(row).find(k => k.toLowerCase() === 'table_schema');
-                const nameKey = Object.keys(row).find(k => k.toLowerCase() === 'table_name');
-
-                if (schemaKey && nameKey) {
-                    const dbName = row[schemaKey] as string;
-                    const tableName = row[nameKey] as string;
-
-                    if (!tablesByDb[dbName]) {
-                        tablesByDb[dbName] = [];
-                    }
-
-                    tablesByDb[dbName].push({
-                        name: tableName,
-                        // 预加载时不包含注释和行数，这些会在点击数据库时更新
-                    });
-                }
-            });
-
-            // 缓存到 store
-            Object.entries(tablesByDb).forEach(([dbName, tables]) => {
-                setTablesCache(connection.id, dbName, tables);
-            });
-
-            // 同时更新本地状态
-            setTables(prev => ({
-                ...prev,
-                ...tablesByDb
-            }));
-
-            console.log('[ConnectionTree] 预加载所有表完成:', {
-                connectionId: connection.id,
-                databases: Object.keys(tablesByDb).length,
-                totalTables: Object.values(tablesByDb).reduce((sum, tables) => sum + tables.length, 0),
-                duration: Date.now() - startTime
-            });
-
-            addCommandToConsole({
-                databaseType: 'mysql',
-                command: sql.trim(),
-                duration: Date.now() - startTime,
-                success: true
-            });
-        } catch (err) {
-            console.error('Failed to preload all tables:', err);
-            // 预加载失败不影响主流程，只记录错误
-            addCommandToConsole({
-                databaseType: 'mysql',
-                command: sql.trim(),
-                duration: Date.now() - startTime,
-                success: false,
-                error: String(err)
-            });
-        }
     };
 
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
@@ -413,12 +295,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             newExpanded.add(dbName);
             setExpandedDatabases(newExpanded);
 
-            // 如果表列表未加载，或者已有缓存但没有详细信息（comment/rowCount），则刷新
-            const cachedTables = tables[dbName];
-            const needsRefresh = !cachedTables ||
-                (cachedTables.length > 0 && !cachedTables[0].rowCount && !cachedTables[0].comment);
-
-            if (needsRefresh) {
+            // 只有在展开节点且表列表未加载时才加载
+            if (!tables[dbName]) {
                 loadTables(dbName);
             }
         }
