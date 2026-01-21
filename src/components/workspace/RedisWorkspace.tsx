@@ -585,8 +585,12 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        const isPrefixSearch = filter && filter.endsWith("*");
-        if (entries[0].isIntersecting && hasMore && !loading && !isPrefixSearch) {
+        // 检查列表是否有滚动条（内容超出容器）
+        const parent = parentRef.current;
+        const hasScrollbar = parent && parent.scrollHeight > parent.clientHeight;
+        
+        // 只有在列表有滚动条时才自动加载更多
+        if (entries[0].isIntersecting && hasMore && !loading && hasScrollbar) {
           fetchKeys(false);
         }
       },
