@@ -41,6 +41,23 @@ export function MainLayout() {
         }
     };
 
+    const ContentWithConsole = ({ children }: { children: React.ReactNode }) => (
+        <ResizablePanelGroup direction="vertical">
+            <ResizablePanel defaultSize={consoleVisible ? 70 : 100}>
+                {children}
+            </ResizablePanel>
+
+            {consoleVisible && (
+                <>
+                    <ResizableHandle />
+                    <ResizablePanel defaultSize={30} minSize={10} maxSize={50}>
+                        <CommandConsole />
+                    </ResizablePanel>
+                </>
+            )}
+        </ResizablePanelGroup>
+    );
+
     return (
         <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
             <div className="flex-1 flex overflow-hidden">
@@ -55,13 +72,21 @@ export function MainLayout() {
                 {/* 2. Main Content Area */}
                 <div className="flex-1 flex overflow-hidden">
                     {activeView === 'home' ? (
-                        <div className="flex-1">
-                            <ConnectionManager />
-                        </div>
+                        <ContentWithConsole>
+                            <div className="h-full flex flex-col">
+                                <div className="flex-1 overflow-hidden">
+                                    <ConnectionManager />
+                                </div>
+                            </div>
+                        </ContentWithConsole>
                     ) : activeView === 'settings' ? (
-                        <div className="flex-1">
-                            <SettingsPage />
-                        </div>
+                        <ContentWithConsole>
+                            <div className="h-full flex flex-col">
+                                <div className="flex-1 overflow-hidden">
+                                    <SettingsPage />
+                                </div>
+                            </div>
+                        </ContentWithConsole>
                     ) : (
                         <ResizablePanelGroup direction="horizontal">
                             <ResizablePanel
@@ -82,93 +107,82 @@ export function MainLayout() {
                             {!sidebarCollapsed && <ResizableHandle />}
 
                             <ResizablePanel defaultSize={80}>
-                                <ResizablePanelGroup direction="vertical">
-                                    <ResizablePanel defaultSize={consoleVisible ? 70 : 100}>
-                                        <div className="h-full flex flex-col bg-background">
-                                            <TabBar />
-                                            <div className="flex-1 overflow-hidden relative">
-                                                {activeTab ? (
-                                                    activeTab.tabType === 'table-schema' && activeTab.schemaInfo ? (
-                                                        <TableSchemaTab
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            connectionId={activeTab.connectionId}
-                                                            dbName={activeTab.schemaInfo.dbName}
-                                                            tableName={activeTab.schemaInfo.tableName}
-                                                        />
-                                                    ) : activeTab.tabType === 'database-tables' && activeTab.databaseTablesInfo ? (
-                                                        <DatabaseTablesTab
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            connectionId={activeTab.connectionId}
-                                                            dbName={activeTab.databaseTablesInfo.dbName}
-                                                            dbType={activeTab.type}
-                                                        />
-                                                    ) : activeTab.type === 'mysql' ? (
-                                                        <MysqlWorkspace
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            name={activeTab.title}
-                                                            connectionId={activeTab.connectionId}
-                                                            initialSql={activeTab.initialSql}
-                                                            savedSql={activeTab.currentSql}
-                                                            dbName={activeTab.dbName}
-                                                            tableName={activeTab.tableName}
-                                                            savedResult={activeTab.savedResult}
-                                                        />
-                                                    ) : activeTab.type === 'redis' ? (
-                                                        <RedisWorkspace
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            name={activeTab.title}
-                                                            connectionId={activeTab.connectionId}
-                                                            db={activeTab.redisDbInfo?.db ?? (activeTab.dbName ? parseInt(activeTab.dbName) : 0)}
-                                                            savedResult={activeTab.savedResult}
-                                                        />
-                                                    ) : activeTab.type === 'memcached' ? (
-                                                        <MemcachedWorkspace
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            name={activeTab.title}
-                                                            connectionId={activeTab.connectionId}
-                                                            savedResult={activeTab.savedResult}
-                                                        />
-                                                    ) : activeTab.type === 'sqlite' ? (
-                                                        <SqliteWorkspace
-                                                            key={activeTab.id}
-                                                            tabId={activeTab.id}
-                                                            name={activeTab.title}
-                                                            connectionId={activeTab.connectionId}
-                                                            initialSql={activeTab.initialSql}
-                                                            savedSql={activeTab.currentSql}
-                                                            dbName={activeTab.dbName}
-                                                            tableName={activeTab.tableName}
-                                                            savedResult={activeTab.savedResult}
-                                                        />
+                                <ContentWithConsole>
+                                    <div className="h-full flex flex-col bg-background">
+                                        <TabBar />
+                                        <div className="flex-1 overflow-hidden relative">
+                                            {activeTab ? (
+                                                activeTab.tabType === 'table-schema' && activeTab.schemaInfo ? (
+                                                    <TableSchemaTab
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        connectionId={activeTab.connectionId}
+                                                        dbName={activeTab.schemaInfo.dbName}
+                                                        tableName={activeTab.schemaInfo.tableName}
+                                                    />
+                                                ) : activeTab.tabType === 'database-tables' && activeTab.databaseTablesInfo ? (
+                                                    <DatabaseTablesTab
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        connectionId={activeTab.connectionId}
+                                                        dbName={activeTab.databaseTablesInfo.dbName}
+                                                        dbType={activeTab.type}
+                                                    />
+                                                ) : activeTab.type === 'mysql' ? (
+                                                    <MysqlWorkspace
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title}
+                                                        connectionId={activeTab.connectionId}
+                                                        initialSql={activeTab.initialSql}
+                                                        savedSql={activeTab.currentSql}
+                                                        dbName={activeTab.dbName}
+                                                        tableName={activeTab.tableName}
+                                                        savedResult={activeTab.savedResult}
+                                                    />
+                                                ) : activeTab.type === 'redis' ? (
+                                                    <RedisWorkspace
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title}
+                                                        connectionId={activeTab.connectionId}
+                                                        db={activeTab.redisDbInfo?.db ?? (activeTab.dbName ? parseInt(activeTab.dbName) : 0)}
+                                                        savedResult={activeTab.savedResult}
+                                                    />
+                                                ) : activeTab.type === 'memcached' ? (
+                                                    <MemcachedWorkspace
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title}
+                                                        connectionId={activeTab.connectionId}
+                                                        savedResult={activeTab.savedResult}
+                                                    />
+                                                ) : activeTab.type === 'sqlite' ? (
+                                                    <SqliteWorkspace
+                                                        key={activeTab.id}
+                                                        tabId={activeTab.id}
+                                                        name={activeTab.title}
+                                                        connectionId={activeTab.connectionId}
+                                                        initialSql={activeTab.initialSql}
+                                                        savedSql={activeTab.currentSql}
+                                                        dbName={activeTab.dbName}
+                                                        tableName={activeTab.tableName}
+                                                        savedResult={activeTab.savedResult}
+                                                    />
 
-                                                    ) : (
-                                                        <div>{t('common.unsupportedType')}: {activeTab.type}</div>
-                                                    )
                                                 ) : (
-                                                    <div className="h-full flex items-center justify-center text-muted-foreground bg-muted/5">
-                                                        <div className="text-center">
-                                                            <p>{t('common.selectTab')}</p>
-                                                        </div>
+                                                    <div>{t('common.unsupportedType')}: {activeTab.type}</div>
+                                                )
+                                            ) : (
+                                                <div className="h-full flex items-center justify-center text-muted-foreground bg-muted/5">
+                                                    <div className="text-center">
+                                                        <p>{t('common.selectTab')}</p>
                                                     </div>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    </ResizablePanel>
-
-                                    {consoleVisible && (
-                                        <>
-                                            <ResizableHandle />
-                                            <ResizablePanel defaultSize={30} minSize={10} maxSize={50}>
-                                                <CommandConsole />
-                                            </ResizablePanel>
-                                        </>
-                                    )}
-                                </ResizablePanelGroup>
+                                    </div>
+                                </ContentWithConsole>
                             </ResizablePanel>
                         </ResizablePanelGroup>
                     )}

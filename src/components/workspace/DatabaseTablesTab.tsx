@@ -72,6 +72,16 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
         if (cachedTables && cachedTables.length > 0) {
             console.log('[DatabaseTablesTab] 从缓存读取表列表:', { connectionId, dbName, count: cachedTables.length });
             setTables(cachedTables);
+
+            // 检查缓存是否包含完整信息（注释和行数）
+            const hasDetailInfo = cachedTables.some(t => t.rowCount !== undefined || t.comment !== undefined);
+
+            // 如果缓存数据不完整，则异步刷新
+            if (!hasDetailInfo) {
+                console.log('[DatabaseTablesTab] 缓存数据不完整，异步刷新详细信息');
+                loadingStateRef.current = { connectionId, dbName, loading: true };
+                loadTables();
+            }
             return;
         }
 
