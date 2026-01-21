@@ -57,26 +57,29 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
 
     // 使用 ref 来防止重复调用
-    const loadingRef = useRef<{ connectionId: number; dbName: string } | null>(null);
+    const loadingStateRef = useRef<{
+        connectionId: number;
+        dbName: string;
+        loading: boolean;
+    } | null>(null);
 
     useEffect(() => {
-        // 如果当前正在加载相同的数据，跳过
-        if (loadingRef.current?.connectionId === connectionId && loadingRef.current?.dbName === dbName) {
+        // 如果当前正在加载相同的数据或已经加载过，跳过
+        if (loadingStateRef.current?.connectionId === connectionId &&
+            loadingStateRef.current?.dbName === dbName &&
+            loadingStateRef.current?.loading) {
+            console.log('[DatabaseTablesTab] 跳过重复加载:', { connectionId, dbName });
             return;
         }
+
+        // 立即设置加载标志，防止并发调用
+        loadingStateRef.current = { connectionId, dbName, loading: true };
         loadTables();
     }, [connectionId, dbName]);
 
     const loadTables = async () => {
         if (!connection) return;
 
-        // 如果已经在加载相同的数据，直接返回
-        if (isLoading && loadingRef.current?.connectionId === connectionId && loadingRef.current?.dbName === dbName) {
-            return;
-        }
-
-        // 标记开始加载
-        loadingRef.current = { connectionId, dbName };
         setIsLoading(true);
         setError(null);
 
@@ -141,6 +144,11 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
             });
         } finally {
             setIsLoading(false);
+            // 加载完成后，重置loading标志，但保留 connectionId 和 dbName
+            if (loadingStateRef.current?.connectionId === connectionId &&
+                loadingStateRef.current?.dbName === dbName) {
+                loadingStateRef.current.loading = false;
+            }
         }
     };
 
