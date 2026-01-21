@@ -251,20 +251,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             return;
         }
 
-        const newExpanded = new Set(expandedDatabases);
-        if (newExpanded.has(dbName)) {
-            newExpanded.delete(dbName);
-            setExpandedDatabases(newExpanded);
-        } else {
-            newExpanded.add(dbName);
-            setExpandedDatabases(newExpanded);
-
-            if (!tables[dbName]) {
-                await loadTables(dbName);
-            }
-        }
-
-        // 打开数据库表列表 Tab
+        // 打开数据库表列表 Tab - DatabaseTablesTab 会自动加载表列表
         if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
             const tabId = `db-tables-${connection.id}-${dbName}`;
             addTab({
@@ -277,6 +264,21 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                     dbName
                 }
             });
+        }
+
+        // 展开/折叠树节点
+        const newExpanded = new Set(expandedDatabases);
+        if (newExpanded.has(dbName)) {
+            newExpanded.delete(dbName);
+            setExpandedDatabases(newExpanded);
+        } else {
+            newExpanded.add(dbName);
+            setExpandedDatabases(newExpanded);
+
+            // 只有在展开节点且表列表未加载时才加载
+            if (!tables[dbName]) {
+                await loadTables(dbName);
+            }
         }
     };
 

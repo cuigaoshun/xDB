@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/store/useAppStore";
 import { invoke } from "@tauri-apps/api/core";
@@ -33,6 +33,7 @@ interface SqlResult {
 interface TableInfo {
     name: string;
     comment?: string;
+    rowCount?: number;
 }
 
 interface DatabaseTablesTabProps {
@@ -55,13 +56,27 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
     // Create table dialog state
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
 
+    // 使用 ref 来防止重复调用
+    const loadingRef = useRef<{ connectionId: number; dbName: string } | null>(null);
+
     useEffect(() => {
+        // 如果当前正在加载相同的数据，跳过
+        if (loadingRef.current?.connectionId === connectionId && loadingRef.current?.dbName === dbName) {
+            return;
+        }
         loadTables();
     }, [connectionId, dbName]);
 
     const loadTables = async () => {
         if (!connection) return;
 
+        // 如果已经在加载相同的数据，直接返回
+        if (isLoading && loadingRef.current?.connectionId === connectionId && loadingRef.current?.dbName === dbName) {
+            return;
+        }
+
+        // 标记开始加载
+        loadingRef.current = { connectionId, dbName };
         setIsLoading(true);
         setError(null);
 
@@ -90,14 +105,16 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                 // Robustly parse result by looking for specific keys if possible, or fallback
                 tableList = result.rows
                     .map(row => {
-                        // find key for name (usually Name) and comment (usually Comment)
+                        // find key for name (usually Name), comment (usually Comment), and rows (usually Rows)
                         // keys might be case sensitive depending on driver, usually returned as is from DB
                         const nameKey = Object.keys(row).find(k => k.toLowerCase() === 'name') || Object.keys(row)[0];
                         const commentKey = Object.keys(row).find(k => k.toLowerCase() === 'comment');
+                        const rowsKey = Object.keys(row).find(k => k.toLowerCase() === 'rows');
 
                         return {
                             name: row[nameKey] as string,
-                            comment: commentKey ? row[commentKey] as string : undefined
+                            comment: commentKey ? row[commentKey] as string : undefined,
+                            rowCount: rowsKey ? row[rowsKey] as number : undefined
                         };
                     })
                     .filter(item => Boolean(item.name));
@@ -312,7 +329,14 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                                                 <TableIcon className="h-4 w-4" />
                                             </div>
                                             <div className="flex flex-col min-w-0 flex-1">
-                                                <span className="font-medium truncate text-sm" title={table.name}>{table.name}</span>
+                                                <div className="flex items-baseline gap-2 w-full">
+                                                    <span className="font-medium truncate text-sm flex-1" title={table.name}>{table.name}</span>
+                                                    {table.rowCount !== undefined && (
+                                                        <span className="text-xs text-muted-foreground/70 shrink-0">
+                                                            {table.rowCount.toLocaleString()}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {table.comment && (
                                                     <span className="text-xs text-muted-foreground truncate" title={table.comment}>
                                                         {table.comment}

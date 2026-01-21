@@ -86,6 +86,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     // 行查看对话框状态
     const [rowViewerOpen, setRowViewerOpen] = useState(false);
     const [viewingRow, setViewingRow] = useState<Record<string, any> | null>(null);
+    const [viewingRowIndex, setViewingRowIndex] = useState<number>(-1);
 
 
     // 分页状态
@@ -1060,7 +1061,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                             </div>
 
                             {/* Result Area */}
-                            <div className="flex-1 overflow-auto px-4 py-1">
+                            <div className="flex-1 px-4 py-1 overflow-hidden">
                                 {error && (
                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap">
                                         Error: {error}
@@ -1069,180 +1070,107 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
                                 {result && (
                                     <div className="h-full flex flex-col gap-0">
-
-                                        <div className="border rounded-md bg-background overflow-auto flex-1">
-                                            <Table style={{ tableLayout: 'fixed' }}>
-                                                <TableHeader className="sticky top-0 bg-muted/50">
-                                                    <TableRow>
-                                                        {/* 复选框列 - 只在有选中行时显示 */}
-                                                        {selectedRowIndices.length > 0 && (
-                                                            <TableHead className="w-[50px] min-w-[50px]">
-                                                                <div className="flex items-center justify-center">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="cursor-pointer"
-                                                                        checked={filteredRows.length > 0 && filteredRows.every(row => selectedRowIndices.includes(result.rows.indexOf(row)))}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.checked) {
-                                                                                // 全选
-                                                                                const allIndices = filteredRows.map(row => result.rows.indexOf(row));
-                                                                                setSelectedRowIndices(allIndices);
-                                                                            } else {
-                                                                                // 取消全选
-                                                                                setSelectedRowIndices([]);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </TableHead>
-                                                        )}
-                                                        {result.columns.map((col, i) => (
-                                                            <TableHead key={i} className="whitespace-nowrap w-[200px] min-w-[200px]">
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 truncate">
-                                                                        <span className="font-semibold text-foreground truncate" title={col.name}>{col.name}</span>
-                                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                                            {getColumnTypeIcon(col.type_name)}
-                                                                            <span className="lowercase truncate">({col.type_name})</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    {/* 筛选下拉菜单 */}
-                                                                    <DropdownMenu>
-                                                                        <DropdownMenuTrigger asChild>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className={cn(
-                                                                                    "h-5 w-5 p-0 ml-1 flex-shrink-0",
-                                                                                    inlineFilters[col.name] && "text-blue-600"
-                                                                                )}
-                                                                            >
-                                                                                <Filter className="h-3 w-3" />
-                                                                            </Button>
-                                                                        </DropdownMenuTrigger>
-                                                                        <DropdownMenuContent align="end" className="w-48 max-h-60 overflow-auto">
-                                                                            <DropdownMenuItem
-                                                                                onClick={() => setInlineFilters(prev => ({ ...prev, [col.name]: '' }))}
-                                                                                className="text-xs"
-                                                                            >
-                                                                                (清除筛选)
-                                                                            </DropdownMenuItem>
-                                                                            <DropdownMenuSeparator />
-                                                                            {(() => {
-                                                                                const uniqueValues = [...new Set(
-                                                                                    result.rows.map(r => {
-                                                                                        const v = r[col.name];
-                                                                                        return v === null ? 'NULL' : typeof v === 'object' ? JSON.stringify(v) : String(v);
-                                                                                    })
-                                                                                )].slice(0, 50);
-                                                                                return uniqueValues.map((val, idx) => (
-                                                                                    <DropdownMenuItem
-                                                                                        key={idx}
-                                                                                        onClick={() => setInlineFilters(prev => ({ ...prev, [col.name]: val }))}
-                                                                                        className={cn(
-                                                                                            "text-xs truncate",
-                                                                                            inlineFilters[col.name] === val && "bg-accent"
-                                                                                        )}
-                                                                                    >
-                                                                                        {val.length > 30 ? val.substring(0, 30) + '...' : val}
-                                                                                    </DropdownMenuItem>
-                                                                                ));
-                                                                            })()}
-                                                                        </DropdownMenuContent>
-                                                                    </DropdownMenu>
-                                                                </div>
-                                                            </TableHead>
-                                                        ))}
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {/* 新增行 */}
-                                                    {newRows.map((row, rowIdx) => (
-                                                        <TableRow key={`new-${rowIdx}`} className="bg-blue-50/50 dark:bg-blue-950/20">
-                                                            {/* 新增行的复选框列 - 只在有选中行时显示 */}
+                                        {/* 外层容器：横向滚动 */}
+                                        <div className="border rounded-md bg-background flex-1 overflow-x-auto overflow-y-hidden">
+                                            {/* 内层容器：纵向滚动 */}
+                                            <div className="overflow-y-auto h-full" style={{ minWidth: 'max-content' }}>
+                                                <Table>
+                                                    <TableHeader className="sticky top-0 bg-muted/50 z-10">
+                                                        <TableRow>
+                                                            {/* 复选框列 - 只在有选中行时显示 */}
                                                             {selectedRowIndices.length > 0 && (
-                                                                <TableCell className="w-[50px] min-w-[50px]">
-                                                                </TableCell>
-                                                            )}
-                                                            {result.columns.map((col, colIdx) => (
-                                                                <TableCell key={colIdx} className="whitespace-nowrap w-[200px] min-w-[200px]">
-                                                                    {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && editingCell?.isNewRow ? (
-                                                                        <div className="relative w-[168px]">
-                                                                            <Input
-                                                                                value={editValue}
-                                                                                onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="h-7 text-xs w-[168px] pr-14"
-                                                                                autoFocus
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === 'Enter') handleCellSubmit();
-                                                                                    if (e.key === 'Escape') handleCellCancel();
-                                                                                }}
-                                                                            />
-                                                                            <div className="absolute right-0 top-0 h-full flex items-center gap-0.5 pr-1">
-                                                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={handleCellSubmit}>
-                                                                                    <Check className="h-3 w-3 text-green-600" />
-                                                                                </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={handleCellCancel}>
-                                                                                    <X className="h-3 w-3 text-red-600" />
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <ContextMenu>
-                                                                            <ContextMenuTrigger asChild>
-                                                                                <div className="truncate cursor-context-menu">
-                                                                                    {row[col.name] === null || row[col.name] === '' ? (
-                                                                                        <span className="text-muted-foreground italic">NULL</span>
-                                                                                    ) : (
-                                                                                        typeof row[col.name] === 'object' ? JSON.stringify(row[col.name]) : String(row[col.name])
-                                                                                    )}
-                                                                                </div>
-                                                                            </ContextMenuTrigger>
-                                                                            <ContextMenuContent>
-                                                                                <ContextMenuItem onClick={() => handleCellEdit(rowIdx, col.name, row[col.name], true)}>
-                                                                                    <Pencil className="h-3 w-3 mr-2" />
-                                                                                    {t('common.edit', '编辑')}
-                                                                                </ContextMenuItem>
-                                                                            </ContextMenuContent>
-                                                                        </ContextMenu>
-                                                                    )}
-                                                                </TableCell>
-                                                            ))}
-
-                                                        </TableRow>
-                                                    ))}
-
-                                                    {/* 现有行 */}
-                                                    {filteredRows.map((row, displayIdx) => {
-                                                        // 找到原始行索引用于编辑操作
-                                                        const originalRowIdx = result.rows.indexOf(row);
-                                                        const isRowSelected = selectedRowIndices.includes(originalRowIdx);
-                                                        return (
-                                                            <TableRow
-                                                                key={displayIdx}
-                                                                className="hover:bg-muted/50"
-                                                            >
-                                                                {/* 复选框列 - 只在有选中行时显示 */}
-                                                                {selectedRowIndices.length > 0 && (
-                                                                    <TableCell className="w-[50px] min-w-[50px] text-center">
+                                                                <TableHead className="w-[50px] min-w-[50px]">
+                                                                    <div className="flex items-center justify-center">
                                                                         <input
                                                                             type="checkbox"
                                                                             className="cursor-pointer"
-                                                                            checked={isRowSelected}
+                                                                            checked={filteredRows.length > 0 && filteredRows.every(row => selectedRowIndices.includes(result.rows.indexOf(row)))}
                                                                             onChange={(e) => {
                                                                                 if (e.target.checked) {
-                                                                                    setSelectedRowIndices([...selectedRowIndices, originalRowIdx]);
+                                                                                    // 全选
+                                                                                    const allIndices = filteredRows.map(row => result.rows.indexOf(row));
+                                                                                    setSelectedRowIndices(allIndices);
                                                                                 } else {
-                                                                                    setSelectedRowIndices(selectedRowIndices.filter(idx => idx !== originalRowIdx));
+                                                                                    // 取消全选
+                                                                                    setSelectedRowIndices([]);
                                                                                 }
                                                                             }}
                                                                         />
+                                                                    </div>
+                                                                </TableHead>
+                                                            )}
+                                                            {result.columns.map((col, i) => (
+                                                                <TableHead key={i} className="whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 truncate">
+                                                                            <span className="font-semibold text-foreground truncate" title={col.name}>{col.name}</span>
+                                                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                                                {getColumnTypeIcon(col.type_name)}
+                                                                                <span className="lowercase truncate">({col.type_name})</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        {/* 筛选下拉菜单 */}
+                                                                        <DropdownMenu>
+                                                                            <DropdownMenuTrigger asChild>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className={cn(
+                                                                                        "h-5 w-5 p-0 ml-1 flex-shrink-0",
+                                                                                        inlineFilters[col.name] && "text-blue-600"
+                                                                                    )}
+                                                                                >
+                                                                                    <Filter className="h-3 w-3" />
+                                                                                </Button>
+                                                                            </DropdownMenuTrigger>
+                                                                            <DropdownMenuContent align="end" className="w-48 max-h-60 overflow-auto">
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() => setInlineFilters(prev => ({ ...prev, [col.name]: '' }))}
+                                                                                    className="text-xs"
+                                                                                >
+                                                                                    (清除筛选)
+                                                                                </DropdownMenuItem>
+                                                                                <DropdownMenuSeparator />
+                                                                                {(() => {
+                                                                                    const uniqueValues = [...new Set(
+                                                                                        result.rows.map(r => {
+                                                                                            const v = r[col.name];
+                                                                                            return v === null ? 'NULL' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+                                                                                        })
+                                                                                    )].slice(0, 50);
+                                                                                    return uniqueValues.map((val, idx) => (
+                                                                                        <DropdownMenuItem
+                                                                                            key={idx}
+                                                                                            onClick={() => setInlineFilters(prev => ({ ...prev, [col.name]: val }))}
+                                                                                            className={cn(
+                                                                                                "text-xs truncate",
+                                                                                                inlineFilters[col.name] === val && "bg-accent"
+                                                                                            )}
+                                                                                        >
+                                                                                            {val.length > 30 ? val.substring(0, 30) + '...' : val}
+                                                                                        </DropdownMenuItem>
+                                                                                    ));
+                                                                                })()}
+                                                                            </DropdownMenuContent>
+                                                                        </DropdownMenu>
+                                                                    </div>
+                                                                </TableHead>
+                                                            ))}
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {/* 新增行 */}
+                                                        {newRows.map((row, rowIdx) => (
+                                                            <TableRow key={`new-${rowIdx}`} className="bg-blue-50/50 dark:bg-blue-950/20">
+                                                                {/* 新增行的复选框列 - 只在有选中行时显示 */}
+                                                                {selectedRowIndices.length > 0 && (
+                                                                    <TableCell className="w-[50px] min-w-[50px]">
                                                                     </TableCell>
                                                                 )}
                                                                 {result.columns.map((col, colIdx) => (
-                                                                    <TableCell key={colIdx} className="p-0 whitespace-nowrap w-[200px] min-w-[200px]">
-                                                                        {editingCell?.rowIdx === originalRowIdx && editingCell?.colName === col.name && !editingCell?.isNewRow ? (
-                                                                            <div className="relative w-[168px] px-2 py-1">
+                                                                    <TableCell key={colIdx} className="whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                        {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && editingCell?.isNewRow ? (
+                                                                            <div className="relative w-[168px]">
                                                                                 <Input
                                                                                     value={editValue}
                                                                                     onChange={(e) => setEditValue(e.target.value)}
@@ -1265,137 +1193,214 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                         ) : (
                                                                             <ContextMenu>
                                                                                 <ContextMenuTrigger asChild>
-                                                                                    <div className="px-2 py-2 cursor-context-menu min-h-[36px] flex items-center">
-                                                                                        {row[col.name] === null ? (
-                                                                                            <span className="text-muted-foreground italic truncate">NULL</span>
+                                                                                    <div className="truncate cursor-context-menu">
+                                                                                        {row[col.name] === null || row[col.name] === '' ? (
+                                                                                            <span className="text-muted-foreground italic">NULL</span>
                                                                                         ) : (
-                                                                                            <span className="flex-1 truncate">{typeof row[col.name] === 'object' && row[col.name] !== null ? JSON.stringify(row[col.name]) : String(row[col.name])}</span>
+                                                                                            typeof row[col.name] === 'object' ? JSON.stringify(row[col.name]) : String(row[col.name])
                                                                                         )}
                                                                                     </div>
                                                                                 </ContextMenuTrigger>
                                                                                 <ContextMenuContent>
-                                                                                    {/* 编辑 */}
-                                                                                    {isEditable && (
-                                                                                        <ContextMenuItem onClick={() => handleCellEdit(originalRowIdx, col.name, row[col.name], false)}>
-                                                                                            <Pencil className="h-3 w-3 mr-2" />
-                                                                                            {t('common.edit', '编辑')}
-                                                                                        </ContextMenuItem>
-                                                                                    )}
-
-                                                                                    {/* 查看行 */}
-                                                                                    <ContextMenuItem
-                                                                                        onClick={() => {
-                                                                                            setViewingRow(row);
-                                                                                            setRowViewerOpen(true);
-                                                                                        }}
-                                                                                    >
-                                                                                        <Eye className="h-3 w-3 mr-2" />
-                                                                                        {t('common.viewRow', '查看行')}
+                                                                                    <ContextMenuItem onClick={() => handleCellEdit(rowIdx, col.name, row[col.name], true)}>
+                                                                                        <Pencil className="h-3 w-3 mr-2" />
+                                                                                        {t('common.edit', '编辑')}
                                                                                     </ContextMenuItem>
-
-                                                                                    {/* 查看格式化 */}
-                                                                                    <ContextMenuItem
-                                                                                        onClick={() => {
-                                                                                            const content = typeof row[col.name] === 'object' && row[col.name] !== null ? JSON.stringify(row[col.name]) : String(row[col.name]);
-                                                                                            setFormatterContent(content);
-                                                                                            setFormatterTitle(`Format value: ${col.name}`);
-                                                                                            setFormatterReadOnly(!isEditable);
-
-                                                                                            if (isEditable) {
-                                                                                                setFormatterOnSave(() => async (newValue: string) => {
-                                                                                                    const whereClause = generateWhereClause(row);
-                                                                                                    const valueStr = newValue === null ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
-                                                                                                    const updateSql = `UPDATE \`${dbName}\`.\`${tableName}\` SET \`${col.name}\` = ${valueStr} WHERE ${whereClause}`;
-                                                                                                    const startTime = Date.now();
-                                                                                                    try {
-                                                                                                        await invoke("execute_sql", {
-                                                                                                            connectionId,
-                                                                                                            sql: updateSql
-                                                                                                        });
-                                                                                                        addCommandToConsole({
-                                                                                                            databaseType: 'mysql',
-                                                                                                            command: updateSql,
-                                                                                                            duration: Date.now() - startTime,
-                                                                                                            success: true
-                                                                                                        });
-                                                                                                        // Update local data
-                                                                                                        const updatedRows = [...result.rows];
-                                                                                                        updatedRows[originalRowIdx] = { ...updatedRows[originalRowIdx], [col.name]: newValue };
-                                                                                                        setResult({ ...result, rows: updatedRows });
-                                                                                                        setOriginalRows(updatedRows);
-                                                                                                    } catch (err: any) {
-                                                                                                        console.error("Update failed:", err);
-                                                                                                        addCommandToConsole({
-                                                                                                            databaseType: 'mysql',
-                                                                                                            command: updateSql,
-                                                                                                            duration: 0,
-                                                                                                            success: false,
-                                                                                                            error: typeof err === 'string' ? err : JSON.stringify(err)
-                                                                                                        });
-                                                                                                    }
-                                                                                                });
-                                                                                            } else {
-                                                                                                setFormatterOnSave(undefined);
-                                                                                            }
-
-                                                                                            setFormatterOpen(true);
-                                                                                        }}
-                                                                                    >
-                                                                                        <Wand2 className="h-3 w-3 mr-2" />
-                                                                                        {t('common.viewFormatted', '查看格式化/完整内容')}
-                                                                                    </ContextMenuItem>
-
-                                                                                    <ContextMenuSeparator />
-
-                                                                                    {/* 选中 */}
-                                                                                    <ContextMenuItem
-                                                                                        onClick={() => {
-                                                                                            if (isRowSelected) {
-                                                                                                setSelectedRowIndices(selectedRowIndices.filter(idx => idx !== originalRowIdx));
-                                                                                            } else {
-                                                                                                setSelectedRowIndices([...selectedRowIndices, originalRowIdx]);
-                                                                                            }
-                                                                                        }}
-                                                                                    >
-                                                                                        <MousePointerClick className="h-3 w-3 mr-2" />
-                                                                                        {isRowSelected ? t('common.deselect', '取消选中') : t('common.select', '选中')}
-                                                                                    </ContextMenuItem>
-
-                                                                                    {/* 复制行 */}
-                                                                                    {isEditable && (
-                                                                                        <ContextMenuItem onClick={() => handleCopySingleRow(originalRowIdx)}>
-                                                                                            <Copy className="h-3 w-3 mr-2" />
-                                                                                            {t('common.duplicateRow', '复制行')}
-                                                                                        </ContextMenuItem>
-                                                                                    )}
-
-                                                                                    {/* 删除行 */}
-                                                                                    {isEditable && (
-                                                                                        <ContextMenuItem
-                                                                                            onClick={() => handleDeleteSingleRow(originalRowIdx)}
-                                                                                            className="text-red-600 focus:text-red-600"
-                                                                                        >
-                                                                                            <Trash2 className="h-3 w-3 mr-2" />
-                                                                                            {t('common.deleteRow', '删除行')}
-                                                                                        </ContextMenuItem>
-                                                                                    )}
                                                                                 </ContextMenuContent>
                                                                             </ContextMenu>
                                                                         )}
                                                                     </TableCell>
                                                                 ))}
+
                                                             </TableRow>
-                                                        );
-                                                    })}
-                                                    {filteredRows.length === 0 && newRows.length === 0 && (
-                                                        <TableRow>
-                                                            <TableCell colSpan={selectedRowIndices.length > 0 ? (result.columns.length || 1) + 1 : (result.columns.length || 1)} className="text-center h-24 text-muted-foreground">
-                                                                {hasActiveInlineFilters ? t('common.noFilterResults', '无匹配结果') : t('common.noResults', 'No results')}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )}
-                                                </TableBody>
-                                            </Table>
+                                                        ))}
+
+                                                        {/* 现有行 */}
+                                                        {filteredRows.map((row, displayIdx) => {
+                                                            // 找到原始行索引用于编辑操作
+                                                            const originalRowIdx = result.rows.indexOf(row);
+                                                            const isRowSelected = selectedRowIndices.includes(originalRowIdx);
+                                                            return (
+                                                                <TableRow
+                                                                    key={displayIdx}
+                                                                    className="hover:bg-muted/50"
+                                                                >
+                                                                    {/* 复选框列 - 只在有选中行时显示 */}
+                                                                    {selectedRowIndices.length > 0 && (
+                                                                        <TableCell className="w-[50px] min-w-[50px] text-center">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="cursor-pointer"
+                                                                                checked={isRowSelected}
+                                                                                onChange={(e) => {
+                                                                                    if (e.target.checked) {
+                                                                                        setSelectedRowIndices([...selectedRowIndices, originalRowIdx]);
+                                                                                    } else {
+                                                                                        setSelectedRowIndices(selectedRowIndices.filter(idx => idx !== originalRowIdx));
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {result.columns.map((col, colIdx) => (
+                                                                        <TableCell key={colIdx} className="p-0 whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                            {editingCell?.rowIdx === originalRowIdx && editingCell?.colName === col.name && !editingCell?.isNewRow ? (
+                                                                                <div className="relative w-[168px] px-2 py-1">
+                                                                                    <Input
+                                                                                        value={editValue}
+                                                                                        onChange={(e) => setEditValue(e.target.value)}
+                                                                                        className="h-7 text-xs w-[168px] pr-14"
+                                                                                        autoFocus
+                                                                                        onKeyDown={(e) => {
+                                                                                            if (e.key === 'Enter') handleCellSubmit();
+                                                                                            if (e.key === 'Escape') handleCellCancel();
+                                                                                        }}
+                                                                                    />
+                                                                                    <div className="absolute right-0 top-0 h-full flex items-center gap-0.5 pr-1">
+                                                                                        <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={handleCellSubmit}>
+                                                                                            <Check className="h-3 w-3 text-green-600" />
+                                                                                        </Button>
+                                                                                        <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={handleCellCancel}>
+                                                                                            <X className="h-3 w-3 text-red-600" />
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <ContextMenu>
+                                                                                    <ContextMenuTrigger asChild>
+                                                                                        <div className="px-2 py-2 cursor-context-menu min-h-[36px] flex items-center">
+                                                                                            {row[col.name] === null ? (
+                                                                                                <span className="text-muted-foreground italic truncate">NULL</span>
+                                                                                            ) : (
+                                                                                                <span className="flex-1 truncate">{typeof row[col.name] === 'object' && row[col.name] !== null ? JSON.stringify(row[col.name]) : String(row[col.name])}</span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </ContextMenuTrigger>
+                                                                                    <ContextMenuContent>
+                                                                                        {/* 编辑 */}
+                                                                                        {isEditable && (
+                                                                                            <ContextMenuItem onClick={() => handleCellEdit(originalRowIdx, col.name, row[col.name], false)}>
+                                                                                                <Pencil className="h-3 w-3 mr-2" />
+                                                                                                {t('common.edit', '编辑')}
+                                                                                            </ContextMenuItem>
+                                                                                        )}
+
+                                                                                        {/* 查看行 */}
+                                                                                        <ContextMenuItem
+                                                                                            onClick={() => {
+                                                                                                setViewingRow(row);
+                                                                                                setViewingRowIndex(originalRowIdx);
+                                                                                                setRowViewerOpen(true);
+                                                                                            }}
+                                                                                        >
+                                                                                            <Eye className="h-3 w-3 mr-2" />
+                                                                                            {t('common.viewRow', '查看行')}
+                                                                                        </ContextMenuItem>
+
+                                                                                        {/* 查看格式化 */}
+                                                                                        <ContextMenuItem
+                                                                                            onClick={() => {
+                                                                                                const content = typeof row[col.name] === 'object' && row[col.name] !== null ? JSON.stringify(row[col.name]) : String(row[col.name]);
+                                                                                                setFormatterContent(content);
+                                                                                                setFormatterTitle(`Format value: ${col.name}`);
+                                                                                                setFormatterReadOnly(!isEditable);
+
+                                                                                                if (isEditable) {
+                                                                                                    setFormatterOnSave(() => async (newValue: string) => {
+                                                                                                        const whereClause = generateWhereClause(row);
+                                                                                                        const valueStr = newValue === null ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
+                                                                                                        const updateSql = `UPDATE \`${dbName}\`.\`${tableName}\` SET \`${col.name}\` = ${valueStr} WHERE ${whereClause}`;
+                                                                                                        const startTime = Date.now();
+                                                                                                        try {
+                                                                                                            await invoke("execute_sql", {
+                                                                                                                connectionId,
+                                                                                                                sql: updateSql
+                                                                                                            });
+                                                                                                            addCommandToConsole({
+                                                                                                                databaseType: 'mysql',
+                                                                                                                command: updateSql,
+                                                                                                                duration: Date.now() - startTime,
+                                                                                                                success: true
+                                                                                                            });
+                                                                                                            // Update local data
+                                                                                                            const updatedRows = [...result.rows];
+                                                                                                            updatedRows[originalRowIdx] = { ...updatedRows[originalRowIdx], [col.name]: newValue };
+                                                                                                            setResult({ ...result, rows: updatedRows });
+                                                                                                            setOriginalRows(updatedRows);
+                                                                                                        } catch (err: any) {
+                                                                                                            console.error("Update failed:", err);
+                                                                                                            addCommandToConsole({
+                                                                                                                databaseType: 'mysql',
+                                                                                                                command: updateSql,
+                                                                                                                duration: 0,
+                                                                                                                success: false,
+                                                                                                                error: typeof err === 'string' ? err : JSON.stringify(err)
+                                                                                                            });
+                                                                                                        }
+                                                                                                    });
+                                                                                                } else {
+                                                                                                    setFormatterOnSave(undefined);
+                                                                                                }
+
+                                                                                                setFormatterOpen(true);
+                                                                                            }}
+                                                                                        >
+                                                                                            <Wand2 className="h-3 w-3 mr-2" />
+                                                                                            {t('common.viewFormatted', '查看格式化/完整内容')}
+                                                                                        </ContextMenuItem>
+
+                                                                                        <ContextMenuSeparator />
+
+                                                                                        {/* 选中 */}
+                                                                                        <ContextMenuItem
+                                                                                            onClick={() => {
+                                                                                                if (isRowSelected) {
+                                                                                                    setSelectedRowIndices(selectedRowIndices.filter(idx => idx !== originalRowIdx));
+                                                                                                } else {
+                                                                                                    setSelectedRowIndices([...selectedRowIndices, originalRowIdx]);
+                                                                                                }
+                                                                                            }}
+                                                                                        >
+                                                                                            <MousePointerClick className="h-3 w-3 mr-2" />
+                                                                                            {isRowSelected ? t('common.deselect', '取消选中') : t('common.select', '选中')}
+                                                                                        </ContextMenuItem>
+
+                                                                                        {/* 复制行 */}
+                                                                                        {isEditable && (
+                                                                                            <ContextMenuItem onClick={() => handleCopySingleRow(originalRowIdx)}>
+                                                                                                <Copy className="h-3 w-3 mr-2" />
+                                                                                                {t('common.duplicateRow', '复制行')}
+                                                                                            </ContextMenuItem>
+                                                                                        )}
+
+                                                                                        {/* 删除行 */}
+                                                                                        {isEditable && (
+                                                                                            <ContextMenuItem
+                                                                                                onClick={() => handleDeleteSingleRow(originalRowIdx)}
+                                                                                                className="text-red-600 focus:text-red-600"
+                                                                                            >
+                                                                                                <Trash2 className="h-3 w-3 mr-2" />
+                                                                                                {t('common.deleteRow', '删除行')}
+                                                                                            </ContextMenuItem>
+                                                                                        )}
+                                                                                    </ContextMenuContent>
+                                                                                </ContextMenu>
+                                                                            )}
+                                                                        </TableCell>
+                                                                    ))}
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                        {filteredRows.length === 0 && newRows.length === 0 && (
+                                                            <TableRow>
+                                                                <TableCell colSpan={selectedRowIndices.length > 0 ? (result.columns.length || 1) + 1 : (result.columns.length || 1)} className="text-center h-24 text-muted-foreground">
+                                                                    {hasActiveInlineFilters ? t('common.noFilterResults', '无匹配结果') : t('common.noResults', 'No results')}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
                                         </div>
 
                                         {/* 分页控件 */}
@@ -1518,6 +1523,69 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                 row={viewingRow}
                 columns={result?.columns || []}
                 title={t('common.viewRow', '查看行数据')}
+                editable={isEditable}
+                onSave={async (editedRow) => {
+                    if (!result || !dbName || !tableName || viewingRowIndex < 0) return;
+
+                    const originalRow = result.rows[viewingRowIndex];
+
+                    try {
+                        const whereClause = generateWhereClause(originalRow);
+
+                        // 构建 UPDATE 语句
+                        const updates: string[] = [];
+                        Object.keys(editedRow).forEach(key => {
+                            const newValue = editedRow[key];
+                            const oldValue = originalRow[key];
+
+                            // 只更新变化的字段
+                            if (newValue !== oldValue) {
+                                const valueStr = newValue === null || newValue === '' ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
+                                updates.push(`\`${key}\` = ${valueStr}`);
+                            }
+                        });
+
+                        if (updates.length === 0) {
+                            // 没有变化，直接返回
+                            return;
+                        }
+
+                        const updateSql = `UPDATE \`${dbName}\`.\`${tableName}\` SET ${updates.join(', ')} WHERE ${whereClause}`;
+
+                        const startTime = Date.now();
+                        await invoke("execute_sql", {
+                            connectionId,
+                            sql: updateSql,
+                            dbName
+                        });
+
+                        addCommandToConsole({
+                            databaseType: 'mysql',
+                            command: updateSql,
+                            duration: Date.now() - startTime,
+                            success: true
+                        });
+
+                        // 更新本地数据
+                        const updatedRows = [...result.rows];
+                        updatedRows[viewingRowIndex] = editedRow;
+                        setResult({ ...result, rows: updatedRows });
+                        setOriginalRows(updatedRows);
+                    } catch (err: any) {
+                        console.error("Update failed:", err);
+                        setError(typeof err === 'string' ? err : JSON.stringify(err));
+
+                        addCommandToConsole({
+                            databaseType: 'mysql',
+                            command: `UPDATE \`${dbName}\`.\`${tableName}\` SET ...`,
+                            duration: 0,
+                            success: false,
+                            error: typeof err === 'string' ? err : JSON.stringify(err)
+                        });
+
+                        throw err;
+                    }
+                }}
             />
         </div>
     );
