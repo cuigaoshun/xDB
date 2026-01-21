@@ -202,7 +202,7 @@ const resources = {
       "redis": {
         "connected": "Connected",
         "filterKeys": "Filter keys...",
-        "filterKeysPlaceholder": "Filter by Key Name... (empty: all, text: exact, prefix*: prefix)",
+        "filterKeysPlaceholder": "Filter by Key Name or Pattern",
         "addKey": "Key",
         "type": "Type",
         "key": "Key",
@@ -245,7 +245,18 @@ const resources = {
         "element": "Element",
         "sortedSet": "Sorted Set",
         "noKeys": "No keys found",
-        "deleteKey": "Delete Key"
+        "deleteKey": "Delete Key",
+        "listView": "List",
+        "treeView": "Tree",
+        "delimiter": "Delimiter",
+        "exactSearch": "Exact",
+        "searchHistory": "History",
+        "noSearchHistory": "No search history",
+        "search": "Search",
+        "clearHistory": "Clear History",
+        "folder": "folder",
+        "folders": "folders",
+        "keyCount": "{{count}} keys"
       },
       "memcached": {
         "searchKey": "Search Key",
@@ -485,7 +496,7 @@ const resources = {
       "redis": {
         "connected": "已连接",
         "filterKeys": "过滤键...",
-        "filterKeysPlaceholder": "通过键名过滤... (空: 全部, 文本: 精确, prefix*: 前缀)",
+        "filterKeysPlaceholder": "通过键名或模式过滤",
         "addKey": "键",
         "type": "类型",
         "key": "键名",
@@ -528,7 +539,18 @@ const resources = {
         "element": "元素",
         "sortedSet": "ZSet",
         "noKeys": "未找到键",
-        "deleteKey": "删除键"
+        "deleteKey": "删除键",
+        "listView": "列表",
+        "treeView": "树形",
+        "delimiter": "分隔符",
+        "exactSearch": "精确",
+        "searchHistory": "历史",
+        "noSearchHistory": "暂无搜索历史",
+        "search": "搜索",
+        "clearHistory": "清空历史",
+        "folder": "文件夹",
+        "folders": "文件夹",
+        "keyCount": "{{count}} 个键"
       },
       "memcached": {
         "searchKey": "搜索键",
