@@ -625,7 +625,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             Object.entries(row).forEach(([key, value]) => {
                 if (value !== null && value !== '') {
                     fields.push(`\`${key}\``);
-                    const escapedValue = String(value).replace(/'/g, "''");
+                    const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                    const escapedValue = strValue.replace(/'/g, "''");
                     values.push(`'${escapedValue}'`);
                 }
             });
@@ -668,10 +669,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
         setNewRows(failedRows);
         setIsLoading(false);
-
-        if (successCount > 0) {
-            handleExecute(); // 刷新数据
-        }
 
         if (failedRows.length > 0) {
             setError(t('common.someRowsFailed', '有 {{count}} 行提交失败，请检查数据。', { count: failedRows.length }));
@@ -1063,8 +1060,14 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                             {/* Result Area */}
                             <div className="flex-1 px-4 py-1 overflow-hidden">
                                 {error && (
-                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap">
-                                        Error: {error}
+                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
+                                        <span>Error: {error}</span>
+                                        <button 
+                                            onClick={() => setError(null)} 
+                                            className="text-red-400 hover:text-red-600 flex-shrink-0"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
                                     </div>
                                 )}
 
