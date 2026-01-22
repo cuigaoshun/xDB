@@ -17,6 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
 import { useTranslation } from "react-i18next";
 import { CreateTableDialog } from "@/components/workspace/CreateTableDialog";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 // 系统数据库列表（移到组件外部避免重复创建）
 const SYSTEM_DBS = new Set(['information_schema', 'mysql', 'performance_schema', 'sys']);
@@ -40,6 +41,11 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const globalExpandedId = useAppStore(state => state.expandedConnectionId);
     const setTablesCache = useAppStore(state => state.setTablesCache);
     const setTablesLoading = useAppStore(state => state.setTablesLoading);
+
+    // 获取设置和最近访问记录
+    const mysqlPrefetchDbCount = useSettingsStore(state => state.mysqlPrefetchDbCount);
+    const getRecentDatabases = useSettingsStore(state => state.getRecentDatabases);
+    const addRecentDatabase = useSettingsStore(state => state.addRecentDatabase);
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [databases, setDatabases] = useState<string[]>([]);
@@ -332,7 +338,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         }
     };
 
-    // 预取所有表信息
+    // 预取表信息（根据设置决定查询范围）
     const prefetchAllTables = async () => {
         if (prefetchLoadingRef.current || hasPrefetchedRef.current) {
             return;
@@ -341,11 +347,28 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
         prefetchLoadingRef.current = true;
         const startTime = Date.now();
 
-        const sql = `
-            SELECT TABLE_SCHEMA, TABLE_NAME 
-            FROM information_schema.TABLES 
-            WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
-        `;
+        // 根据设置决定查询哪些数据库
+        let sql: string;
+        const recentDbs = getRecentDatabases(connection.id);
+
+        if (mysqlPrefetchDbCount === 'all' || recentDbs.length === 0) {
+            // 查询所有非系统数据库
+            sql = `
+                SELECT TABLE_SCHEMA, TABLE_NAME 
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+            `;
+        } else {
+            // 优先查询最近访问的数据库
+            const limit = mysqlPrefetchDbCount;
+            const dbsToQuery = recentDbs.slice(0, limit);
+            const dbList = dbsToQuery.map(db => `'${db.replace(/'/g, "''")}'`).join(',');
+            sql = `
+                SELECT TABLE_SCHEMA, TABLE_NAME 
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA IN (${dbList})
+            `;
+        }
 
         try {
             const result = await invoke<SqlResult>('execute_sql', {
@@ -423,6 +446,11 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
         e.stopPropagation();
+
+        // 记录用户访问的数据库（MySQL/SQLite）
+        if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
+            addRecentDatabase(connection.id, dbName);
+        }
 
         // For Redis, clicking a DB creates a new tab
         if (connection.db_type === 'redis') {

@@ -14,6 +14,10 @@ export interface Settings {
   redisViewPreferences: Record<string, RedisViewPreference>;
   // Redis 搜索历史: key 格式为 `${connectionId}:${db}`, 值为最近10条搜索记录
   redisSearchHistory: Record<string, string[]>;
+  // MySQL 预取数据库数量: 'all' 或具体数字
+  mysqlPrefetchDbCount: number | 'all';
+  // 最近访问的数据库: key 格式为 connectionId, 值为数据库名数组（按访问时间倒序）
+  recentDatabases: Record<number, string[]>;
 }
 
 interface SettingsState extends Settings {
@@ -27,6 +31,11 @@ interface SettingsState extends Settings {
   getRedisSearchHistory: (connectionId: number, db: number) => string[];
   addRedisSearchHistory: (connectionId: number, db: number, keyword: string) => void;
   clearRedisSearchHistory: (connectionId: number, db: number) => void;
+  // MySQL 预取设置方法
+  setMysqlPrefetchDbCount: (count: number | 'all') => void;
+  // 最近访问数据库方法
+  getRecentDatabases: (connectionId: number) => string[];
+  addRecentDatabase: (connectionId: number, dbName: string) => void;
 }
 
 const defaultViewPreference: RedisViewPreference = {
@@ -38,6 +47,8 @@ const defaultSettings: Settings = {
   redisScanCount: 1000,
   redisViewPreferences: {},
   redisSearchHistory: {},
+  mysqlPrefetchDbCount: 20,
+  recentDatabases: {},
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -115,6 +126,30 @@ export const useSettingsStore = create<SettingsState>()(
             [key]: [],
           },
         }));
+      },
+
+      // MySQL 预取设置方法
+      setMysqlPrefetchDbCount: (count) => set({ mysqlPrefetchDbCount: count }),
+
+      // 最近访问数据库方法
+      getRecentDatabases: (connectionId) => {
+        return get().recentDatabases[connectionId] ?? [];
+      },
+
+      addRecentDatabase: (connectionId, dbName) => {
+        set((state) => {
+          const current = state.recentDatabases[connectionId] ?? [];
+          // 去重：移除已存在的相同数据库名
+          const filtered = current.filter((name) => name !== dbName);
+          // 添加到头部，保留最多50条
+          const newList = [dbName, ...filtered].slice(0, 50);
+          return {
+            recentDatabases: {
+              ...state.recentDatabases,
+              [connectionId]: newList,
+            },
+          };
+        });
       },
     }),
     {

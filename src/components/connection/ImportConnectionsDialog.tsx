@@ -60,7 +60,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
         try {
             const selected = await openDialog({
                 filters: [{
-                    name: 'xDB Connection File',
+                    name: t('settings.connectionFileName'),
                     extensions: ['xdb', 'json']
                 }],
                 multiple: false
@@ -97,7 +97,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
             }
         } catch (err) {
             console.error(err);
-            setError("Failed to read file");
+            setError(t('common.failedToReadFile'));
         }
     };
 
@@ -149,8 +149,8 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
         
         if (action === 'rename') {
             // Auto generate a new name: "Name (Imported)" or "Name (1)"
-            let baseName = newItems[index].original.name || "Untitled";
-            let newName = `${baseName} (Imported)`;
+            let baseName = newItems[index].original.name || t('settings.untitled');
+            let newName = `${baseName} (${t('settings.imported')})`;
             let counter = 1;
             while (existingConnections.some(c => c.name === newName) || newItems.some((item, i) => i !== index && item.newName === newName)) {
                 newName = `${baseName} (${counter++})`;
@@ -200,7 +200,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
             reset();
         } catch (err) {
             console.error(err);
-            setError("Import failed partially or completely");
+            setError(t('settings.importFailed'));
             setStep('preview');
         }
     };
@@ -234,7 +234,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
                             <FileJson className="h-10 w-10 text-muted-foreground mb-4" />
                             <p className="text-sm text-muted-foreground">{t('settings.selectFile')}</p>
                             <Button variant="secondary" className="mt-4" onClick={(e) => { e.stopPropagation(); handleFileSelect(); }}>
-                                {t('common.browse', 'Browse')}
+                                {t('common.browse')}
                             </Button>
                         </div>
                     )}
@@ -273,7 +273,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
                                                 )}
                                                 {item.status === 'new' && (
                                                     <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full dark:bg-green-900/30 dark:text-green-400">
-                                                        New
+                                                        {t('settings.new')}
                                                     </span>
                                                 )}
                                             </div>
@@ -282,7 +282,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
                                             </div>
                                             {item.action === 'rename' && (
                                                 <div className="text-xs text-blue-600 mt-1">
-                                                    Rename to: {item.newName}
+                                                    {t('settings.renameTo')} {item.newName}
                                                 </div>
                                             )}
                                         </div>
@@ -333,7 +333,7 @@ export function ImportConnectionsDialog({ open, onOpenChange, onImportSuccess }:
                     
                     {step === 'decrypt' && (
                         <Button onClick={handleDecrypt}>
-                            {t('common.confirm', 'Confirm')}
+                            {t('common.confirm')}
                         </Button>
                     )}
                     

@@ -88,10 +88,10 @@ export function ExportConnectionsDialog({ open, onOpenChange }: ExportConnection
             // Save file dialog
             const filePath = await save({
                 filters: [{
-                    name: 'xDB Connection File',
+                    name: t('settings.connectionFileName'),
                     extensions: ['xdb']
                 }],
-                defaultPath: 'connections.xdb',
+                defaultPath: t('settings.defaultExportFileName'),
             });
 
             if (filePath) {
@@ -121,7 +121,7 @@ export function ExportConnectionsDialog({ open, onOpenChange }: ExportConnection
                 <div className="flex flex-col gap-4 py-4">
                     <div className="flex items-center justify-between px-1">
                         <Label className="text-sm text-muted-foreground">
-                            {selectedIds.length} / {connections.length} {t('common.selected', 'selected')}
+                            {selectedIds.length} / {connections.length} {t('common.selected')}
                         </Label>
                         <Button variant="ghost" size="sm" onClick={handleSelectAll}>
                             {selectedIds.length === connections.length ? t('settings.deselectAll') : t('settings.selectAll')}
