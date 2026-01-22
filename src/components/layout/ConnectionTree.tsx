@@ -10,6 +10,7 @@ import {
     Table as TableIcon,
     Loader2,
     FileCode,
+    ChevronsDownUp,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
@@ -630,6 +631,31 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 <span className="truncate flex-1">
                     {connection.name}
                 </span>
+                {/* 收起所有按钮 - MySQL/SQLite收起表，Redis/Memcached收起整个连接 */}
+                {isExpanded && (
+                    ((['mysql', 'sqlite'] as const).includes(connection.db_type as any) && expandedDatabases.size > 0) ||
+                    (['redis', 'memcached'] as const).includes(connection.db_type as any)
+                ) && (
+                    <button
+                        className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
+                                // 收起所有表（数据库节点）
+                                setExpandedDatabases(new Set());
+                            } else {
+                                // Redis/Memcache: 收起整个连接
+                                setIsExpanded(false);
+                                if (globalExpandedId === connection.id) {
+                                    setExpandedConnectionId(null);
+                                }
+                            }
+                        }}
+                        title={t('common.collapseAll', '收起所有')}
+                    >
+                        <ChevronsDownUp className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
 
             {/* Databases List */}
