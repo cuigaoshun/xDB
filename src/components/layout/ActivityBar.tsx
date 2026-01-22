@@ -95,7 +95,7 @@ export function ActivityBar({ activeView, onViewChange, consoleVisible, onToggle
 }
 
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -236,10 +236,18 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
                     <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
                     <Input
                         placeholder={t('common.searchExplorer')}
-                        className="h-8 pl-7 text-xs bg-background"
+                        className="h-8 pl-7 pr-7 text-xs bg-background"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    {searchTerm && (
+                        <button
+                            className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                            onClick={() => setSearchTerm("")}
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    )}
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
