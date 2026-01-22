@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Connection, useAppStore, TableInfo } from "@/store/useAppStore";
 import { confirm } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -14,13 +15,6 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuTrigger,
-    ContextMenuSeparator,
-} from "@/components/ui/context-menu";
 import { useTranslation } from "react-i18next";
 import { CreateTableDialog } from "@/components/workspace/CreateTableDialog";
 
@@ -60,6 +54,15 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
     const [createTableDbName, setCreateTableDbName] = useState<string>('');
 
+    // 右键菜单状态 - 使用单个共享菜单而不是每行都渲染
+    const [contextMenu, setContextMenu] = useState<{
+        type: 'database' | 'table';
+        db: string;
+        table?: string;
+        x: number;
+        y: number;
+    } | null>(null);
+
     // 使用 ref 来防止 loadDatabases 重复调用
     const loadingDatabasesRef = useRef<{ connectionId: number; loading: boolean } | null>(null);
     const prefetchLoadingRef = useRef(false);
@@ -70,26 +73,81 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     // Auto-expand if filter matches something inside (and we have data)
     // This is tricky with lazy loading. We only filter what we have.
 
-    const isMatch = (text: string) => !filterTerm || text.toLowerCase().includes(filterTerm.toLowerCase());
+    // 缓存小写的 filterTerm 避免重复计算
+    const filterTermLower = useMemo(() => filterTerm?.toLowerCase() || '', [filterTerm]);
 
-    // Filter databases to display
-    const getFilteredDatabases = () => {
-        if (!filterTerm) return databases;
-        return databases.filter(db => {
-            if (isMatch(db)) return true;
-            // Check if any table matches
-            const dbTables = tables[db];
-            if (dbTables && dbTables.some(t => isMatch(t.name))) return true;
-            return false;
-        });
-    };
+    const isMatch = useCallback((text: string) => {
+        if (!filterTermLower) return true;
+        return text.toLowerCase().includes(filterTermLower);
+    }, [filterTermLower]);
 
-    // Filter tables to display for a db
-    const getFilteredTables = (db: string) => {
-        const dbTables = tables[db] || [];
-        if (!filterTerm) return dbTables;
-        return dbTables.filter(t => isMatch(t.name));
-    };
+    // 使用 useMemo 缓存过滤后的数据库列表
+    const filteredDatabasesMap = useMemo(() => {
+        if (!filterTermLower) {
+            return { databases, tablesMap: {} as Record<string, TableInfo[]> };
+        }
+
+        const filteredDbs: string[] = [];
+        const tablesMap: Record<string, TableInfo[]> = {};
+
+        for (const db of databases) {
+            const dbMatch = db.toLowerCase().includes(filterTermLower);
+            const dbTables = tables[db] || [];
+            const matchedTables = dbTables.filter(t => t.name.toLowerCase().includes(filterTermLower));
+
+            if (dbMatch || matchedTables.length > 0) {
+                filteredDbs.push(db);
+                // 如果数据库名匹配，显示所有表；否则只显示匹配的表
+                tablesMap[db] = dbMatch ? dbTables : matchedTables;
+            }
+        }
+
+        return { databases: filteredDbs, tablesMap };
+    }, [databases, tables, filterTermLower]);
+
+    // 定义扁平化的树节点类型
+    type FlatTreeNode = 
+        | { type: 'database'; db: string }
+        | { type: 'table'; db: string; table: TableInfo }
+        | { type: 'loading'; db: string };
+
+    // 将树结构扁平化为虚拟列表可用的数组
+    const flattenedNodes = useMemo((): FlatTreeNode[] => {
+        const nodes: FlatTreeNode[] = [];
+        const filteredDbs = filteredDatabasesMap.databases;
+
+        for (const db of filteredDbs) {
+            nodes.push({ type: 'database', db });
+
+            // 只有展开的数据库才添加表节点
+            if (expandedDatabases.has(db) && (connection.db_type === 'mysql' || connection.db_type === 'sqlite')) {
+                const isLoading = loadingTables.has(db) && (!tables[db] || tables[db].length === 0);
+                if (isLoading) {
+                    nodes.push({ type: 'loading', db });
+                } else {
+                    const dbTables = filterTermLower 
+                        ? (filteredDatabasesMap.tablesMap[db] || [])
+                        : (tables[db] || []);
+                    for (const table of dbTables) {
+                        nodes.push({ type: 'table', db, table });
+                    }
+                }
+            }
+        }
+
+        return nodes;
+    }, [filteredDatabasesMap, expandedDatabases, loadingTables, tables, filterTermLower, connection.db_type]);
+
+    // 虚拟列表容器 ref
+    const virtualListRef = useRef<HTMLDivElement>(null);
+
+    // 虚拟列表配置
+    const virtualizer = useVirtualizer({
+        count: flattenedNodes.length,
+        getScrollElement: () => virtualListRef.current,
+        estimateSize: () => 28, // 每行大约 28px
+        overscan: 10, // 预渲染额外的行数
+    });
 
     // Sync from global expanded ID
     useEffect(() => {
@@ -344,28 +402,24 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     };
 
     // 监听搜索词，如果有匹配的表，自动展开对应的数据库
+    // 使用 filteredDatabasesMap 中已缓存的结果，避免重复计算
     useEffect(() => {
-        if (filterTerm && connection.db_type === 'mysql') {
-            const newExpanded = new Set(expandedDatabases);
-            let changed = false;
-
-            databases.forEach(db => {
-                // 如果数据库名本身匹配，不需要因为表而展开（虽然也可以）
-                // 这里主要处理：数据库名不匹配，但表名匹配的情况
-                const dbTables = tables[db];
-                if (dbTables && dbTables.some(t => isMatch(t.name))) {
-                    if (!newExpanded.has(db)) {
-                        newExpanded.add(db);
-                        changed = true;
-                    }
-                }
+        if (filterTermLower && connection.db_type === 'mysql') {
+            const dbsToExpand = filteredDatabasesMap.databases.filter(db => {
+                // 只展开那些有匹配表的数据库（且尚未展开）
+                const hasMatchingTables = filteredDatabasesMap.tablesMap[db]?.length > 0;
+                return hasMatchingTables && !expandedDatabases.has(db);
             });
 
-            if (changed) {
-                setExpandedDatabases(newExpanded);
+            if (dbsToExpand.length > 0) {
+                setExpandedDatabases(prev => {
+                    const newSet = new Set(prev);
+                    dbsToExpand.forEach(db => newSet.add(db));
+                    return newSet;
+                });
             }
         }
-    }, [filterTerm, tables, databases, connection.db_type]);
+    }, [filterTermLower, filteredDatabasesMap, connection.db_type]);
 
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -602,7 +656,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     }
 
     // For MySQL & Redis & SQLite:
-    const filteredDatabases = getFilteredDatabases();
+    const filteredDatabases = filteredDatabasesMap.databases;
 
     const selfMatch = isMatch(connection.name);
     const hasMatchingChildren = filteredDatabases.length > 0;
@@ -670,10 +724,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
 
             {/* Databases List */}
             {isExpanded && (
-                <div className={cn(
-                    "ml-4 border-l border-border/40 pl-1 overflow-y-auto",
-                    (connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? "max-h-[600px]" : "max-h-[320px]"
-                )}>
+                <div className="ml-4 border-l border-border/40 pl-1">
                     {error && (
                         <div className="px-2 py-1.5 text-xs text-destructive bg-destructive/10 rounded mx-1 mb-1 break-words">
                             {error}
@@ -685,108 +736,158 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                             <span>Loading...</span>
                         </div>
                     ) : (
-                        filteredDatabases.map(db => (
-                            <div key={db} className="flex flex-col">
-                                {/* 为MySQL和SQLite数据库添加右键菜单 */}
-                                {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? (
-                                    <ContextMenu>
-                                        <ContextMenuTrigger>
-                                            <div
-                                                className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
-                                                onClick={(e) => toggleDatabaseExpand(db, e)}
-                                            >
-                                                <button className="p-0.5">
-                                                    {expandedDatabases.has(db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                                </button>
-                                                <Database className="h-3 w-3 shrink-0 text-yellow-500/70" />
-                                                <span className="truncate">{db}</span>
-                                            </div>
-                                        </ContextMenuTrigger>
-                                        <ContextMenuContent>
-                                            <ContextMenuItem onClick={() => handleNewQueryTab(db)}>
-                                                {t('mysql.newQueryTab', '新建查询')}
-                                            </ContextMenuItem>
-                                            <ContextMenuSeparator />
-                                            <ContextMenuItem onClick={() => handleCreateTable(db)}>
-                                                {t('mysql.createTable')}
-                                            </ContextMenuItem>
-                                        </ContextMenuContent>
-                                    </ContextMenu>
-                                ) : (
-                                    <div
-                                        className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
-                                        onClick={(e) => toggleDatabaseExpand(db, e)}
-                                    >
-                                        <Database className={cn(
-                                            "h-3 w-3 shrink-0",
-                                            connection.db_type === 'redis' ? "text-red-400/70" : "text-yellow-500/70"
-                                        )} />
-                                        <span className="truncate">
-                                            {connection.db_type === 'redis' ? `DB ${db}` : db}
-                                        </span>
-                                    </div>
-                                )}
+                        <div
+                            ref={virtualListRef}
+                            className={cn(
+                                "overflow-y-auto",
+                                (connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? "max-h-[600px]" : "max-h-[320px]"
+                            )}
+                        >
+                            <div
+                                style={{
+                                    height: `${virtualizer.getTotalSize()}px`,
+                                    width: '100%',
+                                    position: 'relative',
+                                }}
+                            >
+                                {virtualizer.getVirtualItems().map(virtualRow => {
+                                    const node = flattenedNodes[virtualRow.index];
+                                    
+                                    return (
+                                        <div
+                                            key={virtualRow.key}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: `${virtualRow.size}px`,
+                                                transform: `translateY(${virtualRow.start}px)`,
+                                            }}
+                                        >
+                                            {node.type === 'database' && (
+                                                <div
+                                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs"
+                                                    onClick={(e) => toggleDatabaseExpand(node.db, e)}
+                                                    onContextMenu={(e) => {
+                                                        if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
+                                                            e.preventDefault();
+                                                            setContextMenu({ type: 'database', db: node.db, x: e.clientX, y: e.clientY });
+                                                        }
+                                                    }}
+                                                >
+                                                    {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && (
+                                                        <button className="p-0.5">
+                                                            {expandedDatabases.has(node.db) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                                        </button>
+                                                    )}
+                                                    <Database className={cn(
+                                                        "h-3 w-3 shrink-0",
+                                                        connection.db_type === 'redis' ? "text-red-400/70" : "text-yellow-500/70"
+                                                    )} />
+                                                    <span className="truncate">
+                                                        {connection.db_type === 'redis' ? `DB ${node.db}` : node.db}
+                                                    </span>
+                                                </div>
+                                            )}
 
-                                {/* Tables List (MySQL & SQLite) */}
-                                {(connection.db_type === 'mysql' || connection.db_type === 'sqlite') && expandedDatabases.has(db) && (
-                                    <div className="ml-4 border-l border-border/40 pl-1">
-                                        {(loadingTables.has(db) && (!tables[db] || tables[db].length === 0)) ? (
-                                            <div className="px-4 py-1 flex items-center gap-2 text-muted-foreground text-xs">
-                                                <Loader2 className="h-3 w-3 animate-spin" />
-                                                <span>Loading...</span>
-                                            </div>
-                                        ) : (
-                                            getFilteredTables(db).map(table => (
-                                                <ContextMenu key={table.name}>
-                                                    <ContextMenuTrigger>
-                                                        <div
-                                                            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs ml-4"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onSelectTable?.(connection, db, table.name);
-                                                            }}
-                                                        >
-                                                            <TableIcon className="h-3 w-3 text-blue-400/70 shrink-0" />
-                                                            <span className="truncate">{table.name}</span>
-                                                        </div>
-                                                    </ContextMenuTrigger>
-                                                    <ContextMenuContent>
-                                                        <ContextMenuItem
-                                                            onClick={() => onSelectTable?.(connection, db, table.name)}
-                                                        >
-                                                            {t('mysql.viewData')}
-                                                        </ContextMenuItem>
-                                                        <ContextMenuItem
-                                                            onClick={() => handleViewTableSchema(db, table.name)}
-                                                        >
-                                                            {t('mysql.viewSchema')}
-                                                        </ContextMenuItem>
-                                                        <ContextMenuItem
-                                                            onClick={() => handleNewQueryTab(db, table.name)}
-                                                        >
-                                                            {t('mysql.newQueryTab', '新建查询')}
-                                                        </ContextMenuItem>
-                                                        <ContextMenuSeparator />
-                                                        <ContextMenuItem
-                                                            onClick={() => handleCreateTable(db)}
-                                                        >
-                                                            {t('mysql.createTable')}
-                                                        </ContextMenuItem>
-                                                        <ContextMenuItem
-                                                            onClick={() => handleDeleteTable(db, table.name)}
-                                                            className="text-red-600"
-                                                        >
-                                                            {t('mysql.deleteTable')}
-                                                        </ContextMenuItem>
-                                                    </ContextMenuContent>
-                                                </ContextMenu>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
+                                            {node.type === 'loading' && (
+                                                <div className="px-4 py-1 flex items-center gap-2 text-muted-foreground text-xs ml-4">
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    <span>Loading...</span>
+                                                </div>
+                                            )}
+
+                                            {node.type === 'table' && (
+                                                <div
+                                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs ml-6"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onSelectTable?.(connection, node.db, node.table.name);
+                                                    }}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        setContextMenu({ type: 'table', db: node.db, table: node.table.name, x: e.clientX, y: e.clientY });
+                                                    }}
+                                                >
+                                                    <TableIcon className="h-3 w-3 text-blue-400/70 shrink-0" />
+                                                    <span className="truncate">{node.table.name}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        ))
+                        </div>
                     )}
+                </div>
+            )}
+
+            {/* 共享的右键菜单 */}
+            {contextMenu && (
+                <div
+                    className="fixed inset-0 z-50"
+                    onClick={() => setContextMenu(null)}
+                    onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+                >
+                    <div
+                        className="absolute bg-popover border rounded-md shadow-md py-1 z-50"
+                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {contextMenu.type === 'database' && (
+                            <>
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { handleNewQueryTab(contextMenu.db); setContextMenu(null); }}
+                                >
+                                    {t('mysql.newQueryTab', '新建查询')}
+                                </button>
+                                <div className="h-px bg-border my-1" />
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { handleCreateTable(contextMenu.db); setContextMenu(null); }}
+                                >
+                                    {t('mysql.createTable')}
+                                </button>
+                            </>
+                        )}
+                        {contextMenu.type === 'table' && contextMenu.table && (
+                            <>
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { onSelectTable?.(connection, contextMenu.db, contextMenu.table!); setContextMenu(null); }}
+                                >
+                                    {t('mysql.viewData')}
+                                </button>
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { handleViewTableSchema(contextMenu.db, contextMenu.table!); setContextMenu(null); }}
+                                >
+                                    {t('mysql.viewSchema')}
+                                </button>
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { handleNewQueryTab(contextMenu.db, contextMenu.table); setContextMenu(null); }}
+                                >
+                                    {t('mysql.newQueryTab', '新建查询')}
+                                </button>
+                                <div className="h-px bg-border my-1" />
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                    onClick={() => { handleCreateTable(contextMenu.db); setContextMenu(null); }}
+                                >
+                                    {t('mysql.createTable')}
+                                </button>
+                                <button
+                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap text-red-600"
+                                    onClick={() => { handleDeleteTable(contextMenu.db, contextMenu.table!); setContextMenu(null); }}
+                                >
+                                    {t('mysql.deleteTable')}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 
