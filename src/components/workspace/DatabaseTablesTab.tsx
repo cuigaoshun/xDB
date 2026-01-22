@@ -47,9 +47,12 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
     const { t } = useTranslation();
     const addTab = useAppStore(state => state.addTab);
     const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
-    const getTablesCache = useAppStore(state => state.getTablesCache);
     const setTablesCache = useAppStore(state => state.setTablesCache);
     const clearTablesCache = useAppStore(state => state.clearTablesCache);
+    // 订阅缓存变化，当 ConnectionTree 更新缓存时自动更新
+    const cachedTables = useAppStore(state => state.tablesCache[`${connectionId}-${dbName}`]);
+    // 订阅全局加载状态，避免与 ConnectionTree 重复加载
+    const isGlobalLoading = useAppStore(state => state.tablesLoading[`${connectionId}-${dbName}`] ?? false);
 
     const [tables, setTables] = useState<TableInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -66,15 +69,28 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
         loading: boolean;
     } | null>(null);
 
+    // 监听缓存变化，自动更新本地状态
     useEffect(() => {
-        // 首先尝试从缓存读取
-        const cachedTables = getTablesCache(connectionId, dbName);
+        if (cachedTables && cachedTables.length > 0) {
+            setTables(cachedTables);
+        }
+    }, [cachedTables]);
+
+    useEffect(() => {
+        // 如果缓存中有数据，直接使用缓存，不再自己加载
+        // ConnectionTree 会负责加载完整数据并更新缓存
         if (cachedTables && cachedTables.length > 0) {
             setTables(cachedTables);
             return;
         }
 
-        // 如果当前正在加载相同的数据或已经加载过，跳过
+        // 如果 ConnectionTree 正在加载，等待它完成，不自己加载
+        if (isGlobalLoading) {
+            return;
+        }
+
+        // 缓存为空且没有其他地方在加载时才自己加载（比如直接通过 URL 打开 Tab）
+        // 如果当前正在加载相同的数据，跳过
         if (loadingStateRef.current?.connectionId === connectionId &&
             loadingStateRef.current?.dbName === dbName &&
             loadingStateRef.current?.loading) {
@@ -84,7 +100,7 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
         // 立即设置加载标志，防止并发调用
         loadingStateRef.current = { connectionId, dbName, loading: true };
         loadTables();
-    }, [connectionId, dbName]);
+    }, [connectionId, dbName, isGlobalLoading]);
 
     const loadTables = async () => {
         if (!connection) return;

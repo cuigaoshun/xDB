@@ -45,6 +45,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const setExpandedConnectionId = useAppStore(state => state.setExpandedConnectionId);
     const globalExpandedId = useAppStore(state => state.expandedConnectionId);
     const setTablesCache = useAppStore(state => state.setTablesCache);
+    const setTablesLoading = useAppStore(state => state.setTablesLoading);
 
     const [isExpanded, setIsExpanded] = useState(false);
     const [databases, setDatabases] = useState<string[]>([]);
@@ -63,6 +64,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const loadingDatabasesRef = useRef<{ connectionId: number; loading: boolean } | null>(null);
     const prefetchLoadingRef = useRef(false);
     const hasPrefetchedRef = useRef(false);
+    // 记录哪些数据库已经加载过完整表数据（包含 comment/rowCount）
+    const loadedTablesRef = useRef<Set<string>>(new Set());
 
     // Auto-expand if filter matches something inside (and we have data)
     // This is tricky with lazy loading. We only filter what we have.
@@ -408,17 +411,17 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
             setExpandedDatabases(newExpanded);
 
             // 真正点击展开时，尝试更新最新的表数据
-            // 只有当没有正在加载时才加载
-            if (!loadingTables.has(dbName)) {
+            // 只有当没有正在加载且没有加载过完整数据时才加载
+            if (!loadingTables.has(dbName) && !loadedTablesRef.current.has(dbName)) {
                 loadTables(dbName);
             }
         }
     };
 
     const loadTables = async (dbName: string) => {
-        const newLoading = new Set(loadingTables);
-        newLoading.add(dbName);
-        setLoadingTables(newLoading);
+        setLoadingTables(prev => new Set(prev).add(dbName));
+        // 设置全局加载状态，防止 DatabaseTablesTab 重复加载
+        setTablesLoading(connection.id, dbName, true);
 
         const startTime = Date.now();
         let command = "";
@@ -465,6 +468,9 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 [dbName]: tableList
             }));
 
+            // 标记该数据库已加载完整数据
+            loadedTablesRef.current.add(dbName);
+
             // 缓存到 store 中
             setTablesCache(connection.id, dbName, tableList);
 
@@ -485,9 +491,13 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 error: String(err)
             });
         } finally {
-            const finishedLoading = new Set(loadingTables);
-            finishedLoading.delete(dbName);
-            setLoadingTables(finishedLoading);
+            setLoadingTables(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(dbName);
+                return newSet;
+            });
+            // 清除全局加载状态
+            setTablesLoading(connection.id, dbName, false);
         }
     };
 

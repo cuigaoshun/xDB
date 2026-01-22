@@ -57,6 +57,8 @@ interface AppState {
   expandedConnectionId: number | null;
   // 表信息缓存：key 为 "connectionId-dbName"
   tablesCache: Record<string, TableInfo[]>;
+  // 表信息加载状态：key 为 "connectionId-dbName"
+  tablesLoading: Record<string, boolean>;
 
   setConnections: (connections: Connection[]) => void;
   addTab: (tab: Omit<Tab, 'active'>) => void;
@@ -79,6 +81,9 @@ interface AppState {
   setTablesCache: (connectionId: number, dbName: string, tables: TableInfo[]) => void;
   getTablesCache: (connectionId: number, dbName: string) => TableInfo[] | undefined;
   clearTablesCache: (connectionId: number, dbName: string) => void;
+  // 表信息加载状态方法
+  setTablesLoading: (connectionId: number, dbName: string, loading: boolean) => void;
+  isTablesLoading: (connectionId: number, dbName: string) => boolean;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -88,6 +93,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeView: 'home',
   expandedConnectionId: null,
   tablesCache: {},
+  tablesLoading: {},
 
   setConnections: (connections) => set({ connections }),
 
@@ -214,5 +220,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCache = { ...state.tablesCache };
     delete newCache[`${connectionId}-${dbName}`];
     return { tablesCache: newCache };
-  })
+  }),
+
+  // 表信息加载状态方法
+  setTablesLoading: (connectionId, dbName, loading) => set((state) => ({
+    tablesLoading: {
+      ...state.tablesLoading,
+      [`${connectionId}-${dbName}`]: loading
+    }
+  })),
+
+  isTablesLoading: (connectionId, dbName) => {
+    const state = get();
+    return state.tablesLoading[`${connectionId}-${dbName}`] ?? false;
+  }
 }));
