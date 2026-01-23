@@ -1062,8 +1062,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                 {error && (
                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
                                         <span>Error: {error}</span>
-                                        <button 
-                                            onClick={() => setError(null)} 
+                                        <button
+                                            onClick={() => setError(null)}
                                             className="text-red-400 hover:text-red-600 flex-shrink-0"
                                         >
                                             <X className="h-4 w-4" />
@@ -1075,9 +1075,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                     <div className="h-full flex flex-col gap-0">
                                         {/* 外层容器：横向滚动 */}
                                         <div className="border rounded-md bg-background flex-1 overflow-x-auto overflow-y-hidden">
-                                            {/* 内层容器：纵向滚动 */}
-                                            <div className="overflow-y-auto h-full" style={{ minWidth: 'max-content' }}>
-                                                <Table>
+                                            {/* 内层容器：纵向滚动，宽度根据列数动态计算 */}
+                                            <div className="overflow-y-auto h-full" style={{ width: `${(selectedRowIndices.length > 0 ? 50 : 0) + result.columns.length * 200}px` }}>
+                                                <Table className="table-fixed">
                                                     <TableHeader className="sticky top-0 bg-muted/50 z-10">
                                                         <TableRow>
                                                             {/* 复选框列 - 只在有选中行时显示 */}
