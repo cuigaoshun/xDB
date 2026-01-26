@@ -1,34 +1,34 @@
 import { Search, Plus, Trash2, Info, History, List, FolderTree } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input.tsx";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu.tsx";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable";
+} from "@/components/ui/resizable.tsx";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { RedisHashViewer } from "../redis/RedisHashViewer";
-import { RedisSetViewer } from "../redis/RedisSetViewer";
-import { RedisZSetViewer } from "../redis/RedisZSetViewer";
-import { RedisListViewer } from "../redis/RedisListViewer";
-import { RedisStringViewer } from "../redis/RedisStringViewer";
-import { RedisAddKeyDialog } from "../redis/RedisAddKeyDialog";
-import { RedisKeyTree } from "../redis/RedisKeyTree";
-import { useAppStore } from "@/store/useAppStore";
-import { useSettingsStore } from "@/store/useSettingsStore";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { RedisHashViewer } from "@/components/workspace/redis/RedisHashViewer.tsx";
+import { RedisSetViewer } from "@/components/workspace/redis/RedisSetViewer.tsx";
+import { RedisZSetViewer } from "@/components/workspace/redis/RedisZSetViewer.tsx";
+import { RedisListViewer } from "@/components/workspace/redis/RedisListViewer.tsx";
+import { RedisStringViewer } from "@/components/workspace/redis/RedisStringViewer.tsx";
+import { RedisAddKeyDialog } from "@/components/workspace/redis/RedisAddKeyDialog.tsx";
+import { RedisKeyTree } from "@/components/workspace/redis/RedisKeyTree.tsx";
+import { useAppStore } from "@/store/useAppStore.ts";
+import { useSettingsStore } from "@/store/useSettingsStore.ts";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog.tsx";
 
 interface RedisResult {
   output: any;

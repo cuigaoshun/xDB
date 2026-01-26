@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
 import {
     Loader2, Plus, Trash2, RefreshCw, Edit2, Key,
     Hash, Type, Calendar, Binary, Database, List
@@ -13,12 +13,12 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { confirm } from "@/hooks/use-toast";
-import { ColumnEditor, ColumnDefinition } from "@/components/workspace/ColumnEditor";
+} from "@/components/ui/table.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { confirm } from "@/hooks/use-toast.ts";
+import { ColumnEditor, ColumnDefinition } from "@/components/workspace/mysql/ColumnEditor.tsx";
 
 interface ColumnInfo {
     Field: string;

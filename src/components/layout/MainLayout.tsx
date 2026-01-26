@@ -1,10 +1,10 @@
 import { TabBar } from "./TabBar";
-import { MysqlWorkspace } from "../workspace/MysqlWorkspace";
-import { RedisWorkspace } from "../workspace/RedisWorkspace";
-import { MemcachedWorkspace } from "../workspace/MemcachedWorkspace";
-import { SqliteWorkspace } from "../workspace/SqliteWorkspace";
-import { TableSchemaTab } from "../workspace/TableSchemaTab";
-import { DatabaseTablesTab } from "../workspace/DatabaseTablesTab";
+import { MysqlWorkspace } from "../workspace/mysql/MysqlWorkspace.tsx";
+import { RedisWorkspace } from "../workspace/redis/RedisWorkspace.tsx";
+import { MemcachedWorkspace } from "../workspace/memcached/MemcachedWorkspace.tsx";
+import { SqliteWorkspace } from "../workspace/sqllite/SqliteWorkspace.tsx";
+import { TableSchemaTab } from "../workspace/mysql/TableSchemaTab.tsx";
+import { DatabaseTablesTab } from "../workspace/mysql/DatabaseTablesTab.tsx";
 import { ConnectionManager } from "../workspace/ConnectionManager";
 import { SettingsPage } from "../settings/SettingsPage";
 import { useAppStore } from "@/store/useAppStore";

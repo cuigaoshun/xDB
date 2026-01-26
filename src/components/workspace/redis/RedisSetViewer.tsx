@@ -1,10 +1,10 @@
 import { useState } from "react";
 
-import { confirm } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
+import { confirm } from "@/hooks/use-toast.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Search, Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import {
   Table,
   TableBody,
@@ -12,25 +12,25 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
 
-interface RedisHashViewerProps {
+interface RedisSetViewerProps {
   connectionId: number;
   db: number;
   keyName: string;
-  data: any[]; // [field, value, field, value...]
+  data: any[]; // [member1, member2...]
   loading: boolean;
   hasMore: boolean;
   filter: string;
@@ -39,7 +39,7 @@ interface RedisHashViewerProps {
   observerTarget: React.RefObject<HTMLDivElement | null>;
 }
 
-export function RedisHashViewer({
+export function RedisSetViewer({
   connectionId,
   db,
   keyName,
@@ -50,29 +50,25 @@ export function RedisHashViewer({
   onFilterChange,
   onRefresh,
   observerTarget,
-}: RedisHashViewerProps) {
+}: RedisSetViewerProps) {
   const { t } = useTranslation();
-  const [inlineEditField, setInlineEditField] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newField, setNewField] = useState({ field: "", value: "" });
+  const [newMember, setNewMember] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Parse flat array into objects for easier rendering
-  const pairs = [];
-  for (let i = 0; i < data.length; i += 2) {
-    pairs.push({ field: String(data[i]), value: String(data[i + 1]) });
-  }
+  // Inline edit state
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
-  const handleSave = async (field: string, value: string) => {
+  const handleAdd = async () => {
     const startTime = Date.now();
-    const commandStr = `HSET ${keyName} ${field} "${value.length > 30 ? value.substring(0, 30) + '...' : value}"`;
+    const commandStr = `SADD ${keyName} "${newMember.length > 30 ? newMember.substring(0, 30) + '...' : newMember}"`;
     try {
       setIsSubmitting(true);
       await invoke("execute_redis_command", {
         connectionId,
-        command: "HSET",
-        args: [keyName, field, value],
+        command: "SADD",
+        args: [keyName, newMember],
         db,
       });
 
@@ -84,12 +80,10 @@ export function RedisHashViewer({
       });
 
       onRefresh();
-      setInlineEditField(null);
-      setEditValue("");
       setIsAddDialogOpen(false);
-      setNewField({ field: "", value: "" });
+      setNewMember("");
     } catch (error) {
-      console.error("Failed to save hash field", error);
+      console.error("Failed to add set member", error);
       addCommandToConsole({
         databaseType: 'redis',
         command: commandStr,
@@ -102,17 +96,7 @@ export function RedisHashViewer({
     }
   };
 
-  const handleStartEdit = (pair: { field: string; value: string }) => {
-    setInlineEditField(pair.field);
-    setEditValue(pair.value);
-  };
-
-  const handleCancelEdit = () => {
-    setInlineEditField(null);
-    setEditValue("");
-  };
-
-  const handleDelete = async (field: string) => {
+  const handleDelete = async (member: string) => {
     const confirmed = await confirm({
       title: t('common.confirmDeletion'),
       description: t('redis.deleteConfirm'),
@@ -121,12 +105,12 @@ export function RedisHashViewer({
     if (!confirmed) return;
 
     const startTime = Date.now();
-    const commandStr = `HDEL ${keyName} ${field}`;
+    const commandStr = `SREM ${keyName} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       await invoke("execute_redis_command", {
         connectionId,
-        command: "HDEL",
-        args: [keyName, field],
+        command: "SREM",
+        args: [keyName, member],
         db,
       });
 
@@ -139,7 +123,7 @@ export function RedisHashViewer({
 
       onRefresh();
     } catch (error) {
-      console.error("Failed to delete hash field", error);
+      console.error("Failed to delete set member", error);
       addCommandToConsole({
         databaseType: 'redis',
         command: commandStr,
@@ -147,6 +131,63 @@ export function RedisHashViewer({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
+    }
+  };
+
+  const handleStartEdit = (member: string) => {
+    setEditingMember(member);
+    setEditValue(member);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMember(null);
+    setEditValue("");
+  };
+
+  const handleSaveEdit = async (oldMember: string, newMemberVal: string) => {
+    if (oldMember === newMemberVal) {
+      handleCancelEdit();
+      return;
+    }
+
+    const startTime = Date.now();
+    try {
+      setIsSubmitting(true);
+      // SREM old
+      await invoke("execute_redis_command", {
+        connectionId,
+        command: "SREM",
+        args: [keyName, oldMember],
+        db,
+      });
+      // SADD new
+      await invoke("execute_redis_command", {
+        connectionId,
+        command: "SADD",
+        args: [keyName, newMemberVal],
+        db,
+      });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `SREM ${keyName} "${oldMember}" + SADD ${keyName} "${newMemberVal}"`,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
+      onRefresh();
+      handleCancelEdit();
+    } catch (error) {
+      console.error("Failed to update set member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `SREM + SADD ${keyName}`,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -164,10 +205,10 @@ export function RedisHashViewer({
           />
         </div>
         <div className="text-xs text-muted-foreground">
-          {t('redis.total')}: {pairs.length}{hasMore ? "+" : ""}
+          {t('redis.total')}: {data.length}{hasMore ? "+" : ""}
         </div>
         <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
-          <Plus className="h-4 w-4" /> {t('redis.addField')}
+          <Plus className="h-4 w-4" /> {t('redis.addMember')}
         </Button>
       </div>
 
@@ -176,19 +217,16 @@ export function RedisHashViewer({
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
-              <TableHead className="w-1/3">{t('redis.field')}</TableHead>
-              <TableHead className="w-1/2">{t('redis.value')}</TableHead>
+              <TableHead>{t('redis.member')}</TableHead>
               <TableHead className="w-[100px] text-right">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pairs.map((pair, i) => {
-              const isEditing = inlineEditField === pair.field;
+            {data.map((member, i) => {
+              const memberStr = String(member);
+              const isEditing = editingMember === memberStr;
               return (
-                <TableRow key={`${pair.field} -${i} `} className="group hover:bg-muted/50">
-                  <TableCell className="font-mono text-xs align-top font-medium text-blue-600 dark:text-blue-400">
-                    {pair.field}
-                  </TableCell>
+                <TableRow key={`${memberStr}-${i}`} className="group hover:bg-muted/50">
                   <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                     {isEditing ? (
                       <Textarea
@@ -199,14 +237,12 @@ export function RedisHashViewer({
                       />
                     ) : (
                       <TextFormatterWrapper
-                        content={pair.value}
-                        onSave={async (newValue) => {
-                          await handleSave(pair.field, newValue);
-                        }}
-                        title="Format value"
+                        content={memberStr}
+                        readonly
+                        title="View formatted"
                       >
                         <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{pair.value}</span>
+                          <span className="flex-1">{memberStr}</span>
                         </div>
                       </TextFormatterWrapper>
                     )}
@@ -218,7 +254,7 @@ export function RedisHashViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => handleSave(pair.field, editValue)}
+                          onClick={() => handleSaveEdit(memberStr, editValue)}
                           disabled={isSubmitting}
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -238,7 +274,7 @@ export function RedisHashViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleStartEdit(pair)}
+                          onClick={() => handleStartEdit(memberStr)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -246,7 +282,7 @@ export function RedisHashViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(pair.field)}
+                          onClick={() => handleDelete(memberStr)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -256,10 +292,10 @@ export function RedisHashViewer({
                 </TableRow>
               );
             })}
-            {pairs.length === 0 && !loading && (
+            {data.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
-                  {t('redis.noFields')}
+                <TableCell colSpan={2} className="text-center text-muted-foreground h-24">
+                  {t('redis.noMembers')}
                 </TableCell>
               </TableRow>
             )}
@@ -275,29 +311,20 @@ export function RedisHashViewer({
         )}
       </div>
 
-      {/* Add Field Dialog */}
+      {/* Add Member Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('redis.addField')}</DialogTitle>
+            <DialogTitle>{t('redis.addMember')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="field">{t('redis.field')}</Label>
-              <Input
-                id="field"
-                value={newField.field}
-                onChange={(e) => setNewField({ ...newField, field: e.target.value })}
-                placeholder={t('redis.enterField')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="value">{t('redis.value')}</Label>
+              <Label htmlFor="member">{t('redis.member')}</Label>
               <Textarea
-                id="value"
-                value={newField.value}
-                onChange={(e) => setNewField({ ...newField, value: e.target.value })}
-                placeholder={t('redis.enterValue')}
+                id="member"
+                value={newMember}
+                onChange={(e) => setNewMember(e.target.value)}
+                placeholder={t('redis.enterMember')}
                 className="font-mono text-xs min-h-[100px]"
               />
             </div>
@@ -307,11 +334,11 @@ export function RedisHashViewer({
               {t('common.cancel')}
             </Button>
             <Button
-              onClick={() => handleSave(newField.field, newField.value)}
-              disabled={!newField.field || isSubmitting}
+              onClick={handleAdd}
+              disabled={!newMember || isSubmitting}
               className="bg-blue-600 hover:bg-blue-500 text-white"
             >
-              {isSubmitting ? t('redis.saving') : t('redis.addField')}
+              {isSubmitting ? t('redis.adding') : t('redis.addMember')}
             </Button>
           </DialogFooter>
         </DialogContent>

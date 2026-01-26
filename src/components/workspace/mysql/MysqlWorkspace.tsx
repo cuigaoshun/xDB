@@ -1,13 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
 import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight, Filter, Pencil, Wand2, Eye, MousePointerClick } from "lucide-react";
-import { FilterBuilder } from "@/components/workspace/FilterBuilder";
-import { TextFormatterDialog } from "@/components/common/TextFormatterDialog";
-import { RowViewerDialog } from "@/components/common/RowViewerDialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { FilterBuilder } from "@/components/workspace/mysql/FilterBuilder.tsx";
+import { TextFormatterDialog } from "@/components/common/TextFormatterDialog.tsx";
+import { RowViewerDialog } from "@/components/common/RowViewerDialog.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import {
     Table,
     TableBody,
@@ -15,29 +15,29 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu.tsx";
 import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuTrigger,
     ContextMenuSeparator,
-} from "@/components/ui/context-menu";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn, transparentTheme } from "@/lib/utils";
+} from "@/components/ui/context-menu.tsx";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable.tsx";
+import { cn, transparentTheme } from "@/lib/utils.ts";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useIsDarkTheme } from "@/hooks/useIsDarkTheme";
-import { useAppStore } from "@/store/useAppStore";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { confirm } from "@/hooks/use-toast";
+import { useIsDarkTheme } from "@/hooks/useIsDarkTheme.ts";
+import { useAppStore } from "@/store/useAppStore.ts";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { confirm } from "@/hooks/use-toast.ts";
 
 interface ColumnInfo {
     name: string;

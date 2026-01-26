@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { confirm } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { confirm } from "@/hooks/use-toast.ts";
+import { Button } from "@/components/ui/button.tsx";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import {
   Table,
   TableBody,
@@ -11,16 +11,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Select,
@@ -28,7 +28,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select.tsx";
 import { useTranslation } from "react-i18next";
 
 interface RedisListViewerProps {

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { TableSchemaManager } from "./TableSchemaManager";
+import { TableSchemaManager } from "./TableSchemaManager.tsx";
 
 interface TableSchemaTabProps {
     tabId: string;

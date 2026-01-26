@@ -1,16 +1,16 @@
 import { Search, RefreshCw, Copy, Trash2, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input.tsx";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { useAppStore } from "@/store/useAppStore";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
-import { toast, confirm } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { useAppStore } from "@/store/useAppStore.ts";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
+import { toast, confirm } from "@/hooks/use-toast.ts";
 
 export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: { tabId: string; name: string; connectionId: number; savedResult?: any }) {
     const { t } = useTranslation();

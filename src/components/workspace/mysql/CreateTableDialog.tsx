@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import {
     Dialog,
     DialogContent,
@@ -10,19 +10,19 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog.tsx";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/select.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { Plus, Trash2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { invoke } from "@tauri-apps/api/core";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
 
 interface CreateTableDialogProps {
     open: boolean;

@@ -1,10 +1,10 @@
 import { useState } from "react";
 
-import { confirm } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Plus, Trash2, Pencil, Check, X } from "lucide-react";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
+import { confirm } from "@/hooks/use-toast.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import {
   Table,
   TableBody,
@@ -12,25 +12,25 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table.tsx";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
 
-interface RedisSetViewerProps {
+interface RedisZSetViewerProps {
   connectionId: number;
   db: number;
   keyName: string;
-  data: any[]; // [member1, member2...]
+  data: any[]; // [member, score, member, score...]
   loading: boolean;
   hasMore: boolean;
   filter: string;
@@ -39,7 +39,7 @@ interface RedisSetViewerProps {
   observerTarget: React.RefObject<HTMLDivElement | null>;
 }
 
-export function RedisSetViewer({
+export function RedisZSetViewer({
   connectionId,
   db,
   keyName,
@@ -50,25 +50,30 @@ export function RedisSetViewer({
   onFilterChange,
   onRefresh,
   observerTarget,
-}: RedisSetViewerProps) {
+}: RedisZSetViewerProps) {
   const { t } = useTranslation();
+  const [inlineEditMember, setInlineEditMember] = useState<string | null>(null);
+  const [editScore, setEditScore] = useState("");
+  const [editMemberVal, setEditMemberVal] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newMember, setNewMember] = useState("");
+  const [newItem, setNewItem] = useState({ member: "", score: "0" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Inline edit state
-  const [editingMember, setEditingMember] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  // Parse flat array
+  const members = [];
+  for (let i = 0; i < data.length; i += 2) {
+    members.push({ member: String(data[i]), score: String(data[i + 1]) });
+  }
 
-  const handleAdd = async () => {
+  const handleSave = async (member: string, score: string) => {
     const startTime = Date.now();
-    const commandStr = `SADD ${keyName} "${newMember.length > 30 ? newMember.substring(0, 30) + '...' : newMember}"`;
+    const commandStr = `ZADD ${keyName} ${score} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       setIsSubmitting(true);
       await invoke("execute_redis_command", {
         connectionId,
-        command: "SADD",
-        args: [keyName, newMember],
+        command: "ZADD",
+        args: [keyName, score, member],
         db,
       });
 
@@ -80,10 +85,11 @@ export function RedisSetViewer({
       });
 
       onRefresh();
+      setInlineEditMember(null);
       setIsAddDialogOpen(false);
-      setNewMember("");
+      setNewItem({ member: "", score: "0" });
     } catch (error) {
-      console.error("Failed to add set member", error);
+      console.error("Failed to save zset member", error);
       addCommandToConsole({
         databaseType: 'redis',
         command: commandStr,
@@ -96,20 +102,80 @@ export function RedisSetViewer({
     }
   };
 
+  const handleStartEdit = (item: { member: string; score: string }) => {
+    setInlineEditMember(item.member);
+    setEditMemberVal(item.member);
+    setEditScore(item.score);
+  };
+
+  const handleCancelEdit = () => {
+    setInlineEditMember(null);
+    setEditScore("");
+    setEditMemberVal("");
+  };
+
+  const handleSaveEdit = async (oldMember: string) => {
+    const startTime = Date.now();
+    try {
+      setIsSubmitting(true);
+      // If member name changed, we need to remove old one
+      if (oldMember !== editMemberVal) {
+        await invoke("execute_redis_command", {
+          connectionId,
+          command: "ZREM",
+          args: [keyName, oldMember],
+          db,
+        });
+      }
+      // ZADD (update score or add new member)
+      await invoke("execute_redis_command", {
+        connectionId,
+        command: "ZADD",
+        args: [keyName, editScore, editMemberVal],
+        db,
+      });
+
+      const commandStr = oldMember !== editMemberVal
+        ? `ZREM ${keyName} "${oldMember}" + ZADD ${keyName} ${editScore} "${editMemberVal}"`
+        : `ZADD ${keyName} ${editScore} "${editMemberVal}"`;
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
+      onRefresh();
+      handleCancelEdit();
+    } catch (error) {
+      console.error("Failed to update zset member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `ZADD ${keyName} ...`,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDelete = async (member: string) => {
     const confirmed = await confirm({
       title: t('common.confirmDeletion'),
-      description: t('redis.deleteConfirm'),
+      description: t("redis.deleteConfirm"),
       variant: 'destructive'
     });
     if (!confirmed) return;
 
     const startTime = Date.now();
-    const commandStr = `SREM ${keyName} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
+    const commandStr = `ZREM ${keyName} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       await invoke("execute_redis_command", {
         connectionId,
-        command: "SREM",
+        command: "ZREM",
         args: [keyName, member],
         db,
       });
@@ -123,7 +189,7 @@ export function RedisSetViewer({
 
       onRefresh();
     } catch (error) {
-      console.error("Failed to delete set member", error);
+      console.error("Failed to delete zset member", error);
       addCommandToConsole({
         databaseType: 'redis',
         command: commandStr,
@@ -134,63 +200,6 @@ export function RedisSetViewer({
     }
   };
 
-  const handleStartEdit = (member: string) => {
-    setEditingMember(member);
-    setEditValue(member);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMember(null);
-    setEditValue("");
-  };
-
-  const handleSaveEdit = async (oldMember: string, newMemberVal: string) => {
-    if (oldMember === newMemberVal) {
-      handleCancelEdit();
-      return;
-    }
-
-    const startTime = Date.now();
-    try {
-      setIsSubmitting(true);
-      // SREM old
-      await invoke("execute_redis_command", {
-        connectionId,
-        command: "SREM",
-        args: [keyName, oldMember],
-        db,
-      });
-      // SADD new
-      await invoke("execute_redis_command", {
-        connectionId,
-        command: "SADD",
-        args: [keyName, newMemberVal],
-        db,
-      });
-
-      addCommandToConsole({
-        databaseType: 'redis',
-        command: `SREM ${keyName} "${oldMember}" + SADD ${keyName} "${newMemberVal}"`,
-        duration: Date.now() - startTime,
-        success: true
-      });
-
-      onRefresh();
-      handleCancelEdit();
-    } catch (error) {
-      console.error("Failed to update set member", error);
-      addCommandToConsole({
-        databaseType: 'redis',
-        command: `SREM + SADD ${keyName}`,
-        duration: Date.now() - startTime,
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -198,17 +207,18 @@ export function RedisSetViewer({
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={t('redis.filterKeys')}
+            placeholder={t("redis.filterKeys")}
             className="pl-8 h-9"
             value={filter}
             onChange={(e) => onFilterChange(e.target.value)}
           />
         </div>
         <div className="text-xs text-muted-foreground">
-          {t('redis.total')}: {data.length}{hasMore ? "+" : ""}
+          {t("redis.total")}: {members.length}
+          {hasMore ? "+" : ""}
         </div>
         <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
-          <Plus className="h-4 w-4" /> {t('redis.addMember')}
+          <Plus className="h-4 w-4" /> {t("redis.addMember")}
         </Button>
       </div>
 
@@ -217,34 +227,45 @@ export function RedisSetViewer({
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
-              <TableHead>{t('redis.member')}</TableHead>
-              <TableHead className="w-[100px] text-right">{t('common.actions')}</TableHead>
+              <TableHead className="w-1/2">{t("redis.member")}</TableHead>
+              <TableHead className="w-1/3">{t("redis.score")}</TableHead>
+              <TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((member, i) => {
-              const memberStr = String(member);
-              const isEditing = editingMember === memberStr;
+            {members.map((item, i) => {
+              const isEditing = inlineEditMember === item.member;
               return (
-                <TableRow key={`${memberStr}-${i}`} className="group hover:bg-muted/50">
+                <TableRow key={`${item.member}-${i}`} className="group hover:bg-muted/50">
                   <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                     {isEditing ? (
                       <Textarea
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
+                        value={editMemberVal}
+                        onChange={(e) => setEditMemberVal(e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
-                        autoFocus
                       />
                     ) : (
                       <TextFormatterWrapper
-                        content={memberStr}
+                        content={item.member}
                         readonly
                         title="View formatted"
                       >
                         <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{memberStr}</span>
+                          <span className="flex-1">{item.member}</span>
                         </div>
                       </TextFormatterWrapper>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs align-top text-blue-600 dark:text-blue-400">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={editScore}
+                        onChange={(e) => setEditScore(e.target.value)}
+                        className="h-8 w-32"
+                      />
+                    ) : (
+                      item.score
                     )}
                   </TableCell>
                   <TableCell className="text-right align-top">
@@ -254,7 +275,7 @@ export function RedisSetViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => handleSaveEdit(memberStr, editValue)}
+                          onClick={() => handleSaveEdit(item.member)}
                           disabled={isSubmitting}
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -274,7 +295,7 @@ export function RedisSetViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleStartEdit(memberStr)}
+                          onClick={() => handleStartEdit(item)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -282,7 +303,7 @@ export function RedisSetViewer({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(memberStr)}
+                          onClick={() => handleDelete(item.member)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -292,53 +313,61 @@ export function RedisSetViewer({
                 </TableRow>
               );
             })}
-            {data.length === 0 && !loading && (
+            {members.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={2} className="text-center text-muted-foreground h-24">
-                  {t('redis.noMembers')}
+                <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
+                  {t("redis.noMembers")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-
         <div ref={observerTarget} className="h-px w-full" />
-
         {loading && (
           <div className="p-4 text-center text-muted-foreground text-xs">
-            {t('redis.loading')}
+            {t("redis.loading")}
           </div>
         )}
       </div>
 
-      {/* Add Member Dialog */}
+      {/* Add Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('redis.addMember')}</DialogTitle>
+            <DialogTitle>{t("redis.addMember")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="member">{t('redis.member')}</Label>
+              <Label htmlFor="score">{t("redis.score")}</Label>
+              <Input
+                id="score"
+                type="number"
+                value={newItem.score}
+                onChange={(e) => setNewItem({ ...newItem, score: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="member">{t("redis.member")}</Label>
               <Textarea
                 id="member"
-                value={newMember}
-                onChange={(e) => setNewMember(e.target.value)}
-                placeholder={t('redis.enterMember')}
+                value={newItem.member}
+                onChange={(e) => setNewItem({ ...newItem, member: e.target.value })}
+                placeholder={t("redis.enterMember")}
                 className="font-mono text-xs min-h-[100px]"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              {t('common.cancel')}
+              {t("common.cancel")}
             </Button>
             <Button
-              onClick={handleAdd}
-              disabled={!newMember || isSubmitting}
+              onClick={() => handleSave(newItem.member, newItem.score)}
+              disabled={!newItem.member || !newItem.score || isSubmitting}
               className="bg-blue-600 hover:bg-blue-500 text-white"
             >
-              {isSubmitting ? t('redis.adding') : t('redis.addMember')}
+              {isSubmitting ? t("redis.adding") : t("redis.addMember")}
             </Button>
           </DialogFooter>
         </DialogContent>

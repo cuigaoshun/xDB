@@ -1,24 +1,24 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
 import { Save } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select.tsx";
 import {
   detectFormats,
   applyFormat,
   getFormatLabel,
   type FormatType,
-} from "@/lib/formatters";
+} from "@/lib/formatters.ts";
 
 interface RedisStringViewerProps {
   connectionId: number;

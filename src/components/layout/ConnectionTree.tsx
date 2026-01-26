@@ -16,7 +16,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { addCommandToConsole } from "@/components/ui/CommandConsole";
 import { useTranslation } from "react-i18next";
-import { CreateTableDialog } from "@/components/workspace/CreateTableDialog";
+import { CreateTableDialog } from "@/components/workspace/mysql/CreateTableDialog.tsx";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
 // 系统数据库列表（移到组件外部避免重复创建）

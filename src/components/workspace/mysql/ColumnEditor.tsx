@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import {
     Dialog,
     DialogContent,
@@ -10,16 +10,16 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog.tsx";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 
 interface ColumnEditorProps {
     open: boolean;

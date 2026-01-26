@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
 import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import {
     Table,
     TableBody,
@@ -13,15 +13,15 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
+} from "@/components/ui/table.tsx";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable.tsx";
+import { cn } from "@/lib/utils.ts";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from "@/components/theme/ThemeProvider";
-import { useAppStore } from "@/store/useAppStore";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { confirm } from "@/hooks/use-toast";
+import { useTheme } from "@/components/theme/ThemeProvider.tsx";
+import { useAppStore } from "@/store/useAppStore.ts";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { confirm } from "@/hooks/use-toast.ts";
 
 interface ColumnInfo {
     name: string;

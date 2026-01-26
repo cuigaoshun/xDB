@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore.ts";
 import { invoke } from "@tauri-apps/api/core";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils.ts";
+import { Input } from "@/components/ui/input.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import {
     Table as TableIcon,
     Search,
@@ -21,10 +21,10 @@ import {
     ContextMenuItem,
     ContextMenuTrigger,
     ContextMenuSeparator,
-} from "@/components/ui/context-menu";
-import { addCommandToConsole } from "@/components/ui/CommandConsole";
-import { CreateTableDialog } from "@/components/workspace/CreateTableDialog";
-import { toast, confirm } from "@/hooks/use-toast";
+} from "@/components/ui/context-menu.tsx";
+import { addCommandToConsole } from "@/components/ui/CommandConsole.tsx";
+import { CreateTableDialog } from "@/components/workspace/mysql/CreateTableDialog.tsx";
+import { toast, confirm } from "@/hooks/use-toast.ts";
 
 interface SqlResult {
     rows: Record<string, any>[];

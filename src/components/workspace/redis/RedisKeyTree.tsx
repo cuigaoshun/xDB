@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge.tsx";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface KeyDetail {
