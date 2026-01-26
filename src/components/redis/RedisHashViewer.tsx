@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface RedisHashViewerProps {
   connectionId: number;
@@ -64,6 +65,8 @@ export function RedisHashViewer({
   }
 
   const handleSave = async (field: string, value: string) => {
+    const startTime = Date.now();
+    const commandStr = `HSET ${keyName} ${field} "${value.length > 30 ? value.substring(0, 30) + '...' : value}"`;
     try {
       setIsSubmitting(true);
       await invoke("execute_redis_command", {
@@ -73,6 +76,13 @@ export function RedisHashViewer({
         db,
       });
 
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
       setInlineEditField(null);
       setEditValue("");
@@ -80,6 +90,13 @@ export function RedisHashViewer({
       setNewField({ field: "", value: "" });
     } catch (error) {
       console.error("Failed to save hash field", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -103,6 +120,8 @@ export function RedisHashViewer({
     });
     if (!confirmed) return;
 
+    const startTime = Date.now();
+    const commandStr = `HDEL ${keyName} ${field}`;
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -110,9 +129,24 @@ export function RedisHashViewer({
         args: [keyName, field],
         db,
       });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
     } catch (error) {
       console.error("Failed to delete hash field", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 

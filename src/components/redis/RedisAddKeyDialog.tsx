@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@tauri-apps/api/core";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface RedisAddKeyDialogProps {
     open: boolean;
@@ -55,6 +56,8 @@ export function RedisAddKeyDialog({
         setError(null);
         setIsSubmitting(true);
 
+        const startTime = Date.now();
+
         try {
             let command = "";
             let args: string[] = [];
@@ -82,11 +85,21 @@ export function RedisAddKeyDialog({
                     break;
             }
 
+            const commandStr = `${command} ${args.join(" ")}`;
+
             await invoke("execute_redis_command", {
                 connectionId,
                 command,
                 args,
                 db,
+            });
+
+            // Log command to console
+            addCommandToConsole({
+                databaseType: 'redis',
+                command: commandStr,
+                duration: Date.now() - startTime,
+                success: true
             });
 
             onSuccess();
@@ -99,6 +112,16 @@ export function RedisAddKeyDialog({
             setKeyType("string");
         } catch (err: any) {
             console.error("Failed to create key", err);
+
+            // Log error command to console
+            addCommandToConsole({
+                databaseType: 'redis',
+                command: `${keyType.toUpperCase()} ${keyName} ...`,
+                duration: Date.now() - startTime,
+                success: false,
+                error: typeof err === "string" ? err : err.message
+            });
+
             setError(t('redis.failedToCreate') + ": " + (typeof err === "string" ? err : err.message));
         } finally {
             setIsSubmitting(false);

@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper";
 import {
   Select,
@@ -69,6 +70,8 @@ export function RedisStringViewer({
   };
 
   const handleSave = async () => {
+    const startTime = Date.now();
+    const commandStr = `SET ${keyName} "${displayedContent.length > 50 ? displayedContent.substring(0, 50) + '...' : displayedContent}"`;
     try {
       setIsSubmitting(true);
 
@@ -79,9 +82,23 @@ export function RedisStringViewer({
         db,
       });
 
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
     } catch (error) {
       console.error("Failed to save string value", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }

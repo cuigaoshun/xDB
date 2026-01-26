@@ -1073,10 +1073,20 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
                                 {result && (
                                     <div className="h-full flex flex-col gap-0">
-                                        {/* 外层容器：横向滚动 */}
-                                        <div className="border rounded-md bg-background flex-1 overflow-x-auto overflow-y-hidden">
-                                            {/* 内层容器：纵向滚动，宽度根据列数动态计算 */}
-                                            <div className="overflow-y-auto h-full" style={{ width: `${(selectedRowIndices.length > 0 ? 50 : 0) + result.columns.length * 200}px` }}>
+                                        {/* 单一滚动容器：同时处理横向和纵向滚动，滚动条在可视区域边缘 */}
+                                        <div
+                                            className="border rounded-md bg-background flex-1 overflow-auto"
+                                            style={{
+                                                WebkitOverflowScrolling: 'touch',
+                                                transform: 'translateZ(0)'
+                                            }}
+                                        >
+                                            {/* 表格宽度容器 */}
+                                            <div
+                                                style={{
+                                                    minWidth: `${(selectedRowIndices.length > 0 ? 50 : 0) + result.columns.length * 200}px`
+                                                }}
+                                            >
                                                 <Table className="table-fixed">
                                                     <TableHeader className="sticky top-0 bg-muted/50 z-10">
                                                         <TableRow>
@@ -1590,6 +1600,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                     }
                 }}
             />
-        </div>
+        </div >
     );
 }

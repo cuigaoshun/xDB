@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface RedisZSetViewerProps {
   connectionId: number;
@@ -65,6 +66,8 @@ export function RedisZSetViewer({
   }
 
   const handleSave = async (member: string, score: string) => {
+    const startTime = Date.now();
+    const commandStr = `ZADD ${keyName} ${score} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       setIsSubmitting(true);
       await invoke("execute_redis_command", {
@@ -73,12 +76,27 @@ export function RedisZSetViewer({
         args: [keyName, score, member],
         db,
       });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
       setInlineEditMember(null);
       setIsAddDialogOpen(false);
       setNewItem({ member: "", score: "0" });
     } catch (error) {
       console.error("Failed to save zset member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -97,6 +115,7 @@ export function RedisZSetViewer({
   };
 
   const handleSaveEdit = async (oldMember: string) => {
+    const startTime = Date.now();
     try {
       setIsSubmitting(true);
       // If member name changed, we need to remove old one
@@ -115,10 +134,29 @@ export function RedisZSetViewer({
         args: [keyName, editScore, editMemberVal],
         db,
       });
+
+      const commandStr = oldMember !== editMemberVal
+        ? `ZREM ${keyName} "${oldMember}" + ZADD ${keyName} ${editScore} "${editMemberVal}"`
+        : `ZADD ${keyName} ${editScore} "${editMemberVal}"`;
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
       handleCancelEdit();
     } catch (error) {
       console.error("Failed to update zset member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `ZADD ${keyName} ...`,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -131,6 +169,9 @@ export function RedisZSetViewer({
       variant: 'destructive'
     });
     if (!confirmed) return;
+
+    const startTime = Date.now();
+    const commandStr = `ZREM ${keyName} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -138,9 +179,24 @@ export function RedisZSetViewer({
         args: [keyName, member],
         db,
       });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
     } catch (error) {
       console.error("Failed to delete zset member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 

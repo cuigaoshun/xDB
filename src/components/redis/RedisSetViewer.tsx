@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { addCommandToConsole } from "@/components/ui/CommandConsole";
 
 interface RedisSetViewerProps {
   connectionId: number;
@@ -60,6 +61,8 @@ export function RedisSetViewer({
   const [editValue, setEditValue] = useState("");
 
   const handleAdd = async () => {
+    const startTime = Date.now();
+    const commandStr = `SADD ${keyName} "${newMember.length > 30 ? newMember.substring(0, 30) + '...' : newMember}"`;
     try {
       setIsSubmitting(true);
       await invoke("execute_redis_command", {
@@ -69,11 +72,25 @@ export function RedisSetViewer({
         db,
       });
 
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
       setIsAddDialogOpen(false);
       setNewMember("");
     } catch (error) {
       console.error("Failed to add set member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -87,6 +104,8 @@ export function RedisSetViewer({
     });
     if (!confirmed) return;
 
+    const startTime = Date.now();
+    const commandStr = `SREM ${keyName} "${member.length > 30 ? member.substring(0, 30) + '...' : member}"`;
     try {
       await invoke("execute_redis_command", {
         connectionId,
@@ -94,9 +113,24 @@ export function RedisSetViewer({
         args: [keyName, member],
         db,
       });
+
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
     } catch (error) {
       console.error("Failed to delete set member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: commandStr,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 
@@ -116,6 +150,7 @@ export function RedisSetViewer({
       return;
     }
 
+    const startTime = Date.now();
     try {
       setIsSubmitting(true);
       // SREM old
@@ -133,10 +168,24 @@ export function RedisSetViewer({
         db,
       });
 
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `SREM ${keyName} "${oldMember}" + SADD ${keyName} "${newMemberVal}"`,
+        duration: Date.now() - startTime,
+        success: true
+      });
+
       onRefresh();
       handleCancelEdit();
     } catch (error) {
       console.error("Failed to update set member", error);
+      addCommandToConsole({
+        databaseType: 'redis',
+        command: `SREM + SADD ${keyName}`,
+        duration: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
     } finally {
       setIsSubmitting(false);
     }
