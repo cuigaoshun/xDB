@@ -8,6 +8,7 @@ export interface CommandEntry {
   duration?: number;
   success?: boolean;
   error?: string;
+  result?: string;  // Command execution result
 }
 
 interface ConsoleState {

@@ -309,6 +309,15 @@ const resources = {
         "redis": "Redis",
         "redisScanCount": "Scan Count",
         "redisScanCountDesc": "Number of keys to scan per request (10-10000)"
+      },
+      "console": {
+        "noRedisConnection": "No active Redis connection. Please select a Redis tab first.",
+        "enterRedisCommand": "Enter Redis command... (e.g., GET key, SET key value)",
+        "selectRedisTab": "Select a Redis tab to execute commands",
+        "execute": "Execute",
+        "executing": "Executing...",
+        "previousCommand": "Previous command",
+        "nextCommand": "Next command"
       }
     }
   },
@@ -618,6 +627,15 @@ const resources = {
         "redis": "Redis",
         "redisScanCount": "扫描数量",
         "redisScanCountDesc": "每次扫描的键数量 (10-10000)"
+      },
+      "console": {
+        "noRedisConnection": "无活动的 Redis 连接。请先选择一个 Redis 标签页。",
+        "enterRedisCommand": "输入 Redis 命令... (例如: GET key, SET key value)",
+        "selectRedisTab": "选择一个 Redis 标签页以执行命令",
+        "execute": "执行",
+        "executing": "执行中...",
+        "previousCommand": "上一个命令",
+        "nextCommand": "下一个命令"
       }
     }
   }
