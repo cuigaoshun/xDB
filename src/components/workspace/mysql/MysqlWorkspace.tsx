@@ -672,10 +672,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             return;
         }
         setPageSize(newSize);
-        setCurrentPage(0);
-        // 重新执行查询
-        const processedSql = autoAddLimit(sql, newSize, 0);
-        executeSql(processedSql);
     };
 
     const loadDDL = async () => {
