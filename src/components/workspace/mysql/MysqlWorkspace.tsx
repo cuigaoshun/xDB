@@ -665,14 +665,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     };
 
     // 处理页面大小变化
-    const handlePageSizeChange = () => {
-        const newSize = parseInt(pageSizeInput);
-        if (isNaN(newSize) || newSize <= 0) {
-            alert(t('common.invalidNumber', '请输入有效的数字'));
-            return;
-        }
-        setPageSize(newSize);
-    };
+
 
     const loadDDL = async () => {
         if (!dbName || !tableName) return;
@@ -810,6 +803,14 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     };
 
     const handleExecute = () => {
+        // Update page size from input map
+        const newPageSize = parseInt(pageSizeInput);
+        let currentSize = pageSize;
+        if (!isNaN(newPageSize) && newPageSize > 0) {
+            setPageSize(newPageSize);
+            currentSize = newPageSize;
+        }
+
         // 去除末尾分号以便正确添加 LIMIT
         let sqlToExecute = sql.trim();
         if (sqlToExecute.endsWith(';')) {
@@ -817,7 +818,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         }
 
         // 自动为 SELECT 语句添加 LIMIT
-        const processedSql = autoAddLimit(sqlToExecute, pageSize, currentPage * pageSize);
+        const processedSql = autoAddLimit(sqlToExecute, currentSize, currentPage * currentSize);
         executeSql(processedSql);
     };
 
@@ -1533,23 +1534,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                     type="number"
                                                     value={pageSizeInput}
                                                     onChange={(e) => setPageSizeInput(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            handlePageSizeChange();
-                                                        }
-                                                    }}
-                                                    className="w-20 h-6 text-xs"
                                                     min="1"
                                                 />
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={handlePageSizeChange}
-                                                    className="h-6 w-6 p-0"
-                                                    title="应用 Limit"
-                                                >
-                                                    <Check className="h-3 w-3" />
-                                                </Button>
+
                                             </div>
                                         )}
                                     </div>
