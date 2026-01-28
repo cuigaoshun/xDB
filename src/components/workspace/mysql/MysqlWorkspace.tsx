@@ -880,15 +880,18 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         const widths: Record<string, number> = {};
         result.columns.forEach(col => {
             const type = col.type_name.toUpperCase();
+
+            // Calculate width based on name and type length
+            const nameWidth = col.name.length * 12 + 12;
+            const typeWidth = col.type_name.length * 8 + 12; // type name + icon space
+
+            let width = Math.max(120, nameWidth, typeWidth);
+
             if (type.includes("DATE") || type.includes("TIME") || type.includes("TIMESTAMP")) {
-                widths[col.name] = 150;
-            } else {
-                // Calculate width based on field name length
-                // Base width + char length * approx char width
-                // Min width 120px to accommodate edit buttons
-                const width = Math.max(120, col.name.length * 12 + 20);
-                widths[col.name] = width;
+                width = Math.max(150, width);
             }
+
+            widths[col.name] = width;
         });
         setColumnWidths(widths);
     }, [result?.columns]);
@@ -1191,8 +1194,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                                     variant="ghost"
                                                                                     size="sm"
                                                                                     className={cn(
-                                                                                        "h-5 w-5 p-0 ml-1 flex-shrink-0",
-                                                                                        inlineFilters[col.name] && "text-blue-600"
+                                                                                        "absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 transition-all opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 bg-background/90 shadow-sm border border-border/50",
+                                                                                        inlineFilters[col.name] && "text-blue-600 opacity-100"
                                                                                     )}
                                                                                 >
                                                                                     <Filter className="h-3 w-3" />
