@@ -110,7 +110,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     }, [databases, tables, filterTermLower]);
 
     // 定义扁平化的树节点类型
-    type FlatTreeNode = 
+    type FlatTreeNode =
         | { type: 'database'; db: string }
         | { type: 'table'; db: string; table: TableInfo }
         | { type: 'loading'; db: string };
@@ -129,7 +129,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                 if (isLoading) {
                     nodes.push({ type: 'loading', db });
                 } else {
-                    const dbTables = filterTermLower 
+                    const dbTables = filterTermLower
                         ? (filteredDatabasesMap.tablesMap[db] || [])
                         : (tables[db] || []);
                     for (const table of dbTables) {
@@ -683,8 +683,8 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const selfMatch = isMatch(connection.name);
     const hasMatchingChildren = filteredDatabases.length > 0;
 
-    // Hide if loaded and no matches
-    if (filterTerm && !selfMatch && databases.length > 0 && !hasMatchingChildren) {
+    // Hide if no matches
+    if (filterTerm && !selfMatch && !hasMatchingChildren) {
         return null;
     }
 
@@ -722,26 +722,26 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                     ((['mysql', 'sqlite'] as const).includes(connection.db_type as any) && expandedDatabases.size > 0) ||
                     (['redis', 'memcached'] as const).includes(connection.db_type as any)
                 ) && (
-                    <button
-                        className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
-                                // 收起所有表（数据库节点）
-                                setExpandedDatabases(new Set());
-                            } else {
-                                // Redis/Memcache: 收起整个连接
-                                setIsExpanded(false);
-                                if (globalExpandedId === connection.id) {
-                                    setExpandedConnectionId(null);
+                        <button
+                            className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (connection.db_type === 'mysql' || connection.db_type === 'sqlite') {
+                                    // 收起所有表（数据库节点）
+                                    setExpandedDatabases(new Set());
+                                } else {
+                                    // Redis/Memcache: 收起整个连接
+                                    setIsExpanded(false);
+                                    if (globalExpandedId === connection.id) {
+                                        setExpandedConnectionId(null);
+                                    }
                                 }
-                            }
-                        }}
-                        title={t('common.collapseAll', '收起所有')}
-                    >
-                        <ChevronsDownUp className="h-3.5 w-3.5" />
-                    </button>
-                )}
+                            }}
+                            title={t('common.collapseAll', '收起所有')}
+                        >
+                            <ChevronsDownUp className="h-3.5 w-3.5" />
+                        </button>
+                    )}
             </div>
 
             {/* Databases List */}
@@ -774,7 +774,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                             >
                                 {virtualizer.getVirtualItems().map(virtualRow => {
                                     const node = flattenedNodes[virtualRow.index];
-                                    
+
                                     return (
                                         <div
                                             key={virtualRow.key}

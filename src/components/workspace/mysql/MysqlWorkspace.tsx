@@ -872,6 +872,25 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const connectionName = connection?.name || name;
 
+    const columnWidths = useMemo(() => {
+        if (!result?.columns) return {};
+        const widths: Record<string, number> = {};
+        result.columns.forEach(col => {
+            // Calculate width based on field name length
+            // Base width + char length * approx char width
+            // Min width 120px to accommodate edit buttons
+            const width = Math.max(120, col.name.length * 12 + 20);
+            widths[col.name] = width;
+        });
+        return widths;
+    }, [result?.columns]);
+
+    const totalTableWidth = useMemo(() => {
+        if (!result?.columns) return 0;
+        const colsWidth = result.columns.reduce((acc, col) => acc + (columnWidths[col.name] || 120), 0);
+        return colsWidth + (selectedRowIndices.length > 0 ? 50 : 0);
+    }, [result?.columns, columnWidths, selectedRowIndices.length]);
+
     return (
         <div className="h-full flex flex-col bg-background">
             {/* Toolbar */}
@@ -1055,7 +1074,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                             {/* 表格宽度容器 */}
                                             <div
                                                 style={{
-                                                    minWidth: `${(selectedRowIndices.length > 0 ? 50 : 0) + result.columns.length * 200}px`
+                                                    minWidth: `${totalTableWidth}px`
                                                 }}
                                             >
                                                 <Table className="table-fixed">
@@ -1084,7 +1103,11 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                 </TableHead>
                                                             )}
                                                             {result.columns.map((col, i) => (
-                                                                <TableHead key={i} className="whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                <TableHead
+                                                                    key={i}
+                                                                    className="whitespace-nowrap"
+                                                                    style={{ width: `${columnWidths[col.name] || 120}px`, minWidth: `${columnWidths[col.name] || 120}px` }}
+                                                                >
                                                                     <div className="flex items-center justify-between">
                                                                         <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 truncate">
                                                                             <span className="font-semibold text-foreground truncate" title={col.name}>{col.name}</span>
@@ -1152,13 +1175,17 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                     </TableCell>
                                                                 )}
                                                                 {result.columns.map((col, colIdx) => (
-                                                                    <TableCell key={colIdx} className="whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                    <TableCell
+                                                                        key={colIdx}
+                                                                        className="whitespace-nowrap"
+                                                                        style={{ width: `${columnWidths[col.name] || 120}px`, minWidth: `${columnWidths[col.name] || 120}px` }}
+                                                                    >
                                                                         {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && editingCell?.isNewRow ? (
-                                                                            <div className="relative w-[168px]">
+                                                                            <div className="relative w-full">
                                                                                 <Input
                                                                                     value={editValue}
                                                                                     onChange={(e) => setEditValue(e.target.value)}
-                                                                                    className="h-7 text-xs w-[168px] pr-14"
+                                                                                    className="h-7 text-xs w-full pr-14"
                                                                                     autoFocus
                                                                                     onKeyDown={(e) => {
                                                                                         if (e.key === 'Enter') handleCellSubmit();
@@ -1227,13 +1254,17 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                         </TableCell>
                                                                     )}
                                                                     {result.columns.map((col, colIdx) => (
-                                                                        <TableCell key={colIdx} className="p-0 whitespace-nowrap w-[200px] min-w-[200px]">
+                                                                        <TableCell
+                                                                            key={colIdx}
+                                                                            className="p-0 whitespace-nowrap"
+                                                                            style={{ width: `${columnWidths[col.name] || 120}px`, minWidth: `${columnWidths[col.name] || 120}px` }}
+                                                                        >
                                                                             {editingCell?.rowIdx === originalRowIdx && editingCell?.colName === col.name && !editingCell?.isNewRow ? (
-                                                                                <div className="relative w-[168px] px-2 py-1">
+                                                                                <div className="relative w-full px-2 py-1">
                                                                                     <Input
                                                                                         value={editValue}
                                                                                         onChange={(e) => setEditValue(e.target.value)}
-                                                                                        className="h-7 text-xs w-[168px] pr-14"
+                                                                                        className="h-7 text-xs w-full pr-14"
                                                                                         autoFocus
                                                                                         onKeyDown={(e) => {
                                                                                             if (e.key === 'Enter') handleCellSubmit();
