@@ -883,8 +883,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             const type = col.type_name.toUpperCase();
 
             // Calculate width based on name and type length
-            const nameWidth = col.name.length * 10 + 12;
-            const typeWidth = col.type_name.length * 6 + 12; // type name + icon space
+            const nameWidth = col.name.length * 8 + 12;
+            const typeWidth = col.type_name.length * 8 + 12; // type name + icon space
 
             let width = Math.max(110, nameWidth, typeWidth);
 
@@ -1156,7 +1156,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                             {/* 复选框列 - 只在有选中行时显示 */}
                                                             {selectedRowIndices.length > 0 && (
                                                                 <TableHead className="w-[50px] min-w-[50px] p-0">
-                                                                    <div className="flex items-center justify-center h-full">
+                                                                    <div className="flex items-center justify-center h-full w-full">
                                                                         <input
                                                                             type="checkbox"
                                                                             className="cursor-pointer"
@@ -1180,7 +1180,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                     key={i}
                                                                     className="whitespace-nowrap p-0"
                                                                 >
-                                                                    <div className="flex items-center justify-between relative group h-full px-2">
+                                                                    <div className={cn("flex items-center justify-between relative group h-full w-full", i === 0 && "px-2")}>
                                                                         <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 truncate pr-2">
                                                                             <span className="font-semibold text-foreground truncate" title={col.name}>{col.name}</span>
                                                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1359,7 +1359,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                                             ) : (
                                                                                 <ContextMenu>
                                                                                     <ContextMenuTrigger asChild>
-                                                                                        <div className="px-2 py-2 cursor-context-menu min-h-[36px] flex items-center">
+                                                                                        <div className={cn("py-2 cursor-context-menu min-h-[36px] flex items-center pr-2", colIdx === 0 && "pl-2")}>
                                                                                             {row[col.name] === null ? (
                                                                                                 <span className="text-muted-foreground italic truncate">NULL</span>
                                                                                             ) : (
