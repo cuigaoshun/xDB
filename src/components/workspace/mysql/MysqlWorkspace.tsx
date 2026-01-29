@@ -59,6 +59,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const updateTab = useAppStore(state => state.updateTab);
 
     const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users");
+    //用于存储当前实际执行的SQL（不含分页），用于翻页时保持上下文，与编辑器中的 sql 分离
+    const [executedSql, setExecutedSql] = useState(savedSql || initialSql || "SELECT * FROM users");
     const [result, setResult] = useState<SqlResult | null>(savedResult || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -158,6 +160,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             displaySql += ';';
 
             setSql(displaySql);
+            setExecutedSql(displaySql);
 
             // 如果只是注释，不自动执行
             const isJustComments = displaySql.trim().split('\n').every(line => line.trim().startsWith('--') || line.trim().startsWith('#') || line.trim() === '');
@@ -660,7 +663,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
         // 重新执行查询
-        const processedSql = autoAddLimit(sql, pageSize, newPage * pageSize);
+        const processedSql = autoAddLimit(executedSql, pageSize, newPage * pageSize);
         executeSql(processedSql);
     };
 
@@ -818,6 +821,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
         }
 
         // 自动为 SELECT 语句添加 LIMIT
+        // 自动为 SELECT 语句添加 LIMIT
+        setExecutedSql(sqlToExecute);
         const processedSql = autoAddLimit(sqlToExecute, currentSize, currentPage * currentSize);
         executeSql(processedSql);
     };
@@ -1083,6 +1088,15 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                         onChange={setWhereClause}
                         onExecute={(clause, orderBy) => {
                             if (!dbName || !tableName) return;
+
+                            // Update page size from input map
+                            const newPageSize = parseInt(pageSizeInput);
+                            let currentSize = pageSize;
+                            if (!isNaN(newPageSize) && newPageSize > 0) {
+                                setPageSize(newPageSize);
+                                currentSize = newPageSize;
+                            }
+
                             let query = `SELECT * FROM \`${dbName}\`.\`${tableName}\``;
                             if (clause) {
                                 query += ` WHERE ${clause}`;
@@ -1090,7 +1104,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                             if (orderBy) {
                                 query += ` ORDER BY \`${orderBy.split(' ')[0]}\` ${orderBy.split(' ')[1]}`;
                             }
-                            const processedSql = autoAddLimit(query + ';', pageSize, 0);
+                            // 仅更新执行用的 SQL，不修改编辑器中的 SQL
+                            setExecutedSql(query + ';');
+                            const processedSql = autoAddLimit(query + ';', currentSize, 0);
                             setCurrentPage(0);
                             executeSql(processedSql);
                         }}
