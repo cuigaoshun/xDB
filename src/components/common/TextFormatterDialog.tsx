@@ -100,7 +100,7 @@ export function TextFormatterDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+            <DialogContent className="max-w-5xl h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>{title || t('common.textFormatter')}</DialogTitle>
                 </DialogHeader>
@@ -151,9 +151,8 @@ export function TextFormatterDialog({
                             value={readonly ? formatResult.content : editedContent}
                             onChange={(e) => !readonly && setEditedContent(e.target.value)}
                             readOnly={readonly}
-                            className="w-full font-mono text-sm border-0 bg-transparent p-4 focus-visible:ring-0 resize-y"
+                            className="w-full h-full font-mono text-sm border-0 bg-transparent p-4 focus-visible:ring-0 resize-none"
                             spellCheck={false}
-                            rows={Math.max(15, Math.min((readonly ? formatResult.content : editedContent).split('\n').length + 2, 50))} // Auto-size (min 15, max 50 rows)
                         />
                     </div>
                 </div>

@@ -129,7 +129,8 @@ const resources = {
         "confirmCancelChanges": "Are you sure you want to discard all new rows?",
         "confirmDeleteRow": "Are you sure you want to delete this row?",
         "fetchSchemaFailed": "Failed to fetch table schema: ",
-        "noColumnsFound": "No columns found, cannot add row"
+        "noColumnsFound": "No columns found, cannot add row",
+        "key": "Key"
       },
       "menu": {
         "home": "Home",
@@ -447,7 +448,8 @@ const resources = {
         "confirmCancelChanges": "确定要放弃所有新增行吗？",
         "confirmDeleteRow": "确定要删除这一行吗？",
         "fetchSchemaFailed": "获取表结构失败：",
-        "noColumnsFound": "未找到表的列信息，无法新增行"
+        "noColumnsFound": "未找到表的列信息，无法新增行",
+        "key": "键"
       },
       "menu": {
         "home": "首页",
