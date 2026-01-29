@@ -883,10 +883,10 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
             const type = col.type_name.toUpperCase();
 
             // Calculate width based on name and type length
-            const nameWidth = col.name.length * 12 + 12;
-            const typeWidth = col.type_name.length * 8 + 12; // type name + icon space
+            const nameWidth = col.name.length * 10 + 12;
+            const typeWidth = col.type_name.length * 6 + 12; // type name + icon space
 
-            let width = Math.max(120, nameWidth, typeWidth);
+            let width = Math.max(110, nameWidth, typeWidth);
 
             if (type.includes("DATE") || type.includes("TIME") || type.includes("TIMESTAMP")) {
                 width = Math.max(150, width);
@@ -1155,8 +1155,8 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                         <TableRow>
                                                             {/* 复选框列 - 只在有选中行时显示 */}
                                                             {selectedRowIndices.length > 0 && (
-                                                                <TableHead className="w-[50px] min-w-[50px]">
-                                                                    <div className="flex items-center justify-center">
+                                                                <TableHead className="w-[50px] min-w-[50px] p-0">
+                                                                    <div className="flex items-center justify-center h-full">
                                                                         <input
                                                                             type="checkbox"
                                                                             className="cursor-pointer"
@@ -1178,9 +1178,9 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                             {result.columns.map((col, i) => (
                                                                 <TableHead
                                                                     key={i}
-                                                                    className="whitespace-nowrap"
+                                                                    className="whitespace-nowrap p-0"
                                                                 >
-                                                                    <div className="flex items-center justify-between relative group h-full">
+                                                                    <div className="flex items-center justify-between relative group h-full px-2">
                                                                         <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 truncate pr-2">
                                                                             <span className="font-semibold text-foreground truncate" title={col.name}>{col.name}</span>
                                                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1535,6 +1535,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                                                     value={pageSizeInput}
                                                     onChange={(e) => setPageSizeInput(e.target.value)}
                                                     min="1"
+                                                    className="w-20 h-6 text-xs"
                                                 />
 
                                             </div>
