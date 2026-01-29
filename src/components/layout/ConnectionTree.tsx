@@ -64,7 +64,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
     const resetConnectionListHeight = useSettingsStore(state => state.resetConnectionListHeight);
 
     // Local resizing state for smooth UI
-    const [isResizing, setIsResizing] = useState(false);
+    const [, setIsResizing] = useState(false);
     const [dragHeight, setDragHeight] = useState<number | undefined>(undefined);
     const resizingRef = useRef<{ startY: number, startHeight: number } | null>(null);
 
@@ -823,7 +823,7 @@ export function ConnectionTreeItem({ connection, isActive, onSelect, onSelectTab
                         <div
                             ref={virtualListRef}
                             className={cn(
-                                "overflow-y-auto transition-all duration-75",
+                                "overflow-y-auto transition-all duration-75 scrollbar-thin",
                                 !actualHeight && ((connection.db_type === 'mysql' || connection.db_type === 'sqlite') ? "max-h-[600px]" : "max-h-[320px]")
                             )}
                             style={actualHeight ? { height: actualHeight } : undefined}
