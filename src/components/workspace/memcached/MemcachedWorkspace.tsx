@@ -12,12 +12,19 @@ import { TextFormatterDialog } from "@/components/common/TextFormatterDialog.tsx
 
 export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: { tabId: string; name: string; connectionId: number; savedResult?: any }) {
     const { t } = useTranslation();
-    const [searchKey, setSearchKey] = useState(savedResult?.searchKey || "");
+    const [searchKey, setSearchKey] = useState(""); // Input value
     const [loading, setLoading] = useState(false);
-    const [selectedValue, setSelectedValue] = useState<string | null>(savedResult?.selectedValue || null);
-    const [history, setHistory] = useState<string[]>([]);
-    const [showFormatDialog, setShowFormatDialog] = useState(false);
 
+    // Store list of results instead of single value
+    const [results, setResults] = useState<Array<{ key: string, value: string, timestamp: number }>>(
+        savedResult?.results || []
+    );
+
+    // For the dialog
+    const [showFormatDialog, setShowFormatDialog] = useState(false);
+    const [dialogContent, setDialogContent] = useState("");
+
+    const [history, setHistory] = useState<string[]>([]);
     const updateTab = useAppStore(state => state.updateTab);
 
     // Sync state to global store
@@ -25,13 +32,12 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
         const timer = setTimeout(() => {
             updateTab(tabId, {
                 savedResult: {
-                    searchKey,
-                    selectedValue
+                    results // Save the list
                 }
             });
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchKey, selectedValue, tabId, updateTab]);
+    }, [results, tabId, updateTab]);
 
     // Load history from localStorage on mount
     useEffect(() => {
@@ -60,7 +66,6 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
 
         setSearchKey(keyToSearch);
         setLoading(true);
-        setSelectedValue(null);
 
         addToHistory(keyToSearch);
 
@@ -71,7 +76,16 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                 connectionId,
                 key: keyToSearch,
             });
-            setSelectedValue(val);
+
+            // Add new result to top, remove duplicate key if exists (optional), keep max 10
+            setResults(prev => {
+                const filtered = prev.filter(item => item.key !== keyToSearch);
+                return [{
+                    key: keyToSearch,
+                    value: val,
+                    timestamp: Date.now()
+                }, ...filtered].slice(0, 10);
+            });
 
             addCommandToConsole({
                 databaseType: 'memcached',
@@ -81,7 +95,17 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
             });
         } catch (error) {
             console.error("Failed to fetch value", error);
-            setSelectedValue(t('common.errorFetching') + ": " + error);
+
+            // Still add to list but with error message? Or show toast? 
+            // Better to show in the list so user knows it failed.
+            setResults(prev => {
+                const filtered = prev.filter(item => item.key !== keyToSearch);
+                return [{
+                    key: keyToSearch,
+                    value: t('common.errorFetching') + ": " + error,
+                    timestamp: Date.now()
+                }, ...filtered].slice(0, 10);
+            });
 
             addCommandToConsole({
                 databaseType: 'memcached',
@@ -95,12 +119,12 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
         }
     };
 
-    const handleDelete = async () => {
-        if (!searchKey) return;
+    const handleDelete = async (keyToDelete: string) => {
+        if (!keyToDelete) return;
 
         const confirmed = await confirm({
             title: t('common.confirmDeletion'),
-            description: t('memcached.deleteConfirm', { key: searchKey }),
+            description: t('memcached.deleteConfirm', { key: keyToDelete }),
             variant: 'destructive'
         });
 
@@ -111,13 +135,19 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
         try {
             await invoke("delete_memcached_key", {
                 connectionId,
-                key: searchKey
+                key: keyToDelete
             });
-            setSelectedValue(t('common.deleted'));
+
+            // Remove from list
+            setResults(prev => prev.filter(item => item.key !== keyToDelete));
+
+            toast({
+                description: t('common.deleted')
+            });
 
             addCommandToConsole({
                 databaseType: 'memcached',
-                command: `delete ${searchKey}`,
+                command: `delete ${keyToDelete}`,
                 duration: Date.now() - startTime,
                 success: true
             });
@@ -131,12 +161,17 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
 
             addCommandToConsole({
                 databaseType: 'memcached',
-                command: `delete ${searchKey}`,
+                command: `delete ${keyToDelete}`,
                 duration: Date.now() - startTime,
                 success: false,
                 error: String(error)
             });
         }
+    };
+
+    const openFormatDialog = (content: string) => {
+        setDialogContent(content);
+        setShowFormatDialog(true);
     };
 
     return (
@@ -155,7 +190,7 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
             </div>
 
             {/* Search & History Section */}
-            <div className="p-4 border-b bg-muted/5 shrink-0 flex flex-col gap-4">
+            <div className="p-4 border-b bg-muted/5 shrink-0 flex flex-col gap-4 shadow-sm z-10">
                 <div className="flex gap-2">
                     <Input
                         value={searchKey}
@@ -195,78 +230,87 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                 )}
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 min-h-0 flex flex-col bg-muted/10">
-                {selectedValue !== null ? (
-                    <div className="h-full flex flex-col">
-                        {/* Toolbar */}
-                        <div className="flex items-center justify-between px-4 py-2 border-b bg-background shadow-sm shrink-0">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <span className="text-sm text-muted-foreground whitespace-nowrap">{t('common.key')}:</span>
-                                <code className="text-sm font-mono bg-muted/50 px-2 py-0.5 rounded select-text truncate max-w-[400px]" title={searchKey}>
-                                    {searchKey}
-                                </code>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 gap-1.5"
-                                    onClick={() => setShowFormatDialog(true)}
-                                >
-                                    <Wand2 className="w-3.5 h-3.5" />
-                                    <span className="sr-only sm:not-sr-only sm:inline-block">{t('common.viewFormatted')}</span>
-                                </Button>
+            {/* Main Content Area - List of Cards */}
+            <div className="flex-1 min-h-0 bg-muted/10 overflow-y-auto">
+                {results.length > 0 ? (
+                    <div className="p-4 flex flex-col gap-6 max-w-5xl mx-auto">
+                        {results.map((item) => (
+                            <div key={`${item.key}-${item.timestamp}`} className="flex flex-col bg-background border rounded-lg shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+                                {/* Card Toolbar */}
+                                <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/5 shrink-0">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <Badge variant="outline" className="font-mono text-xs text-muted-foreground">
+                                            {new Date(item.timestamp).toLocaleTimeString()}
+                                        </Badge>
+                                        <code className="text-sm font-bold font-mono text-primary px-1 rounded select-text truncate max-w-[400px]" title={item.key}>
+                                            {item.key}
+                                        </code>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 gap-1.5"
+                                            onClick={() => openFormatDialog(item.value)}
+                                        >
+                                            <Wand2 className="w-3.5 h-3.5" />
+                                            <span className="sr-only sm:not-sr-only sm:inline-block">{t('common.viewFormatted')}</span>
+                                        </Button>
 
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 gap-1.5"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(selectedValue);
-                                        toast({ description: t('common.copied') });
-                                    }}
-                                >
-                                    <Copy className="w-3.5 h-3.5" />
-                                    <span className="sr-only sm:not-sr-only sm:inline-block">{t('common.copy')}</span>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={handleDelete}
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span className="sr-only sm:not-sr-only sm:inline-block">{t('redis.deleteKey')}</span>
-                                </Button>
-                            </div>
-                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 gap-1.5"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(item.value);
+                                                toast({ description: t('common.copied') });
+                                            }}
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                            <span className="sr-only sm:not-sr-only sm:inline-block">{t('common.copy')}</span>
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={() => handleDelete(item.key)}
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span className="sr-only sm:not-sr-only sm:inline-block">{t('redis.deleteKey')}</span>
+                                        </Button>
+                                    </div>
+                                </div>
 
-                        {/* Editor/Viewer */}
-                        <div className="flex-1 min-h-0 p-4">
-                            <textarea
-                                className="w-full h-full p-4 font-mono text-sm bg-background border rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-                                value={selectedValue}
-                                readOnly
-                                spellCheck={false}
-                            />
-                        </div>
+                                {/* Card Content */}
+                                <div className="h-64 relative group">
+                                    <textarea
+                                        className="w-full h-full p-4 font-mono text-sm bg-transparent border-0 resize-none focus:outline-none focus:ring-0"
+                                        value={item.value}
+                                        readOnly
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     !loading && (
-                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30 pb-20">
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-30">
                             <Search className="w-16 h-16 mb-4 stroke-1" />
                             <p className="text-lg">{t('memcached.enterKeyToSearch')}</p>
                         </div>
                     )
                 )}
+
+                {/* Bottom Spacer */}
+                <div className="h-12"></div>
             </div>
 
             {/* Dialog */}
             <TextFormatterDialog
                 open={showFormatDialog}
                 onOpenChange={setShowFormatDialog}
-                content={selectedValue || ""}
+                content={dialogContent}
                 readonly
                 title={t('common.formatValue')}
             />
