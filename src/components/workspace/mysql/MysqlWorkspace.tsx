@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button.tsx";
-import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight, Filter, Pencil, Wand2, Eye, MousePointerClick } from "lucide-react";
+import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight, Filter, Pencil, Wand2, Eye, MousePointerClick, Database } from "lucide-react";
 import { FilterBuilder } from "@/components/workspace/mysql/FilterBuilder.tsx";
 import { TextFormatterDialog } from "@/components/common/TextFormatterDialog.tsx";
 import { RowViewerDialog } from "@/components/common/RowViewerDialog.tsx";
@@ -57,6 +57,7 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
     const { t } = useTranslation();
     const isDark = useIsDarkTheme();
     const updateTab = useAppStore(state => state.updateTab);
+    const addTab = useAppStore(state => state.addTab);
 
     const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM users");
     //用于存储当前实际执行的SQL（不含分页），用于翻页时保持上下文，与编辑器中的 sql 分离
@@ -1075,19 +1076,43 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                     )}
                 </div>
 
-                {/* Right Side Toolbar Actions */}
                 <div className="flex gap-2 items-center">
                     {tableName && (
-                        <Button
-                            variant={showDDL ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setShowDDL(!showDDL)}
-                            title="Show DDL"
-                            className={cn(showDDL && "bg-muted")}
-                        >
-                            <FileCode className="h-4 w-4 mr-1" />
-                            DDL
-                        </Button>
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    if (!dbName || !tableName || !connection) return;
+                                    const tabId = `schema-${connection.id}-${dbName}-${tableName}`;
+                                    addTab({
+                                        id: tabId,
+                                        title: `${tableName} - ${t('mysql.tableStructure')}`,
+                                        type: connection.db_type,
+                                        tabType: 'table-schema',
+                                        connectionId: connection.id,
+                                        schemaInfo: {
+                                            dbName,
+                                            tableName
+                                        }
+                                    });
+                                }}
+                                title={t('mysql.viewSchema')}
+                            >
+                                <Database className="h-4 w-4 mr-1" />
+                                {t('mysql.structure', 'Structure')}
+                            </Button>
+                            <Button
+                                variant={showDDL ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={() => setShowDDL(!showDDL)}
+                                title="Show DDL"
+                                className={cn(showDDL && "bg-muted")}
+                            >
+                                <FileCode className="h-4 w-4 mr-1" />
+                                DDL
+                            </Button>
+                        </>
                     )}
                 </div>
             </div>

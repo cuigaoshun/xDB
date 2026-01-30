@@ -4,8 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button.tsx";
 import {
     Loader2, Plus, Trash2, RefreshCw, Edit2, Key,
-    Hash, Type, Calendar, Binary, Database, List, FileCode, X
+    Hash, Type, Calendar, Binary, Database, List, FileCode, X, Table as TableIcon
 } from "lucide-react";
+import { useAppStore } from "@/store/useAppStore.ts";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog.tsx";
@@ -47,6 +48,7 @@ interface TableSchemaManagerProps {
 export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh }: TableSchemaManagerProps) {
     const { t } = useTranslation();
     const isDark = useIsDarkTheme();
+    const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const [columns, setColumns] = useState<ColumnInfo[]>([]);
     const [indexes, setIndexes] = useState<IndexInfo[]>([]);
     const [tableComment, setTableComment] = useState<string>('');
@@ -492,6 +494,29 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                     >
                         <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
                         {t('mysql.refreshSchema')}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                            if (!connection) return;
+                            const addTab = useAppStore.getState().addTab;
+                            const tabId = `query-${connectionId}-${dbName}-${Date.now()}`;
+                            const initialSql = `SELECT * FROM \`${dbName}\`.\`${tableName}\``;
+                            addTab({
+                                id: tabId,
+                                title: tableName ? `${tableName} - Query` : `${dbName} - Query`,
+                                type: connection.db_type,
+                                connectionId: connectionId,
+                                dbName,
+                                tableName,
+                                initialSql
+                            });
+                        }}
+                        className="h-7 whitespace-nowrap shrink-0 ml-1"
+                    >
+                        <TableIcon className="h-3 w-3 mr-1" />
+                        {t('mysql.viewData', 'View Data')}
                     </Button>
                     <Button
                         variant={showDDL ? "secondary" : "ghost"}

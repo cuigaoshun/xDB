@@ -202,6 +202,7 @@ const resources = {
         "viewData": "View Data",
         "viewSchema": "View Schema",
         "refreshTables": "Refresh Tables",
+        "structure": "Structure",
         "newQueryTab": "New Query"
       },
       "redis": {
@@ -521,6 +522,7 @@ const resources = {
         "viewData": "查看数据",
         "viewSchema": "查看表结构",
         "refreshTables": "刷新表列表",
+        "structure": "表结构",
         "newQueryTab": "新建查询"
       },
       "redis": {
