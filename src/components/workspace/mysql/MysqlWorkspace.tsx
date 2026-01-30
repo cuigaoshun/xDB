@@ -743,7 +743,6 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
 
         setIsLoading(true);
         setError(null);
-        setResult(null);
 
         const startTime = Date.now();
 
@@ -753,6 +752,20 @@ export function MysqlWorkspace({ tabId, name, connectionId, initialSql, savedSql
                 sql: query,
                 dbName
             });
+
+            // Check if columns changed
+            let columnsChanged = true;
+            if (result?.columns && data.columns && result.columns.length === data.columns.length) {
+                columnsChanged = !result.columns.every((col, i) =>
+                    col.name === data.columns[i].name && col.type_name === data.columns[i].type_name
+                );
+            }
+
+            if (!columnsChanged && result?.columns) {
+                // Keep the old columns reference to prevent useEffect from resetting column widths
+                data.columns = result.columns;
+            }
+
             setResult(data);
             setOriginalRows(data.rows);
             // 更新筛选器的列信息
