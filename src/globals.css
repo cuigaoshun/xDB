@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Modern Light Theme - Clean & Minimal */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Dark style like before */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 221 83% 53%;
+  }
+
+  .dark {
+    /* Modern Dark Theme - Softer & Comfortable */
+    --background: 220 13% 18%;
+    --foreground: 210 20% 98%;
+
+    --card: 220 13% 18%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 220 13% 20%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 210 20% 98%;
+    --primary-foreground: 220 13% 18%;
+
+    --secondary: 220 13% 23%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 220 13% 23%;
+    --muted-foreground: 220 9% 60%;
+
+    --accent: 220 13% 23%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 62.8% 45%;
+    --destructive-foreground: 210 20% 98%;
+
+    --border: 220 13% 26%;
+    --input: 220 13% 23%;
+    --ring: 220 9% 70%;
+
+    /* Sidebar - Slightly darker */
+    --sidebar-background: 220 13% 15%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 210 20% 98%;
+    --sidebar-primary-foreground: 220 13% 18%;
+    --sidebar-accent: 220 13% 20%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 220 13% 23%;
+    --sidebar-ring: 220 9% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+@layer utilities {
+  .scrollbar-thin {
+    /* Firefox */
+    scrollbar-width: none;
+  }
+
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 20px;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
