@@ -15,7 +15,7 @@ import {
     haveColumnsChanged,
     mergeSqlResultWithSchema,
     resolveEditableState,
-} from "../utils/resultTable";
+} from "@/components/workspace/sql/utils/resultTable";
 
 interface UseMysqlWorkspaceQueryOptions {
     tabId: string;

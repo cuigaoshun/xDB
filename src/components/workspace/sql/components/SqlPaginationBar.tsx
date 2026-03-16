@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 
-interface MysqlPaginationBarProps {
+interface SqlPaginationBarProps {
     currentPage: number;
     pageSize: number;
     pageSizeInput: string;
@@ -17,7 +17,7 @@ interface MysqlPaginationBarProps {
     onPageSizeInputChange: (value: string) => void;
 }
 
-export function MysqlPaginationBar({
+export function SqlPaginationBar({
     currentPage,
     pageSize,
     pageSizeInput,
@@ -29,11 +29,11 @@ export function MysqlPaginationBar({
     editDisabledReason,
     onPageChange,
     onPageSizeInputChange,
-}: MysqlPaginationBarProps) {
+}: SqlPaginationBarProps) {
     const { t } = useTranslation();
 
     return (
-        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-1 shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
             {hasActiveInlineFilters ? (
                 <span>{filteredRows} / {totalRows} {t("common.rowsReturned", "rows returned")}</span>
             ) : (

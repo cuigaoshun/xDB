@@ -21,12 +21,12 @@ import {
     haveColumnsChanged,
     mergeSqlResultWithSchema,
     resolveEditableState,
-} from "@/components/workspace/mysql/utils/resultTable";
-import { MysqlWorkspaceToolbar } from "@/components/workspace/mysql/components/MysqlWorkspaceToolbar.tsx";
-import { MysqlQueryEditor } from "@/components/workspace/mysql/components/MysqlQueryEditor.tsx";
-import { MysqlResultTable } from "@/components/workspace/mysql/components/MysqlResultTable.tsx";
-import { MysqlPaginationBar } from "@/components/workspace/mysql/components/MysqlPaginationBar.tsx";
-import { MysqlDdlPanel } from "@/components/workspace/mysql/components/MysqlDdlPanel.tsx";
+} from "@/components/workspace/sql/utils/resultTable";
+import { SqlWorkspaceToolbar } from "@/components/workspace/sql/components/SqlWorkspaceToolbar.tsx";
+import { SqlQueryEditor } from "@/components/workspace/sql/components/SqlQueryEditor.tsx";
+import { SqlResultTable } from "@/components/workspace/sql/components/SqlResultTable.tsx";
+import { SqlPaginationBar } from "@/components/workspace/sql/components/SqlPaginationBar.tsx";
+import { SqlDdlPanel } from "@/components/workspace/sql/components/SqlDdlPanel.tsx";
 
 interface SqliteWorkspaceProps {
     tabId: string;
@@ -744,7 +744,7 @@ export function SqliteWorkspace({
 
     return (
         <div className="h-full flex flex-col bg-background">
-            <MysqlWorkspaceToolbar
+            <SqlWorkspaceToolbar
                 connection={connection}
                 connectionName={connectionName}
                 dbName={dbName}
@@ -781,8 +781,8 @@ export function SqliteWorkspace({
             <div className="flex-1 flex overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                     <ResizablePanel defaultSize={showDDL ? 60 : 100} minSize={30}>
-                        <div className="h-full flex flex-col">
-                            <MysqlQueryEditor
+                        <div className="h-full min-h-0 flex flex-col">
+                            <SqlQueryEditor
                                 connectionId={connectionId}
                                 dbName={dbName}
                                 defaultValue={defaultSqlRef.current}
@@ -793,7 +793,7 @@ export function SqliteWorkspace({
                                 }}
                                 onSqlChange={handleEditorSqlChange}
                             />
-                            <div className="flex-1 pb-1 overflow-hidden">
+                            <div className="flex-1 min-h-0 pb-1 overflow-hidden">
                                 {error && (
                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
                                         <span>Error: {error}</span>
@@ -825,8 +825,8 @@ export function SqliteWorkspace({
                                 )}
 
                                 {result && (result.columns.length > 0 || !successMessage) && (
-                                    <div className="h-full flex flex-col">
-                                        <MysqlResultTable
+                                    <div className="h-full min-h-0 flex flex-col">
+                                        <SqlResultTable
                                             result={result}
                                             isEditable={editableState.isEditable}
                                             newRows={newRows}
@@ -867,7 +867,7 @@ export function SqliteWorkspace({
                                         />
 
                                         {result.rows.length > 0 && (
-                                            <MysqlPaginationBar
+                                            <SqlPaginationBar
                                                 currentPage={currentPage}
                                                 pageSize={pageSize}
                                                 pageSizeInput={pageSizeInput}
@@ -896,7 +896,7 @@ export function SqliteWorkspace({
                     {showDDL && (
                         <>
                             <ResizableHandle withHandle />
-                            <MysqlDdlPanel
+                            <SqlDdlPanel
                                 ddl={ddl}
                                 isDark={isDark}
                                 isLoading={isLoadingDDL}

@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils.ts";
 import type { EditingCell, FilteredRowEntry, SqlResult } from "@/types/sql";
 import { getCellDisplayValue, getInitialColumnWidths } from "../utils/resultTable";
 
-interface MysqlResultTableProps {
+interface SqlResultTableProps {
     result: SqlResult;
     isEditable: boolean;
     newRows: Record<string, any>[];
@@ -69,7 +69,7 @@ interface MysqlResultTableProps {
     renderColumnTypeIcon: (typeName: string) => ReactNode;
 }
 
-export function MysqlResultTable({
+export function SqlResultTable({
     result,
     isEditable,
     newRows,
@@ -96,7 +96,7 @@ export function MysqlResultTable({
     onInlineFilterChange,
     onOpenFormatter,
     renderColumnTypeIcon,
-}: MysqlResultTableProps) {
+}: SqlResultTableProps) {
     const { t } = useTranslation();
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
     const resizingRef = useRef<{ colName: string; startX: number; startWidth: number; startTotalWidth: number } | null>(null);
@@ -179,9 +179,9 @@ export function MysqlResultTable({
     );
 
     return (
-        <div className="h-full flex flex-col gap-0">
+        <div className="h-full min-h-0 flex flex-col gap-0">
             <div
-                className="border rounded-md bg-background flex-1 overflow-auto"
+                className="border rounded-md bg-background flex-1 min-h-0 overflow-auto"
                 style={{
                     WebkitOverflowScrolling: "touch",
                     transform: "translateZ(0)",

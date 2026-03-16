@@ -1,4 +1,4 @@
-import { Search, RefreshCw, Copy, Trash2, Clock, Wand2, Plus } from "lucide-react";
+import { Search, RefreshCw, Copy, Trash2, Clock, Wand2, Plus, Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input.tsx";
 import { useState, useEffect } from "react";
@@ -41,6 +41,53 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
     const [newValue, setNewValue] = useState("");
     const [newTtl, setNewTtl] = useState("0");
     const [adding, setAdding] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [editingKey, setEditingKey] = useState("");
+    const [editingValue, setEditingValue] = useState("");
+    const [editingTtl, setEditingTtl] = useState("0");
+    const [updating, setUpdating] = useState(false);
+
+    const upsertResult = (key: string, value: string) => {
+        setResults(prev => {
+            const filtered = prev.filter(item => item.key !== key);
+            return [{
+                key,
+                value,
+                timestamp: Date.now()
+            }, ...filtered].slice(0, 10);
+        });
+    };
+
+    const resetAddForm = () => {
+        setNewKey("");
+        setNewValue("");
+        setNewTtl("0");
+    };
+
+    const resetEditForm = () => {
+        setEditingKey("");
+        setEditingValue("");
+        setEditingTtl("0");
+    };
+
+    const saveKey = async ({
+        key,
+        value,
+        ttl,
+    }: {
+        key: string;
+        value: string;
+        ttl: string;
+    }) => {
+        await invokeSetMemcached({
+            connectionId,
+            key,
+            value,
+            ttl: parseInt(ttl, 10) || 0
+        });
+
+        upsertResult(key, value);
+    };
 
     const handleSaveNewKey = async () => {
         if (!newKey.trim()) {
@@ -55,27 +102,14 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
         setAdding(true);
 
         try {
-            await invokeSetMemcached({
-                            connectionId,
-                            key: newKey,
-                            value: newValue,
-                            ttl: parseInt(newTtl) || 0
-                        });
-
-            // Add to results list
-            setResults(prev => {
-                const filtered = prev.filter(item => item.key !== newKey);
-                return [{
-                    key: newKey,
-                    value: newValue,
-                    timestamp: Date.now()
-                }, ...filtered].slice(0, 10);
+            await saveKey({
+                key: newKey,
+                value: newValue,
+                ttl: newTtl
             });
             toast({ description: t('common.insertSuccess') });
             setIsAddOpen(false);
-            setNewKey("");
-            setNewValue("");
-            setNewTtl("0");
+            resetAddForm();
         } catch (error) {
             console.error("Failed to set key", error);
             toast({
@@ -85,6 +119,41 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
             });
         } finally {
             setAdding(false);
+        }
+    };
+
+    const openEditDialog = (key: string, value: string) => {
+        setEditingKey(key);
+        setEditingValue(value);
+        setEditingTtl("0");
+        setIsEditOpen(true);
+    };
+
+    const handleUpdateKey = async () => {
+        if (!editingKey.trim()) {
+            return;
+        }
+
+        setUpdating(true);
+
+        try {
+            await saveKey({
+                key: editingKey,
+                value: editingValue,
+                ttl: editingTtl
+            });
+            toast({ description: t('common.savedSuccess') });
+            setIsEditOpen(false);
+            resetEditForm();
+        } catch (error) {
+            console.error("Failed to update key", error);
+            toast({
+                variant: "destructive",
+                title: t('common.error'),
+                description: t('common.failedToUpdate') + ": " + error
+            });
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -137,27 +206,13 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                         });
 
             // Add new result to top, remove duplicate key if exists (optional), keep max 10
-            setResults(prev => {
-                const filtered = prev.filter(item => item.key !== keyToSearch);
-                return [{
-                    key: keyToSearch,
-                    value: val,
-                    timestamp: Date.now()
-                }, ...filtered].slice(0, 10);
-            });
+            upsertResult(keyToSearch, val);
         } catch (error) {
             console.error("Failed to fetch value", error);
 
             // Still add to list but with error message? Or show toast? 
             // Better to show in the list so user knows it failed.
-            setResults(prev => {
-                const filtered = prev.filter(item => item.key !== keyToSearch);
-                return [{
-                    key: keyToSearch,
-                    value: t('common.errorFetching') + ": " + error,
-                    timestamp: Date.now()
-                }, ...filtered].slice(0, 10);
-            });
+            upsertResult(keyToSearch, t('common.errorFetching') + ": " + error);
         } finally {
             setLoading(false);
         }
@@ -291,6 +346,16 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                                             variant="ghost"
                                             size="sm"
                                             className="h-8 gap-1.5"
+                                            onClick={() => openEditDialog(item.key, item.value)}
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            <span className="sr-only sm:not-sr-only sm:inline-block">{t('common.edit')}</span>
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 gap-1.5"
                                             onClick={() => openFormatDialog(item.value)}
                                         >
                                             <Wand2 className="w-3.5 h-3.5" />
@@ -403,6 +468,66 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                         </Button>
                         <Button onClick={handleSaveNewKey} disabled={adding}>
                             {adding && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                            {t('common.save')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog
+                open={isEditOpen}
+                onOpenChange={(open) => {
+                    setIsEditOpen(open);
+                    if (!open) {
+                        resetEditForm();
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('common.edit')} {t('memcached.addKey') || "Key"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-key" className="text-left">
+                                Key
+                            </Label>
+                            <Input
+                                id="edit-key"
+                                value={editingKey}
+                                disabled
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-ttl" className="text-left">
+                                TTL (Seconds, 0 for infinite)
+                            </Label>
+                            <Input
+                                id="edit-ttl"
+                                type="number"
+                                value={editingTtl}
+                                onChange={(e) => setEditingTtl(e.target.value)}
+                                placeholder="0"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-value" className="text-left">
+                                Value
+                            </Label>
+                            <Textarea
+                                id="edit-value"
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                placeholder="Enter value..."
+                                className="font-mono h-32"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                            {t('common.cancel')}
+                        </Button>
+                        <Button onClick={handleUpdateKey} disabled={updating}>
+                            {updating && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
                             {t('common.save')}
                         </Button>
                     </DialogFooter>

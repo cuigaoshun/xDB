@@ -4,7 +4,7 @@ import Editor from "@monaco-editor/react";
 import type { SchemaColumnMeta } from "@/types/sql";
 import { useAppStore } from "@/store/useAppStore.ts";
 
-interface MysqlQueryEditorProps {
+interface SqlQueryEditorProps {
     connectionId: number;
     dbName?: string;
     defaultValue: string;
@@ -14,7 +14,7 @@ interface MysqlQueryEditorProps {
     onSqlChange: (sql: string) => void;
 }
 
-export function MysqlQueryEditor({
+export function SqlQueryEditor({
     connectionId,
     dbName,
     defaultValue,
@@ -22,7 +22,7 @@ export function MysqlQueryEditor({
     schemaColumnsRef,
     onEditorMount,
     onSqlChange,
-}: MysqlQueryEditorProps) {
+}: SqlQueryEditorProps) {
     const completionDisposableRef = useRef<any>(null);
     const editorRef = useRef<any>(null);
 

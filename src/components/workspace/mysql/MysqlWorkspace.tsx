@@ -12,14 +12,14 @@ import { DEFAULT_PAGE_SIZE, DEBOUNCE_DELAY } from "@/constants/workspace";
 import { autoAddLimit } from "@/hooks/usePagination";
 import { useDDLPanelResize } from "@/hooks/useDDLPanelResize";
 import type { SqlResult } from "@/types/sql";
-import { buildFilteredRowEntries, buildUniqueColumnValueMap } from "./utils/resultTable";
+import { buildFilteredRowEntries, buildUniqueColumnValueMap } from "@/components/workspace/sql/utils/resultTable";
 import { useMysqlWorkspaceQuery } from "./hooks/useMysqlWorkspaceQuery";
 import { useMysqlRowEditing } from "./hooks/useMysqlRowEditing";
-import { MysqlWorkspaceToolbar } from "./components/MysqlWorkspaceToolbar";
-import { MysqlQueryEditor } from "./components/MysqlQueryEditor";
-import { MysqlResultTable } from "./components/MysqlResultTable";
-import { MysqlPaginationBar } from "./components/MysqlPaginationBar";
-import { MysqlDdlPanel } from "./components/MysqlDdlPanel";
+import { SqlWorkspaceToolbar } from "@/components/workspace/sql/components/SqlWorkspaceToolbar";
+import { SqlQueryEditor } from "@/components/workspace/sql/components/SqlQueryEditor";
+import { SqlResultTable } from "@/components/workspace/sql/components/SqlResultTable";
+import { SqlPaginationBar } from "@/components/workspace/sql/components/SqlPaginationBar";
+import { SqlDdlPanel } from "@/components/workspace/sql/components/SqlDdlPanel";
 
 interface MysqlWorkspaceProps {
     tabId: string;
@@ -298,7 +298,7 @@ export function MysqlWorkspace({
 
     return (
         <div className="h-full flex flex-col bg-background">
-            <MysqlWorkspaceToolbar
+            <SqlWorkspaceToolbar
                 connection={connection}
                 connectionName={connectionName}
                 dbName={dbName}
@@ -334,8 +334,8 @@ export function MysqlWorkspace({
             <div className="flex-1 flex overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                     <ResizablePanel defaultSize={showDDL ? 60 : 100} minSize={30}>
-                        <div className="h-full flex flex-col">
-                            <MysqlQueryEditor
+                        <div className="h-full min-h-0 flex flex-col">
+                            <SqlQueryEditor
                                 connectionId={connectionId}
                                 dbName={dbName}
                                 defaultValue={defaultSqlRef.current}
@@ -347,7 +347,7 @@ export function MysqlWorkspace({
                                 onSqlChange={handleEditorSqlChange}
                             />
 
-                            <div className="flex-1 pb-1 overflow-hidden">
+                            <div className="flex-1 min-h-0 pb-1 overflow-hidden">
                                 {error && (
                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
                                         <span>Error: {error}</span>
@@ -379,8 +379,8 @@ export function MysqlWorkspace({
                                 )}
 
                                 {result && (result.columns.length > 0 || !successMessage) && (
-                                    <div className="h-full flex flex-col">
-                                        <MysqlResultTable
+                                    <div className="h-full min-h-0 flex flex-col">
+                                        <SqlResultTable
                                             result={result}
                                             isEditable={editableState.isEditable}
                                             newRows={rowEditing.newRows}
@@ -415,7 +415,7 @@ export function MysqlWorkspace({
                                         />
 
                                         {result.rows.length > 0 && (
-                                            <MysqlPaginationBar
+                                            <SqlPaginationBar
                                                 currentPage={currentPage}
                                                 pageSize={pageSize}
                                                 pageSizeInput={pageSizeInput}
@@ -444,7 +444,7 @@ export function MysqlWorkspace({
                     {showDDL && (
                         <>
                             <ResizableHandle withHandle />
-                            <MysqlDdlPanel
+                            <SqlDdlPanel
                                 ddl={ddl}
                                 isDark={isDark}
                                 isLoading={isLoadingDDL}

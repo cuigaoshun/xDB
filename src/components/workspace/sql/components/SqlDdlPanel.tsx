@@ -5,14 +5,14 @@ import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { ResizablePanel } from "@/components/ui/resizable.tsx";
 import { transparentTheme } from "@/lib/utils.ts";
 
-interface MysqlDdlPanelProps {
+interface SqlDdlPanelProps {
     ddl: string;
     isDark: boolean;
     isLoading: boolean;
     panelRef: RefObject<any>;
 }
 
-export function MysqlDdlPanel({ ddl, isDark, isLoading, panelRef }: MysqlDdlPanelProps) {
+export function SqlDdlPanel({ ddl, isDark, isLoading, panelRef }: SqlDdlPanelProps) {
     return (
         <ResizablePanel ref={panelRef} defaultSize={20} minSize={10} maxSize={80}>
             <div className="h-full flex flex-col bg-background border-t">

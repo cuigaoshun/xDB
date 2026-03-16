@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { Connection } from "@/store/useAppStore";
 
-interface MysqlWorkspaceToolbarProps {
+interface SqlWorkspaceToolbarProps {
     connection?: Connection;
     connectionName: string;
     dbName?: string;
@@ -27,7 +27,7 @@ interface MysqlWorkspaceToolbarProps {
     onToggleDDL: () => void;
 }
 
-export function MysqlWorkspaceToolbar({
+export function SqlWorkspaceToolbar({
     connection,
     connectionName,
     dbName,
@@ -48,7 +48,7 @@ export function MysqlWorkspaceToolbar({
     onCancelChanges,
     onOpenSchemaTab,
     onToggleDDL,
-}: MysqlWorkspaceToolbarProps) {
+}: SqlWorkspaceToolbarProps) {
     const { t } = useTranslation();
 
     return (
