@@ -42,6 +42,27 @@ export interface EditingCell {
     isNewRow: boolean;
 }
 
+export interface EditableState {
+    isEditable: boolean;
+    reason: string;
+}
+
+export interface SchemaColumnMeta {
+    name: string;
+    type: string;
+    comment: string;
+}
+
+export interface RowSelectionState {
+    indices: number[];
+    indexSet: Set<number>;
+}
+
+export interface FilteredRowEntry {
+    row: Record<string, any>;
+    originalIndex: number;
+}
+
 /**
  * 分页状态
  */
