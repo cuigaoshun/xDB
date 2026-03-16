@@ -26,6 +26,7 @@ interface RedisStringViewerProps {
   db: number;
   keyName: string;
   value: any;
+  loading?: boolean;
   onRefresh: () => void;
 }
 
@@ -34,6 +35,7 @@ export function RedisStringViewer({
   db,
   keyName,
   value,
+  loading = false,
   onRefresh,
 }: RedisStringViewerProps) {
   const { t } = useTranslation();
@@ -122,6 +124,11 @@ export function RedisStringViewer({
         </Button>
       </div>
       <div className="flex-1 flex flex-col min-h-0 p-4">
+        {loading && !content && (
+          <div className="mb-3 text-xs text-muted-foreground">
+            {t('redis.loadingValue', 'Loading value...')}
+          </div>
+        )}
         <TextFormatterWrapper
           content={displayedContent}
           onSave={(newContent) => setDisplayedContent(newContent)}

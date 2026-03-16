@@ -326,8 +326,9 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           setKeys((prev) => [...prev, ...result.keys]);
         }
 
-        setCursor(result.cursor);
-        setHasMore(result.cursor !== "0");
+        const nextCursor = String(result.cursor);
+        setCursor(nextCursor);
+        setHasMore(nextCursor !== "0");
 
         // Update the last scanned filter only on successful scan
         setLastScannedFilter(currentFilter);
@@ -484,8 +485,9 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         setAllValues((prev) => [...prev, ...filteredValues]);
       }
 
-      setValueCursor(result.cursor);
-      const hasMoreData = result.cursor !== "0";
+      const nextCursor = String(result.cursor);
+      setValueCursor(nextCursor);
+      const hasMoreData = nextCursor !== "0";
       setValueHasMore(hasMoreData);
 
       if (reset) {
@@ -695,6 +697,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const valueObserverTarget = useRef<HTMLDivElement>(null);
+  const keyAutoLoadReadyRef = useRef(true);
+  const valueAutoLoadReadyRef = useRef(true);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -704,7 +708,13 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         const hasScrollbar = parent && parent.scrollHeight > parent.clientHeight;
 
         // 只有在列表有滚动条时才自动加载更多
-        if (entries[0].isIntersecting && hasMore && !loading && hasScrollbar) {
+        if (!entries[0].isIntersecting) {
+          keyAutoLoadReadyRef.current = true;
+          return;
+        }
+
+        if (keyAutoLoadReadyRef.current && hasMore && !loading && hasScrollbar) {
+          keyAutoLoadReadyRef.current = false;
           fetchKeys(false);
         }
       },
@@ -722,15 +732,22 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
+        const entry = entries[0];
         const currentKeyItem = selectedKeyItemRef.current;
         
         // 检查列表是否有滚动条（内容超出容器）
         const parent = valueObserverTarget.current?.parentElement;
         const hasScrollbar = parent && parent.scrollHeight > parent.clientHeight;
 
-        if (entries[0].isIntersecting && valueHasMore && !valueLoading &&
+        if (!entry.isIntersecting) {
+          valueAutoLoadReadyRef.current = true;
+          return;
+        }
+
+        if (valueAutoLoadReadyRef.current && valueHasMore && !valueLoading &&
           selectedKey && currentKeyItem &&
           (currentKeyItem.type === "hash" || currentKeyItem.type === "set" || currentKeyItem.type === "zset") && hasScrollbar) {
+          valueAutoLoadReadyRef.current = false;
           fetchComplexValues(false);
         }
       },
@@ -745,6 +762,11 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   }, [valueHasMore, valueLoading, fetchComplexValues, selectedKey]);
 
   const handleKeyClick = useCallback((keyItem: KeyDetail) => {
+    if (selectedKeyRef.current === keyItem.key) {
+      return;
+    }
+
+    valueAutoLoadReadyRef.current = true;
     setSelectedKey(keyItem.key);
     setSelectedValue(null);
 
@@ -779,6 +801,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     const currentKeyItem = selectedKeyItemRef.current;
     if (!currentSelectedKey || !currentKeyItem) return;
 
+    valueAutoLoadReadyRef.current = true;
     const requestId = createValueRequestToken();
 
     // Refresh key details (TTL, length, etc)
@@ -1030,7 +1053,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                         }`}
                       onClick={() => {
                         // 继续扫描
-                        if (hasMore && filter === lastScannedFilter && cursor !== "0") {
+                        if (hasMore && filter === lastScannedFilter && String(cursor) !== "0") {
                           fetchKeys(false);
                         } else {
                           fetchKeys(true);
@@ -1290,29 +1313,23 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
                 {/* Value Content */}
                 <div className="flex-1 overflow-hidden flex flex-col">
-                  {valueLoading ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      {t('redis.loadingValue', 'Loading value...')}
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0">
-                      <ValueViewer
-                        connectionId={connectionId}
-                        db={db}
-                        keyName={selectedKey || ""}
-                        value={selectedValue}
-                        type={selectedKeyItem?.type}
-                        allValues={allValues}
-                        hasMore={valueHasMore}
-                        loading={valueLoading}
-                        filter={valueFilter}
-                        onFilterChange={setValueFilter}
-                        onSearch={() => fetchComplexValues(true)}
-                        onRefresh={handleRefresh}
-                        observerTarget={valueObserverTarget}
-                      />
-                    </div>
-                  )}
+                  <div className="flex-1 min-h-0">
+                    <ValueViewer
+                      connectionId={connectionId}
+                      db={db}
+                      keyName={selectedKey || ""}
+                      value={selectedValue}
+                      type={selectedKeyItem?.type}
+                      allValues={allValues}
+                      hasMore={valueHasMore}
+                      loading={valueLoading}
+                      filter={valueFilter}
+                      onFilterChange={setValueFilter}
+                      onSearch={() => fetchComplexValues(true)}
+                      onRefresh={handleRefresh}
+                      observerTarget={valueObserverTarget}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1421,6 +1438,7 @@ function ValueViewer({
         db={db}
         keyName={keyName}
         value={value}
+        loading={loading}
         onRefresh={onRefresh}
       />
     );
