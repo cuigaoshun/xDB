@@ -52,7 +52,7 @@ export function useMysqlRowEditing({
     const [viewingRowIndex, setViewingRowIndex] = useState(-1);
 
     const selectedRowIndexSet = useMemo(() => new Set(selectedRowIndices), [selectedRowIndices]);
-    const noPrimaryKeyMessage = t("common.noPrimaryKey", "无法更新/删除：表没有主键");
+    const noPrimaryKeyMessage = t("common.noPrimaryKey", "Cannot update/delete: table has no primary key");
 
     const updateExistingRowLocally = useCallback((rowIndex: number, nextRow: Record<string, any>) => {
         setResult((previousResult) => {
@@ -172,7 +172,7 @@ export function useMysqlRowEditing({
         try {
             const columns = await ensureTableColumns();
             if (columns.length === 0) {
-                setError(t("common.noColumnsFound", "未找到表的列信息，无法新增行"));
+                setError(t("common.noColumnsFound", "Table column information not found, cannot add row"));
                 return;
             }
 
@@ -189,7 +189,7 @@ export function useMysqlRowEditing({
         } catch (schemaError: any) {
             console.error("Failed to fetch table structure for adding row:", schemaError);
             setError(
-                t("common.fetchSchemaFailed", "无法获取表结构信息 ")
+                t("common.fetchSchemaFailed", "Failed to fetch table structure ")
                 + (schemaError?.message || String(schemaError)),
             );
         }
@@ -317,7 +317,7 @@ export function useMysqlRowEditing({
             const failedCount = settled.filter((item) => item.status === "rejected").length;
 
             if (failedCount > 0) {
-                setError(t("common.someRowsFailed", "部分行提交失败，请检查数据。"));
+                setError(t("common.someRowsFailed", "Some rows failed to submit, please check your data."));
             }
 
             await refresh(executedSql);

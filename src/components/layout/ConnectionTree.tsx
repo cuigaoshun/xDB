@@ -763,7 +763,7 @@ export function ConnectionTreeItem({
     };
 
     const handleNewQueryTab = (dbName: string, tableName?: string) => {
-        const initialSql = tableName ? `SELECT * FROM \`${dbName}\`.\`${tableName}\`;` : `-- ${t("mysql.newQueryTab", "新建查询")}`;
+        const initialSql = tableName ? `SELECT * FROM \`${dbName}\`.\`${tableName}\`;` : `-- ${t("mysql.newQueryTab", "New Query")}`;
 
         addTab({
             id: `query-${connection.id}-${dbName}-${Date.now()}`,

@@ -115,18 +115,18 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
             if (dbType === 'sqlite') {
                 command = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;";
                 const result = await invokeSqliteSql<SqlResult>({
-                                    connectionId,
-                                    sql: command
-                                });
+                    connectionId,
+                    sql: command
+                });
                 tableList = result.rows
                     .map(row => ({ name: Object.values(row)[0] as string }))
                     .filter(item => Boolean(item.name));
             } else {
                 command = `SHOW TABLE STATUS FROM \`${dbName}\``;
                 const result = await invokeSql<SqlResult>({
-                                    connectionId,
-                                    sql: command
-                                });
+                    connectionId,
+                    sql: command
+                });
 
                 // Robustly parse result by looking for specific keys if possible, or fallback
                 tableList = result.rows
@@ -205,7 +205,7 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
         const queryTabId = `query-${connection.id}-${dbName}-${Date.now()}`;
         const initialSql = table
             ? `SELECT * FROM \`${dbName}\`.\`${table}\`;`
-            : `-- ${t('mysql.newQueryTab', '新建查询')}\nSELECT * FROM \`${dbName}\`.table_name;`;
+            : `-- ${t('mysql.newQueryTab', 'New Query')}\nSELECT * FROM \`${dbName}\`.table_name;`;
 
         addTab({
             id: queryTabId,
@@ -232,7 +232,7 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
         try {
             const sql = `DROP TABLE \`${dbName}\`.\`${table}\``;
 
-            await invokeSql({connectionId, sql});
+            await invokeSql({ connectionId, sql });
             // 清除缓存并刷新表列表
             clearTablesCache(connectionId, dbName);
             await loadTables();
@@ -265,12 +265,12 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                         <Input
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder={t('common.searchTables', '搜索表...')}
+                            placeholder={t('common.searchTables', 'Search Tables')}
                             className="pl-8 h-8 text-sm"
                         />
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {filteredTables.length} {t('common.items', '项')}
+                        {filteredTables.length} {t('common.items', 'items')}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => loadTables()}
-                        title={t('common.refresh', '刷新')}
+                        title={t('common.refresh', 'Refresh')}
                     >
                         <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                     </Button>
@@ -291,7 +291,7 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                             onClick={() => setShowCreateTableDialog(true)}
                         >
                             <Plus className="h-3.5 w-3.5" />
-                            {t('mysql.createTable', '新建表')}
+                            {t('mysql.createTable', 'Create Table')}
                         </Button>
                     )}
                 </div>
@@ -308,12 +308,12 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                 {isLoading && tables.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
                         <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>{t('common.loading', '加载中...')}</span>
+                        <span>{t('common.loading', 'Loading...')}</span>
                     </div>
                 ) : filteredTables.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
                         <TableIcon className="h-10 w-10 opacity-20" />
-                        <span>{searchTerm ? t('common.noMatches', '未找到匹配项') : t('common.noTables', '暂无数据表')}</span>
+                        <span>{searchTerm ? t('common.noMatches', 'No matches found') : t('common.noTables', 'No tables found')}</span>
                     </div>
                 ) : (
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2 content-start">
@@ -349,20 +349,20 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
                                 <ContextMenuContent className="w-48">
                                     <ContextMenuItem onClick={() => handleSelectTable(table.name)}>
                                         <TableIcon className="mr-2 h-4 w-4" />
-                                        {t('mysql.viewData', '查看数据')}
+                                        {t('mysql.viewData', 'View Data')}
                                     </ContextMenuItem>
                                     <ContextMenuItem onClick={() => handleViewTableSchema(table.name)}>
                                         <FileCode className="mr-2 h-4 w-4" />
-                                        {t('mysql.viewSchema', '查看结构')}
+                                        {t('mysql.viewSchema', 'View Structure')}
                                     </ContextMenuItem>
                                     <ContextMenuItem onClick={() => handleNewQueryTab(table.name)}>
                                         <Play className="mr-2 h-4 w-4" />
-                                        {t('mysql.newQueryTab', '新建查询')}
+                                        {t('mysql.newQueryTab', 'New Query')}
                                     </ContextMenuItem>
                                     <ContextMenuSeparator />
                                     <ContextMenuItem onClick={() => handleDeleteTable(table.name)} className="text-red-600 focus:text-red-600">
                                         <Trash2 className="mr-2 h-4 w-4" />
-                                        {t('mysql.deleteTable', '删除表')}
+                                        {t('mysql.deleteTable', 'Delete Table')}
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             </ContextMenu>

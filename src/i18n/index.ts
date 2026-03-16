@@ -82,7 +82,13 @@ const resources = {
         "show": "Show",
         "items": "items",
         "noPrimaryKey": "No primary key, cannot edit/delete",
+        "noPrimaryKeyEditable": "Table has no primary key, cannot edit",
         "multiTableNoEdit": "Multi-table query cannot be edited directly, please use UPDATE statement",
+        "multiTableNotEditable": "Multi-table query cannot be edited directly, please use UPDATE statement",
+        "queryNotEditable": "Current query is not editable",
+        "noMatches": "No matches found",
+        "noTables": "No tables found",
+        "refresh": "Refresh",
         "light": "Light",
         "dark": "Dark",
         "system": "System",
@@ -251,6 +257,7 @@ const resources = {
         "structure": "Structure",
         "newQueryTab": "New Query",
         "createDatabase": "Create Database",
+        "createDatabaseDescription": "Create a new database with specified character set and collation",
         "createDatabaseSuccess": "Database \"{{db}}\" created successfully",
         "deleteDatabase": "Delete Database",
         "confirmDeleteDatabase": "Are you sure you want to delete database \"{{db}}\"? This action cannot be undone.",
@@ -411,17 +418,17 @@ const resources = {
         "importFailed": "Import failed partially or completely",
         "passwordsNotIncluded": "Passwords were not included in export",
         "mysql": "MySQL",
-        "mysqlPrefetchDbCount": "Prefetch Database Count",
+        "mysqlPrefetchDbCount": "Prefetch Databases Count",
         "mysqlPrefetchDbCountDesc": "Preload table info for recently accessed databases when expanding connection",
-        "showSystemDatabases": "Show System Databases",
-        "showSystemDatabasesDesc": "Show default system databases like information_schema, mysql, etc.",
+        "showSystemDatabases": "Show system databases",
+        "showSystemDatabasesDesc": "Show information_schema, mysql, performance_schema, sys, etc.",
         "all": "All",
         "redis": "Redis",
         "redisScanCount": "Scan Count",
         "redisScanCountDesc": "Number of keys to scan per request (10-10000)",
         "checkForUpdates": "Check for Updates",
         "checking": "Checking...",
-        "github": "Open Source",
+        "github": "Open Source Address",
       },
       "updater": {
         "checkFailed": {
@@ -540,7 +547,13 @@ const resources = {
         "show": "显示",
         "items": "条",
         "noPrimaryKey": "表无主键，无法编辑/删除",
+        "noPrimaryKeyEditable": "表没有主键，无法编辑",
         "multiTableNoEdit": "多表查询不支持直接编辑，请使用 UPDATE 语句",
+        "multiTableNotEditable": "多表查询不支持直接编辑，请使用 UPDATE 语句",
+        "queryNotEditable": "当前查询不支持编辑",
+        "noMatches": "未找到匹配项",
+        "noTables": "暂无数据表",
+        "refresh": "刷新",
         "light": "浅色",
         "dark": "深色",
         "system": "系统",
@@ -929,8 +942,8 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'zh', // 默认中文
-    lng: 'zh', // 强制默认中文
+    fallbackLng: 'en',
+    lng: 'en',
     interpolation: {
       escapeValue: false
     }

@@ -112,17 +112,17 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-right text-sm font-medium">{t('common.group', '分组')}</label>
+                <label className="text-right text-sm font-medium">{t('common.group', 'Group')}</label>
                 <div className="col-span-3">
                     <Select
                         value={formData.group_id?.toString() || "none"}
                         onValueChange={(value) => handleChange('group_id', value === "none" ? undefined : parseInt(value))}
                     >
                         <SelectTrigger className="w-full">
-                            <SelectValue placeholder={t('common.selectGroup', '选择分组')} />
+                            <SelectValue placeholder={t('common.selectGroup', 'Select Group')} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="none">{t('common.noGroup', '无分组')}</SelectItem>
+                            <SelectItem value="none">{t('common.noGroup', 'No Group')}</SelectItem>
                             {connectionGroups.map((group) => (
                                 <SelectItem key={group.id} value={group.id.toString()}>
                                     <div className="flex items-center gap-2">

@@ -22,7 +22,7 @@ import { toast } from "@/hooks/useToast";
 export function SettingsPage() {
   const { t } = useTranslation();
   const [checking, setChecking] = useState(false);
-  
+
   const {
     updateInfo,
     downloading,
@@ -34,7 +34,7 @@ export function SettingsPage() {
     setReadyToInstall,
     reset: resetUpdate,
   } = useUpdateStore();
-  
+
   const {
     redisScanCount,
     setRedisScanCount,
@@ -49,7 +49,7 @@ export function SettingsPage() {
     setChecking(true);
     try {
       const update = await check();
-      
+
       if (!update) {
         toast({
           title: t("updater.none.title"),
@@ -61,7 +61,7 @@ export function SettingsPage() {
 
       // 保存更新信息到状态
       setUpdateInfo({ update, version: update.version || "" });
-      
+
       toast({
         title: t("updater.available.title"),
         description: t("updater.available.description", { version: update.version }),
@@ -164,7 +164,7 @@ export function SettingsPage() {
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="mysqlPrefetchDbCount">{t('settings.mysqlPrefetchDbCount', '预取数据库数量')}</Label>
+              <Label htmlFor="mysqlPrefetchDbCount">{t('settings.mysqlPrefetchDbCount', 'Prefetch Databases Count')}</Label>
               <div className="flex items-center gap-2">
                 <Select
                   value={String(mysqlPrefetchDbCount)}
@@ -184,11 +184,11 @@ export function SettingsPage() {
                     <SelectItem value="20">20</SelectItem>
                     <SelectItem value="50">50</SelectItem>
                     <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="all">{t('settings.all', '全部')}</SelectItem>
+                    <SelectItem value="all">{t('settings.all', 'All')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">
-                  {t('settings.mysqlPrefetchDbCountDesc', '展开连接时预加载最近访问的数据库表信息')}
+                  {t('settings.mysqlPrefetchDbCountDesc', 'Preload table info for recently accessed databases when expanding connection')}
                 </span>
               </div>
             </div>
@@ -204,10 +204,10 @@ export function SettingsPage() {
                   htmlFor="showSystemDatabases"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  {t('settings.showSystemDatabases', '展示系统默认数据库')}
+                  {t('settings.showSystemDatabases', 'Show system databases')}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  {t('settings.showSystemDatabasesDesc', '展示 information_schema, mysql, performance_schema, sys 等系统内置数据库')}
+                  {t('settings.showSystemDatabasesDesc', 'Show information_schema, mysql, performance_schema, sys, etc.')}
                 </p>
               </div>
             </div>
@@ -257,9 +257,9 @@ export function SettingsPage() {
                     {t('app.name')} v{import.meta.env.PACKAGE_VERSION}
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleCheckUpdate}
                   disabled={checking || downloading}
                 >
@@ -281,15 +281,15 @@ export function SettingsPage() {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={handleCancelUpdate}
                       >
                         {t('updater.notYet')}
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={handleDownloadUpdate}
                       >
                         <Download className="h-4 w-4 mr-2" />
@@ -312,13 +312,13 @@ export function SettingsPage() {
                         <span className="text-muted-foreground">{downloadProgress}%</span>
                       </div>
                       <div className="w-full bg-secondary rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-primary h-2 rounded-full transition-all duration-300"
                           style={{ width: `${downloadProgress}%` }}
                         />
                       </div>
                     </div>
-                    
+
                     {/* 下载完成后显示安装按钮 */}
                     {readyToInstall && (
                       <div className="flex items-center justify-between pt-2">
@@ -326,15 +326,15 @@ export function SettingsPage() {
                           {t('updater.available.description', { version: updateInfo?.version || '' })}
                         </p>
                         <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={handleCancelUpdate}
                           >
                             {t('updater.notYet')}
                           </Button>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={handleInstallUpdate}
                           >
                             {t('updater.install')}
@@ -357,12 +357,12 @@ export function SettingsPage() {
             <div className="space-y-1">
               <p className="text-sm font-medium">xDB</p>
               <p className="text-sm text-muted-foreground">
-                {t('settings.github', '开源地址')}
+                {t('settings.github', 'Open Source Address')}
               </p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => openUrl('https://github.com/cuigaoshun/xDB')}
             >
               <Github className="h-4 w-4 mr-2" />

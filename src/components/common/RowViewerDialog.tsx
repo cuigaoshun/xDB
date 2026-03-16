@@ -133,7 +133,7 @@ export function RowViewerDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle>{title || t('common.viewRow', '查看行数据')}</DialogTitle>
+                    <DialogTitle>{title || t('common.viewRow', 'View Row')}</DialogTitle>
                 </DialogHeader>
 
                 {error && (
@@ -146,10 +146,10 @@ export function RowViewerDialog({
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted z-10">
                             <TableRow>
-                                <TableHead className="w-[200px] font-semibold">{t('common.field', '字段')}</TableHead>
-                                <TableHead className="w-[100px]">{t('common.type', '类型')}</TableHead>
-                                <TableHead className="w-[150px]">{t('common.comment', '注释')}</TableHead>
-                                <TableHead>{t('common.value', '值')}</TableHead>
+                                <TableHead className="w-[200px] font-semibold">{t('common.field', 'Field')}</TableHead>
+                                <TableHead className="w-[100px]">{t('common.type', 'Type')}</TableHead>
+                                <TableHead className="w-[150px]">{t('common.comment', 'Comment')}</TableHead>
+                                <TableHead>{t('common.value', 'Value')}</TableHead>
                                 {!editable && <TableHead className="w-[60px]"></TableHead>}
                             </TableRow>
                         </TableHeader>
@@ -211,7 +211,7 @@ export function RowViewerDialog({
                                                     size="sm"
                                                     className="h-6 w-6 p-0"
                                                     onClick={() => handleCopyValue(col.name, value)}
-                                                    title={t('common.copy', '复制')}
+                                                    title={t('common.copy', 'Copy')}
                                                 >
                                                     {copiedField === col.name ? (
                                                         <Check className="h-3 w-3 text-green-600" />
@@ -235,7 +235,7 @@ export function RowViewerDialog({
                             onClick={() => onOpenChange(false)}
                             disabled={isSaving}
                         >
-                            {t('common.cancel', '取消')}
+                            {t('common.cancel', 'Cancel')}
                         </Button>
                         <Button
                             onClick={handleSubmit}
@@ -245,10 +245,10 @@ export function RowViewerDialog({
                             {isSaving ? (
                                 <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    {t('common.submitting', '提交中...')}
+                                    {t('common.submitting', 'Submitting...')}
                                 </>
                             ) : (
-                                submitLabel || t('common.submit', '提交')
+                                submitLabel || t('common.submit', 'Submit')
                             )}
                         </Button>
                     </DialogFooter>

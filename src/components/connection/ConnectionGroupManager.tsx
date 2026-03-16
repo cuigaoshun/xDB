@@ -83,10 +83,10 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
     const handleUpdate = async (data: Omit<ConnectionGroup, 'id' | 'created_at'>) => {
         if (!editingGroup) return;
         try {
-            await updateConnectionGroup({ 
-                ...data, 
+            await updateConnectionGroup({
+                ...data,
                 id: editingGroup.id,
-                created_at: editingGroup.created_at 
+                created_at: editingGroup.created_at
             });
             await fetchGroups();
             setEditingGroup(null);
@@ -135,13 +135,13 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
-                        <DialogTitle>管理连接分组</DialogTitle>
+                        <DialogTitle>{t('common.manageGroups', 'Manage Groups')}</DialogTitle>
                     </DialogHeader>
 
                     <div className="py-4">
                         <div className="flex justify-between items-center mb-4">
                             <p className="text-sm text-muted-foreground">
-                                创建分组来组织您的数据库连接
+                                {t('common.manageGroupsDescription', 'Create groups to organize your database connections')}
                             </p>
                             <Button onClick={() => setIsNewGroupOpen(true)}>
                                 <Plus className="h-4 w-4 mr-2" />
@@ -173,7 +173,7 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium">{group.name}</span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    ({getConnectionCount(group.id)} 个连接)
+                                                    ({getConnectionCount(group.id)} {t('common.connectionsCount', 'connections')})
                                                 </span>
                                             </div>
                                             {group.description && (
@@ -211,7 +211,7 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
             <Dialog open={isNewGroupOpen} onOpenChange={setIsNewGroupOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>新建分组</DialogTitle>
+                        <DialogTitle>{t('common.createGroup', 'Create Group')}</DialogTitle>
                     </DialogHeader>
                     <ConnectionGroupDialog
                         onSubmit={handleCreate}
@@ -224,7 +224,7 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
             <Dialog open={!!editingGroup} onOpenChange={(open) => !open && setEditingGroup(null)}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>编辑分组</DialogTitle>
+                        <DialogTitle>{t('common.editGroup', 'Edit Group')}</DialogTitle>
                     </DialogHeader>
                     {editingGroup && (
                         <ConnectionGroupDialog

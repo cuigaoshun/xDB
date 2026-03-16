@@ -75,7 +75,7 @@ export function CreateDatabaseDialog({ open, onOpenChange, connectionId, onSucce
             }
             sql += ';';
 
-            await invokeSql({connectionId, sql});
+            await invokeSql({ connectionId, sql });
             toast({
                 title: t('common.success'),
                 description: t('mysql.createDatabaseSuccess', { db: dbName }),
@@ -99,7 +99,7 @@ export function CreateDatabaseDialog({ open, onOpenChange, connectionId, onSucce
                 <DialogHeader>
                     <DialogTitle>{t('mysql.createDatabase')}</DialogTitle>
                     <DialogDescription>
-                        Create a new database with specified character set and collation.
+                        {t('mysql.createDatabaseDescription', 'Create a new database with specified character set and collation')}
                     </DialogDescription>
                 </DialogHeader>
 

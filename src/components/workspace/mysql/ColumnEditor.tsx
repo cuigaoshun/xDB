@@ -44,13 +44,13 @@ export interface ColumnDefinition {
 
 const DATA_TYPES = [
     // 数值类型
-    { groupKey: 'mysql.dataTypeGroup.numeric', groupDefault: '数值类型', types: ['TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'DECIMAL'] },
+    { groupKey: 'mysql.dataTypeGroup.numeric', groupDefault: 'Numeric Types', types: ['TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'DECIMAL'] },
     // 字符串类型
-    { groupKey: 'mysql.dataTypeGroup.string', groupDefault: '字符串类型', types: ['CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BINARY', 'VARBINARY'] },
+    { groupKey: 'mysql.dataTypeGroup.string', groupDefault: 'String Types', types: ['CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BINARY', 'VARBINARY'] },
     // 日期时间类型
-    { groupKey: 'mysql.dataTypeGroup.datetime', groupDefault: '日期时间类型', types: ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR'] },
+    { groupKey: 'mysql.dataTypeGroup.datetime', groupDefault: 'Date/Time Types', types: ['DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR'] },
     // 其他类型
-    { groupKey: 'mysql.dataTypeGroup.other', groupDefault: '其他类型', types: ['ENUM', 'SET', 'JSON', 'BLOB', 'MEDIUMBLOB', 'LONGBLOB'] },
+    { groupKey: 'mysql.dataTypeGroup.other', groupDefault: 'Other Types', types: ['ENUM', 'SET', 'JSON', 'BLOB', 'MEDIUMBLOB', 'LONGBLOB'] },
 ];
 
 const TYPES_WITH_LENGTH = ['CHAR', 'VARCHAR', 'BINARY', 'VARBINARY', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'DECIMAL', 'FLOAT', 'DOUBLE'];
@@ -97,7 +97,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
     const hasChanges = (): boolean => {
         if (mode === 'add') return true; // 添加模式总是允许
         if (!initialDataRef.current) return true;
-        
+
         // 对比各个字段
         const initial = initialDataRef.current;
         if (columnDef.type !== initial.type) return true;
@@ -106,13 +106,13 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
         if (columnDef.defaultValue !== initial.defaultValue) return true;
         if (columnDef.autoIncrement !== initial.autoIncrement) return true;
         if (columnDef.comment !== initial.comment) return true;
-        
+
         return false;
     };
 
     const handlePreview = () => {
         if (!columnDef.name.trim()) {
-            alert(t('mysql.columnEditor.nameRequired', '列名不能为空'));
+            alert(t('mysql.columnEditor.nameRequired', 'Column name is required'));
             return;
         }
 
@@ -166,8 +166,8 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                     </DialogTitle>
                     <DialogDescription>
                         {mode === 'add'
-                            ? t('mysql.columnEditor.addDescription', '定义新列的属性')
-                            : t('mysql.columnEditor.editDescription', '修改列的属性（注意：某些修改可能导致数据丢失）')}
+                            ? t('mysql.columnEditor.addDescription', 'Define properties for the new column')
+                            : t('mysql.columnEditor.editDescription', 'Modify column properties (note: some changes may cause data loss)')}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -264,7 +264,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                                 htmlFor="nullable"
                                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                             >
-                                {t('mysql.allowNull', '允许NULL值')}
+                                {t('mysql.allowNull', 'Allow NULL')}
                             </label>
                         </div>
                     </div>
@@ -279,7 +279,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                             value={columnDef.defaultValue || ''}
                             onChange={(e) => setColumnDef({ ...columnDef, defaultValue: e.target.value })}
                             className="col-span-3"
-                            placeholder={t('mysql.defaultValuePlaceholder', '留空表示无默认值')}
+                            placeholder={t('mysql.defaultValuePlaceholder', 'Leave empty for no default')}
                         />
                     </div>
 
@@ -301,7 +301,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                                     htmlFor="auto-increment"
                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
-                                    {t('mysql.autoIncrementLabel', '自动增长（AUTO_INCREMENT）')}
+                                    {t('mysql.autoIncrementLabel', 'Auto Increment (AUTO_INCREMENT)')}
                                 </label>
                             </div>
                         </div>
@@ -317,7 +317,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                             value={columnDef.comment || ''}
                             onChange={(e) => setColumnDef({ ...columnDef, comment: e.target.value })}
                             className="col-span-3"
-                            placeholder={t('mysql.commentPlaceholder', '列的说明注释')}
+                            placeholder={t('mysql.commentPlaceholder', 'Column description/comment')}
                             rows={2}
                         />
                     </div>
@@ -343,7 +343,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="default">{t('mysql.positionDefault', '默认（最后）')}</SelectItem>
+                                        <SelectItem value="default">{t('mysql.positionDefault', 'Default (at end)')}</SelectItem>
                                         <SelectItem value="FIRST">{t('mysql.first')}</SelectItem>
                                         <SelectItem value="AFTER">{t('mysql.after')}</SelectItem>
                                     </SelectContent>
@@ -353,7 +353,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                             {columnDef.position === 'AFTER' && (
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">
-                                        {t('mysql.afterColumn', '在...之后')}
+                                        {t('mysql.afterColumn', 'After column')}
                                     </Label>
                                     <Select
                                         value={columnDef.afterColumn || existingColumns[0]}
@@ -383,7 +383,7 @@ export function ColumnEditor({ open, onOpenChange, onPreview, initialData, mode,
                         {t('common.cancel')}
                     </Button>
                     <Button onClick={handlePreview}>
-                        {mode === 'add' ? t('common.add', '添加') : t('common.confirm', '确定')}
+                        {mode === 'add' ? t('common.add', 'Add') : t('common.confirm', 'Confirm')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

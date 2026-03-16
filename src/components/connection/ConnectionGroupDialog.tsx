@@ -14,14 +14,14 @@ interface ConnectionGroupDialogProps {
 }
 
 const PRESET_COLORS = [
-    { name: '蓝色', value: '#3b82f6' },
-    { name: '绿色', value: '#10b981' },
-    { name: '红色', value: '#ef4444' },
-    { name: '黄色', value: '#f59e0b' },
-    { name: '紫色', value: '#8b5cf6' },
-    { name: '粉色', value: '#ec4899' },
-    { name: '灰色', value: '#6b7280' },
-    { name: '青色', value: '#06b6d4' },
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#10b981' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Yellow', value: '#f59e0b' },
+    { name: 'Purple', value: '#8b5cf6' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Gray', value: '#6b7280' },
+    { name: 'Cyan', value: '#06b6d4' },
 ];
 
 export function ConnectionGroupDialog({ initialData, onSubmit, onCancel, submitLabel }: ConnectionGroupDialogProps) {
@@ -59,7 +59,7 @@ export function ConnectionGroupDialog({ initialData, onSubmit, onCancel, submitL
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="col-span-3"
-                    placeholder="开发环境"
+                    placeholder={t('common.connectionGroupPlaceholder', 'e.g. Development')}
                 />
             </div>
 
@@ -75,7 +75,7 @@ export function ConnectionGroupDialog({ initialData, onSubmit, onCancel, submitL
             </div>
 
             <div className="grid grid-cols-4 items-start gap-4">
-                <label className="text-right text-sm font-medium pt-2">{t('common.color', '颜色')}</label>
+                <label className="text-right text-sm font-medium pt-2">{t('common.color', 'Color')}</label>
                 <div className="col-span-3 space-y-3">
                     <div className="flex flex-wrap gap-2">
                         {PRESET_COLORS.map((preset) => (

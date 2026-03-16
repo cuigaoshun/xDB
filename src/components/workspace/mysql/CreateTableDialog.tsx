@@ -127,7 +127,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
         try {
             const sql = generateDDL();
 
-            await invokeSql({connectionId, sql});
+            await invokeSql({ connectionId, sql });
             onSuccess?.();
             onOpenChange(false);
 
@@ -149,7 +149,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                 <DialogHeader>
                     <DialogTitle>{t('mysql.createTable')}</DialogTitle>
                     <DialogDescription>
-                        定义新表的结构和属性
+                        {t('mysql.createTableDescription', 'Define the structure and properties of the new table')}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -215,7 +215,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                             onChange={(e) => setComment(e.target.value)}
                             className="col-span-3"
                             rows={2}
-                            placeholder="表的说明注释"
+                            placeholder={t('mysql.commentPlaceholder', 'Column description/comment')}
                         />
                     </div>
 
@@ -233,7 +233,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                             {columns.map((col, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 bg-muted/20 rounded">
                                     <Input
-                                        placeholder="列名"
+                                        placeholder={t('mysql.columnNamePlaceholder', 'column_name')}
                                         value={col.name}
                                         onChange={(e) => handleColumnChange(index, 'name', e.target.value)}
                                         className="col-span-3 h-8 text-xs"
@@ -252,7 +252,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                                         </SelectContent>
                                     </Select>
                                     <Input
-                                        placeholder="长度"
+                                        placeholder={t('mysql.lengthPlaceholder', '255')}
                                         value={col.length}
                                         onChange={(e) => handleColumnChange(index, 'length', e.target.value)}
                                         className="col-span-1 h-8 text-xs"
@@ -269,7 +269,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                                             checked={col.isPrimary}
                                             onCheckedChange={(checked) => handleColumnChange(index, 'isPrimary', checked)}
                                         />
-                                        <span className="text-xs">主键</span>
+                                        <span className="text-xs">{t('mysql.primary', 'Primary Key')}</span>
                                     </div>
                                     <div className="col-span-1 flex items-center gap-2">
                                         <Checkbox

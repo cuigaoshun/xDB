@@ -471,15 +471,15 @@ export function MysqlWorkspace({
                 columns={result?.columns || []}
                 title={
                     rowEditing.rowViewerMode === "create" && rowEditing.viewingRowIndex === -1
-                        ? t("common.addRow", "新增行")
+                        ? t("common.addRow", "Add Row")
                         : ((editableState.isEditable || rowEditing.rowViewerMode === "create")
-                            ? t("common.editRow", "编辑行")
-                            : t("common.viewRow", "查看行数据"))
+                            ? t("common.editRow", "Edit Row")
+                            : t("common.viewRow", "View Row"))
                 }
                 submitLabel={
                     rowEditing.rowViewerMode === "create" && rowEditing.viewingRowIndex === -1
-                        ? t("common.add", "新增")
-                        : t("common.save", "保存")
+                        ? t("common.add", "Add")
+                        : t("common.save", "Save")
                 }
                 editable={editableState.isEditable || rowEditing.rowViewerMode === "create"}
                 onSave={rowEditing.handleRowViewerSave}

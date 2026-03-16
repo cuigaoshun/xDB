@@ -56,7 +56,7 @@ export function RedisAddKeyDialog({
         setError(null);
         setIsSubmitting(true);
 
-        
+
 
         try {
             let command = "";
@@ -214,7 +214,7 @@ export function RedisAddKeyDialog({
 
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="key-ttl" className="text-right">
-                            {t('redis.ttl', 'TTL')}
+                            {t('redis.ttl', 'TTL (seconds)')}
                         </Label>
                         <div className="col-span-3 flex items-center gap-2">
                             <Input

@@ -33,7 +33,7 @@ export function SqlPaginationBar({
     const { t } = useTranslation();
 
     return (
-        <div className="mt-1 shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-1 pl-2 shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
             {hasActiveInlineFilters ? (
                 <span>{filteredRows} / {totalRows} {t("common.rowsReturned", "rows returned")}</span>
             ) : (

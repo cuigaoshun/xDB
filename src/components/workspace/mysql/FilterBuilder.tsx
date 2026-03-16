@@ -217,8 +217,8 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="ASC">{t('common.ascending', '升序')}</SelectItem>
-                                            <SelectItem value="DESC">{t('common.descending', '降序')}</SelectItem>
+                                            <SelectItem value="ASC">{t('common.ascending', 'ASC')}</SelectItem>
+                                            <SelectItem value="DESC">{t('common.descending', 'DESC')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {onExecute && (
@@ -255,7 +255,7 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                 <>
                                     <div className="h-4 w-[1px] bg-border mx-1"></div>
                                     <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">{t('common.orderBy', '排序')}:</span>
+                                    <span className="text-xs text-muted-foreground">{t('common.orderBy', 'Order By')}:</span>
                                     <Select value={orderByField} onValueChange={setOrderByField}>
                                         <SelectTrigger className="w-[150px] h-7 text-xs">
                                             <SelectValue placeholder={t('common.selectField', '选择字段')} />
@@ -273,8 +273,8 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="ASC">{t('common.ascending', '升序')}</SelectItem>
-                                            <SelectItem value="DESC">{t('common.descending', '降序')}</SelectItem>
+                                            <SelectItem value="ASC">{t('common.ascending', 'ASC')}</SelectItem>
+                                            <SelectItem value="DESC">{t('common.descending', 'DESC')}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {onExecute && (

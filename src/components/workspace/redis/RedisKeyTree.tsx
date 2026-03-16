@@ -13,13 +13,13 @@ interface KeyDetail {
 }
 
 interface TreeNode {
-  id: string;           // 唯一标识
-  name: string;         // 当前节点显示名称
-  fullPath: string;     // 完整路径前缀
-  isLeaf: boolean;      // 是否是叶子节点（实际的 key）
-  children: TreeNode[]; // 子节点
-  keyDetail?: KeyDetail; // 叶子节点的详细信息
-  keyCount: number;     // 子节点中的 key 数量
+  id: string;           // Unique identifier
+  name: string;         // Display name
+  fullPath: string;     // Full path prefix
+  isLeaf: boolean;      // Whether it is a leaf node (actual key)
+  children: TreeNode[]; // Child nodes
+  keyDetail?: KeyDetail; // Detailed information for leaf nodes
+  keyCount: number;     // Number of keys in child nodes
 }
 
 interface FlatNode {
@@ -76,7 +76,7 @@ export function RedisKeyTree({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // 构建树结构
+  // Build tree structure
   const tree = useMemo(() => {
     const root: TreeNode = {
       id: "root",
@@ -87,7 +87,7 @@ export function RedisKeyTree({
       keyCount: 0,
     };
 
-    // 如果分隔符为空，直接返回扁平列表
+    // If delimiter is empty, return flat list directly
     if (!delimiter) {
       root.children = keys.map((key) => ({
         id: key.key,
@@ -135,7 +135,7 @@ export function RedisKeyTree({
       }
     }
 
-    // 计算每个节点的 key 数量
+    // Calculate key count for each node
     const calculateKeyCount = (node: TreeNode): number => {
       if (node.isLeaf) {
         node.keyCount = 1;
@@ -146,7 +146,7 @@ export function RedisKeyTree({
     };
     calculateKeyCount(root);
 
-    // 排序：文件夹优先，然后按名称排序
+    // Sort: folders first, then by name
     const sortChildren = (node: TreeNode) => {
       node.children.sort((a, b) => {
         if (a.isLeaf !== b.isLeaf) {
@@ -161,23 +161,23 @@ export function RedisKeyTree({
     return root;
   }, [keys, delimiter]);
 
-  // 扁平化树结构用于虚拟滚动
+  // Flatten tree structure for virtual scrolling
   const flattenedNodes = useMemo(() => {
     const result: FlatNode[] = [];
 
     const traverse = (node: TreeNode, depth: number) => {
-      // 跳过根节点
+      // Skip root node
       if (node.id !== "root") {
         const isExpanded = expandedNodes.has(node.id);
         result.push({ node, depth, isExpanded });
 
-        // 如果不是叶子节点且未展开，跳过子节点
+        // If not a leaf node and not expanded, skip children
         if (!node.isLeaf && !isExpanded) {
           return;
         }
       }
 
-      // 遍历子节点
+      // Traverse children
       for (const child of node.children) {
         traverse(child, node.id === "root" ? 0 : depth + 1);
       }
@@ -187,7 +187,7 @@ export function RedisKeyTree({
     return result;
   }, [tree, expandedNodes]);
 
-  // 切换展开/折叠
+  // Toggle expanded/collapsed
   const toggleNode = useCallback((nodeId: string) => {
     setExpandedNodes((prev) => {
       const next = new Set(prev);
@@ -200,7 +200,7 @@ export function RedisKeyTree({
     });
   }, []);
 
-  // 虚拟列表
+  // Virtual list
   const rowVirtualizer = useVirtualizer({
     count: flattenedNodes.length,
     getScrollElement: () => parentRef.current,
@@ -242,9 +242,8 @@ export function RedisKeyTree({
               }}
             >
               <div
-                className={`flex items-center h-full px-2 cursor-pointer hover:bg-accent/50 transition-colors ${
-                  isSelected ? "bg-accent" : ""
-                }`}
+                className={`flex items-center h-full px-2 cursor-pointer hover:bg-accent/50 transition-colors ${isSelected ? "bg-accent" : ""
+                  }`}
                 style={{ paddingLeft: `${depth * 16 + 8}px` }}
                 onClick={() => {
                   if (node.isLeaf && node.keyDetail) {
@@ -254,7 +253,7 @@ export function RedisKeyTree({
                   }
                 }}
               >
-                {/* 展开/折叠图标 或 占位 */}
+                {/* Expand/Collapse icon or placeholder */}
                 {!node.isLeaf ? (
                   <button
                     className="p-0.5 hover:bg-accent rounded mr-1"
@@ -273,7 +272,7 @@ export function RedisKeyTree({
                   <span className="w-5 mr-1" />
                 )}
 
-                {/* 图标 */}
+                {/* Icon */}
                 {node.isLeaf ? (
                   <Badge
                     variant="outline"
@@ -289,17 +288,16 @@ export function RedisKeyTree({
                   <Folder className="w-4 h-4 text-yellow-600 mr-2 shrink-0" />
                 )}
 
-                {/* 名称 */}
+                {/* Name */}
                 <span
-                  className={`flex-1 text-sm truncate ${
-                    node.isLeaf ? "font-mono" : "font-medium"
-                  }`}
+                  className={`flex-1 text-sm truncate ${node.isLeaf ? "font-mono" : "font-medium"
+                    }`}
                   title={node.isLeaf ? node.keyDetail?.key : node.fullPath}
                 >
                   {node.name}
                 </span>
 
-                {/* 右侧信息 */}
+                {/* Right side info */}
                 {node.isLeaf ? (
                   <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-2">
                     <span>{formatTTL(node.keyDetail?.ttl)}</span>

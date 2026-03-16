@@ -107,27 +107,27 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
             // 加载列信息
             const columnsQuery = `SHOW FULL COLUMNS FROM \`${dbName}\`.\`${tableName}\``;
             const columnsResult = await invokeSql<any>({
-                            connectionId,
-                            sql: columnsQuery
-                        });
+                connectionId,
+                sql: columnsQuery
+            });
             setColumns(columnsResult.rows || []);
 
             // 加载索引信息
             const indexesQuery = `SHOW INDEX FROM \`${dbName}\`.\`${tableName}\``;
-            
+
             const indexesResult = await invokeSql<any>({
-                            connectionId,
-                            sql: indexesQuery
-                        });
+                connectionId,
+                sql: indexesQuery
+            });
             setIndexes(indexesResult.rows || []);
 
             // 加载表注释
             const tableStatusQuery = `SHOW TABLE STATUS FROM \`${dbName}\` WHERE Name = '${tableName}'`;
-            
+
             const tableStatusResult = await invokeSql<any>({
-                            connectionId,
-                            sql: tableStatusQuery
-                        });
+                connectionId,
+                sql: tableStatusQuery
+            });
             if (tableStatusResult.rows && tableStatusResult.rows.length > 0) {
                 setTableComment(tableStatusResult.rows[0].Comment || '');
             }
@@ -154,7 +154,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
 
     const handleDeleteIndex = async (indexName: string) => {
         if (indexName === 'PRIMARY') {
-            alert(t('mysql.primary') + ' ' + t('common.delete'));
+            alert(t('mysql.primary') + ' ' + t('common.delete', 'Delete'));
             return;
         }
 
@@ -199,7 +199,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
         const fullSql = `ALTER TABLE \`${dbName}\`.\`${tableName}\` ${sqlPart}`;
         const isAdd = editorMode === 'add';
         const columnName = columnDef.name;
-        
+
         setPendingSqlOperations(prev => {
             // 查找是否已有对同一列的操作（修改列时通过 originalName 匹配，添加列时通过列名匹配）
             const existingIndex = prev.findIndex(op => {
@@ -208,22 +208,22 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                     return op.type === 'add_column' && op.originalName === columnName;
                 } else {
                     // 修改列：检查是否有修改该列的操作（通过 originalName 匹配）
-                    return (op.type === 'modify_column' || op.type === 'add_column') && 
-                           (op.originalName === columnName || 
+                    return (op.type === 'modify_column' || op.type === 'add_column') &&
+                        (op.originalName === columnName ||
                             op.description.includes(columnName));
                 }
             });
-            
+
             const newOperation: PendingSqlOperation = {
                 id: `${isAdd ? 'add' : 'mod'}_col_${Date.now()}`,
                 type: isAdd ? 'add_column' : 'modify_column',
-                description: isAdd 
-                    ? t('mysql.operation.addColumn', { column: columnDef.name }) 
+                description: isAdd
+                    ? t('mysql.operation.addColumn', { column: columnDef.name })
                     : t('mysql.operation.modifyColumn', { column: columnDef.name }),
                 sql: fullSql,
                 originalName: columnName
             };
-            
+
             if (existingIndex >= 0) {
                 // 替换已有的操作
                 const newOps = [...prev];
@@ -259,7 +259,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
         setDDLContent('Loading...');
         try {
             const sql = `SHOW CREATE TABLE \`${dbName}\`.\`${tableName}\``;
-            
+
             const result = await invokeSql<any>({
                 connectionId,
                 sql
@@ -546,7 +546,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                                             <TableHead className="w-[100px]">{t('mysql.key')}</TableHead>
                                                             <TableHead className="w-[150px]">{t('mysql.defaultValue')}</TableHead>
                                                             <TableHead className="w-[120px]">{t('mysql.extra')}</TableHead>
-                                                            <TableHead className="w-[200px]">{t('mysql.comment', '注释')}</TableHead>
+                                                            <TableHead className="w-[200px]">{t('mysql.comment', 'Comment')}</TableHead>
                                                             <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                                                         </TableRow>
                                                     </TableHeader>
@@ -562,15 +562,15 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                                                 <TableCell className="font-mono text-xs">{col.Type}</TableCell>
                                                                 <TableCell>
                                                                     {col.Null === 'YES' ? (
-                                                                        <Badge variant="outline" className="text-xs">{t('common.yes', 'YES')}</Badge>
+                                                                        <Badge variant="outline" className="text-xs">{t('common.yes', 'Yes')}</Badge>
                                                                     ) : (
-                                                                        <Badge variant="secondary" className="text-xs">{t('common.no', 'NO')}</Badge>
+                                                                        <Badge variant="secondary" className="text-xs">{t('common.no', 'No')}</Badge>
                                                                     )}
                                                                 </TableCell>
                                                                 <TableCell>
                                                                     {col.Key && (
                                                                         <Badge variant={col.Key === 'PRI' ? 'default' : 'outline'} className="text-xs">
-                                                                            {col.Key === 'PRI' ? t('mysql.primary', 'PRIMARY') : col.Key === 'UNI' ? t('mysql.unique', 'UNIQUE') : col.Key === 'MUL' ? t('mysql.index', 'INDEX') : col.Key}
+                                                                            {col.Key === 'PRI' ? t('mysql.primary', 'Primary Key') : col.Key === 'UNI' ? t('mysql.unique', 'Unique') : col.Key === 'MUL' ? t('mysql.index', 'Index') : col.Key}
                                                                         </Badge>
                                                                     )}
                                                                 </TableCell>
@@ -734,7 +734,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                         {ddlContent === 'Loading...' ? (
                                             <div className="flex items-center justify-center h-full text-muted-foreground">
                                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                Loading...
+                                                {t('common.loading', 'Loading...')}
                                             </div>
                                         ) : (
                                             <SyntaxHighlighter
@@ -807,8 +807,8 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                                             {op.type === 'drop_index' && t('mysql.dropIndex')}
                                                         </span>
                                                         <span className="font-medium">{op.originalName || op.description.split(':')[1]?.trim()}</span>
-                                                        <X 
-                                                            className="h-3 w-3 cursor-pointer hover:text-red-600 ml-1" 
+                                                        <X
+                                                            className="h-3 w-3 cursor-pointer hover:text-red-600 ml-1"
                                                             onClick={() => handleRemovePendingOperation(op.id)}
                                                         />
                                                     </Badge>
@@ -824,19 +824,19 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                                                 {((): string => {
                                                     const alterOps = pendingSqlOperations.filter(op => op.sql.startsWith('ALTER TABLE'));
                                                     if (alterOps.length === 0) return pendingSqlOperations.map(op => op.sql).join(';' + '\n');
-                                                    
+
                                                     const firstSql = alterOps[0].sql;
                                                     const tableMatch = firstSql.match(/ALTER TABLE `([^`]+)`\.`([^`]+)`/);
                                                     if (!tableMatch) return pendingSqlOperations.map(op => op.sql).join(';\n');
-                                                    
+
                                                     const [, db, table] = tableMatch;
                                                     const clauses = alterOps.map(op => {
                                                         const match = op.sql.match(/ALTER TABLE `[^`]+`\.`[^`]+` (.+)/);
                                                         return match ? match[1] : '';
                                                     }).filter(Boolean);
-                                                    
+
                                                     const rawSql = `ALTER TABLE \`${db}\`.\`${table}\` ${clauses.join(', ')};`;
-                                                    
+
                                                     // 使用 sql-formatter 美化 SQL
                                                     try {
                                                         return format(rawSql, {

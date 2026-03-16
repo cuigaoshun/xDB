@@ -175,11 +175,11 @@ export function useMysqlWorkspaceQuery({
 
             if (isNonSelectStatement && (!mergedData.columns || mergedData.columns.length === 0)) {
                 const statementType = trimmedUpper.split(/\s+/)[0];
-                const affectedInfo = mergedData.affected_rows > 0 ? `，影响行数: ${mergedData.affected_rows}` : "";
-                const message = `${statementType} 语句执行成功${affectedInfo}`;
+                const affectedInfo = mergedData.affected_rows > 0 ? `, ${t('mysql.affectedRows', 'affected rows')}: ${mergedData.affected_rows}` : "";
+                const message = `${statementType} ${t('mysql.statementExecutedSuccessfully', 'statement executed successfully')}${affectedInfo}`;
                 setSuccessMessage(message);
                 toast({
-                    title: t("common.success", "执行成功"),
+                    title: t("common.success", "Success"),
                     description: message,
                     duration: 3000,
                 });
@@ -192,9 +192,9 @@ export function useMysqlWorkspaceQuery({
                 : [];
 
             setEditableState(resolveEditableState(query, keys, Boolean(dbName && tableName), {
-                noPrimaryKey: t("common.noPrimaryKeyEditable", "表没有主键，无法编辑"),
-                multiTable: t("common.multiTableNotEditable", "多表查询不支持直接编辑，请使用 UPDATE 语句"),
-                unsupported: t("common.queryNotEditable", "当前查询不支持编辑"),
+                noPrimaryKey: t("common.noPrimaryKeyEditable", "Table has no primary key, cannot edit"),
+                multiTable: t("common.multiTableNotEditable", "Multi-table query does not support direct editing, please use UPDATE statement"),
+                unsupported: t("common.queryNotEditable", "Current query is not editable"),
             }));
 
             return mergedData;

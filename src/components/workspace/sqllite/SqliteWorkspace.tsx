@@ -116,7 +116,7 @@ export function SqliteWorkspace({
     const hasActiveInlineFilters = useMemo(() => Object.values(inlineFilters).some((value) => value.trim() !== ""), [inlineFilters]);
     const uniqueColumnValueMap = useMemo(() => (result ? buildUniqueColumnValueMap(result.columns, result.rows) : {}), [result]);
     const ddlPanelRef = useDDLPanelResize(ddl, showDDL, isLoadingDDL);
-    const noPrimaryKeyMessage = t("common.noPrimaryKey", "无法更新/删除：表没有主键");
+    const noPrimaryKeyMessage = t("common.noPrimaryKey", "Cannot update/delete: Table has no primary key");
 
     const setEditorSqlValue = useCallback((sql: string) => {
         if (editorRef.current) {
@@ -213,16 +213,16 @@ export function SqliteWorkspace({
                 const message = `${statementType} 语句执行成功${affectedInfo}`;
                 setSuccessMessage(message);
                 toast({
-                    title: t("common.success", "执行成功"),
+                    title: t("common.success", "Success"),
                     description: message,
                     duration: 3000,
                 });
             }
             const keys = tableName ? (options?.knownKeys || prefetchedKeys || await detectPrimaryKeys()) : [];
             setEditableState(resolveEditableState(query, keys, Boolean(tableName), {
-                noPrimaryKey: t("common.noPrimaryKeyEditable", "表没有主键，无法编辑"),
-                multiTable: t("common.multiTableNotEditable", "多表查询不支持直接编辑，请使用 UPDATE 语句"),
-                unsupported: t("common.queryNotEditable", "当前查询不支持编辑"),
+                noPrimaryKey: t("common.noPrimaryKeyEditable", "Table has no primary key, cannot edit"),
+                multiTable: t("common.multiTableNotEditable", "Multi-table query cannot be edited directly, please use UPDATE statement"),
+                unsupported: t("common.queryNotEditable", "Current query is not editable"),
             }));
             return mergedData;
         } catch (queryError: any) {
@@ -504,7 +504,7 @@ export function SqliteWorkspace({
         try {
             const columns = await ensureTableColumns();
             if (columns.length === 0) {
-                setError(t("common.noColumnsFound", "未找到表的列信息，无法新增行"));
+                setError(t("common.noColumnsFound", "No columns found, cannot add row"));
                 return;
             }
             const emptyRow = columns.reduce<Record<string, any>>((row, column) => {
@@ -637,7 +637,7 @@ export function SqliteWorkspace({
             await refresh(executedSql);
         }
         if (failedRows.length > 0) {
-            setError(t("common.someRowsFailed", "部分行提交失败，请检查数据。"));
+            setError(t("common.someRowsFailed", "Some rows failed to submit, please check data."));
         }
     }, [connectionId, executedSql, newRows, refresh, t, tableName]);
 
