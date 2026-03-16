@@ -129,7 +129,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   updateTab: (id, updates) => set((state) => ({
-    tabs: state.tabs.map(t => t.id === id ? { ...t, ...updates } : t)
+    tabs: state.tabs.map((t) => {
+      if (t.id !== id) return t;
+
+      return {
+        ...t,
+        ...updates,
+        savedResult: updates.savedResult === undefined
+          ? t.savedResult
+          : {
+            ...(t.savedResult ?? {}),
+            ...updates.savedResult,
+          },
+      };
+    })
   })),
 
   replaceTab: (oldId, newTab) => set((state) => {

@@ -15,6 +15,7 @@ interface MysqlWorkspaceToolbarProps {
     selectedCount: number;
     newRowsCount: number;
     showDDL: boolean;
+    showSchemaButton?: boolean;
     onExecute: () => void;
     onFormatSql: () => void;
     onAddRow: () => void;
@@ -37,6 +38,7 @@ export function MysqlWorkspaceToolbar({
     selectedCount,
     newRowsCount,
     showDDL,
+    showSchemaButton = true,
     onExecute,
     onFormatSql,
     onAddRow,
@@ -161,15 +163,17 @@ export function MysqlWorkspaceToolbar({
             <div className="flex gap-2 items-center">
                 {tableName && connection && (
                     <>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onOpenSchemaTab}
-                            title={t("mysql.viewSchema")}
-                        >
-                            <Database className="h-4 w-4 mr-1" />
-                            {t("mysql.structure", "Structure")}
-                        </Button>
+                        {showSchemaButton && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={onOpenSchemaTab}
+                                title={t("mysql.viewSchema")}
+                            >
+                                <Database className="h-4 w-4 mr-1" />
+                                {t("mysql.structure", "Structure")}
+                            </Button>
+                        )}
                         <Button
                             variant={showDDL ? "secondary" : "ghost"}
                             size="sm"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -67,6 +67,11 @@ export function RedisSetViewer({
   // Inline edit state
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  const members = useMemo(
+    () => data.map((member) => String(member)),
+    [data]
+  );
 
   const handleAdd = async () => {
     try {
@@ -190,8 +195,7 @@ export function RedisSetViewer({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((member, i) => {
-              const memberStr = String(member);
+            {members.map((memberStr, i) => {
               const isEditing = editingMember === memberStr;
               return (
                 <TableRow key={`${memberStr}-${i}`} className="group hover:bg-muted/50">
@@ -280,7 +284,7 @@ export function RedisSetViewer({
                 </TableRow>
               );
             })}
-            {data.length === 0 && !loading && (
+            {members.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={2} className="text-center text-muted-foreground h-24">
                   {t('redis.noMembers')}

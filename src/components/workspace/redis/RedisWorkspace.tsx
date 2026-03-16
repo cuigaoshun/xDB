@@ -68,6 +68,9 @@ interface ScanResult {
   keys: KeyDetail[];
 }
 
+const MAX_PERSISTED_KEYS = 200;
+const MAX_PERSISTED_VALUES = 200;
+
 // Pure function - extract outside component to avoid recreation
 const getSearchPattern = (searchTerm: string): string => {
   if (!searchTerm.trim()) {
@@ -113,7 +116,7 @@ const KEY_ITEM_HEIGHT = 52; // Fixed height for each key item
 export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult }: { tabId: string; name: string; connectionId: number; db?: number; savedResult?: any }) {
   const { t } = useTranslation();
   const [keys, setKeys] = useState<KeyDetail[]>(savedResult?.keys || []);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState(savedResult?.filter || "");
   const [cursor, setCursor] = useState<string>(savedResult?.cursor || "0");
   const [hasMore, setHasMore] = useState(savedResult?.hasMore ?? true);
   const [selectedKey, setSelectedKey] = useState<string | null>(savedResult?.selectedKey || null);
@@ -130,8 +133,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
   // Scan state for complex data types
   const [valueCursor, setValueCursor] = useState<string>(savedResult?.valueCursor || "0");
-  const [valueHasMore, setValueHasMore] = useState(true);
-  const [valueFilter, setValueFilter] = useState<string>("");
+  const [valueHasMore, setValueHasMore] = useState(savedResult?.valueHasMore ?? true);
+  const [valueFilter, setValueFilter] = useState<string>(savedResult?.valueFilter || "");
   const [allValues, setAllValues] = useState<any[]>(savedResult?.allValues || []);
   const [totalItemCount, setTotalItemCount] = useState<number | null>(null);
 
@@ -158,7 +161,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   }, [redisSearchHistory, connectionId, db]);
 
   // 新增状态：精确搜索和是否已搜索
-  const [exactSearch, setExactSearch] = useState(false);
+  const [exactSearch, setExactSearch] = useState(savedResult?.exactSearch ?? false);
   const [hasSearched, setHasSearched] = useState(savedResult?.hasSearched ?? false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -179,37 +182,6 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   // 显示 Scan More 按钮的条件：非精确搜索 + 搜索框非空 + 已搜索
   // hasMore 只决定按钮是否可点击，不决定是否显示
   const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched;
-
-  // Sync keys state to global store
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateTab(tabId, {
-        savedResult: {
-          keys,
-          cursor,
-          hasMore,
-          lastScannedFilter,
-          hasSearched
-        }
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [keys, cursor, hasMore, lastScannedFilter, hasSearched, tabId, updateTab]);
-
-  // Sync value state to global store (separate effect to reduce updates)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      updateTab(tabId, {
-        savedResult: {
-          selectedKey,
-          selectedValue,
-          allValues,
-          valueCursor
-        }
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [selectedKey, selectedValue, allValues, valueCursor, tabId, updateTab]);
 
   // Refs for stable access in callbacks
   const loadingRef = useRef(loading);
@@ -234,14 +206,70 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   valueFilterRef.current = valueFilter;
   const selectedKeyRef = useRef(selectedKey);
   selectedKeyRef.current = selectedKey;
-  const keysRef = useRef(keys);
-  keysRef.current = keys;
+
+  const selectedKeyItem = useMemo(
+    () => keys.find((k) => k.key === selectedKey),
+    [keys, selectedKey]
+  );
+
+  const selectedKeyItemRef = useRef<KeyDetail | undefined>(selectedKeyItem);
+  selectedKeyItemRef.current = selectedKeyItem;
+
+  const keyRequestIdRef = useRef(0);
+  const valueRequestIdRef = useRef(0);
+
+  const createValueRequestToken = useCallback(() => {
+    valueRequestIdRef.current += 1;
+    return valueRequestIdRef.current;
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateTab(tabId, {
+        savedResult: {
+          filter,
+          exactSearch,
+          keys: keys.length <= MAX_PERSISTED_KEYS ? keys : [],
+          cursor,
+          hasMore,
+          lastScannedFilter,
+          hasSearched,
+          selectedKey,
+          selectedValue: selectedKeyItem?.type === "string" ? selectedValue : null,
+          valueCursor,
+          valueHasMore,
+          valueFilter,
+          allValues: allValues.length <= MAX_PERSISTED_VALUES ? allValues : [],
+        }
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [
+    allValues,
+    cursor,
+    exactSearch,
+    filter,
+    hasMore,
+    hasSearched,
+    keys,
+    lastScannedFilter,
+    selectedKey,
+    selectedKeyItem?.type,
+    selectedValue,
+    tabId,
+    updateTab,
+    valueCursor,
+    valueFilter,
+    valueHasMore,
+  ]);
 
   const fetchKeys = useCallback(async (reset = false) => {
     if (loadingRef.current) return;
     if (!reset && !hasMoreRef.current) return;
 
     setLoading(true);
+    const requestId = ++keyRequestIdRef.current;
 
     const currentFilter = filterRef.current;
     const useExactSearch = exactSearchRef.current && currentFilter.trim() !== "";
@@ -264,11 +292,14 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
             keys: [searchTerm],
             db,
           });
+          if (requestId !== keyRequestIdRef.current) return;
           setKeys(keyDetails);
         } else {
+          if (requestId !== keyRequestIdRef.current) return;
           setKeys([]);
         }
 
+        if (requestId !== keyRequestIdRef.current) return;
         setHasMore(false);
         setCursor("0");
 
@@ -287,6 +318,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           db,
         });
 
+        if (requestId !== keyRequestIdRef.current) return;
+
         if (reset) {
           setKeys(result.keys);
         } else {
@@ -302,11 +335,15 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         // Log command to console
       }
     } catch (e) {
-      console.error("Failed to fetch keys", e);
+      if (requestId === keyRequestIdRef.current) {
+        console.error("Failed to fetch keys", e);
+      }
 
       // Log error command
     } finally {
-      setLoading(false);
+      if (requestId === keyRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [connectionId, db, redisScanCount]);
 
@@ -327,7 +364,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       console.error("Failed to delete key", error);
       toast({ title: t('redis.deleteFailed'), description: String(error), variant: 'destructive' });
     }
-  }, [connectionId, db, selectedKey, fetchKeys]);
+  }, [connectionId, db, selectedKey, t]);
 
   const handleUpdateTTL = useCallback(async () => {
     if (!selectedKey) return;
@@ -380,13 +417,13 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
   const fetchComplexValues = useCallback(async (reset = false, forcedType?: string) => {
     const currentSelectedKey = selectedKeyRef.current;
-    const currentKeys = keysRef.current;
-    const currentKeyItem = currentKeys.find((k) => k.key === currentSelectedKey);
+    const currentKeyItem = selectedKeyItemRef.current;
     if (!currentSelectedKey || !currentKeyItem) return;
     if (valueLoadingRef.current) return;
     if (!reset && !valueHasMoreRef.current) return;
 
     setValueLoading(true);
+    const requestId = createValueRequestToken();
     const currentCursor = reset ? "0" : valueCursorRef.current;
 
     // Determine search strategy for complex values
@@ -435,6 +472,10 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         return;
       }
 
+      if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+        return;
+      }
+
       let filteredValues = result.values;
 
       if (reset) {
@@ -464,10 +505,15 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                 args: [currentSelectedKey],
                 db,
               });
+              if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+                return;
+              }
               setTotalItemCount(Number(res.output));
             } catch (e) {
-              console.error(e);
-              setTotalItemCount(null);
+              if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+                console.error(e);
+                setTotalItemCount(null);
+              }
             }
           } else {
             setTotalItemCount(null);
@@ -483,24 +529,28 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
       // Log command to console
     } catch (e) {
-      console.error("Failed to fetch complex values", e);
+      if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+        console.error("Failed to fetch complex values", e);
+      }
 
       // Log error command
     } finally {
-      setValueLoading(false);
+      if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+        setValueLoading(false);
+      }
     }
-  }, [connectionId, db]);
+  }, [connectionId, createValueRequestToken, db]);
 
   const fetchListValues = useCallback(async (start = 0, end = 99, forcedType?: string) => {
     const currentSelectedKey = selectedKeyRef.current;
-    const currentKeys = keysRef.current;
-    const currentKeyItem = currentKeys.find((k) => k.key === currentSelectedKey);
+    const currentKeyItem = selectedKeyItemRef.current;
     if (!currentSelectedKey || !currentKeyItem) return;
     const type = forcedType || currentKeyItem.type;
     if (type !== "list") return;
     if (valueLoadingRef.current) return;
 
     setValueLoading(true);
+    const requestId = createValueRequestToken();
 
     try {
       const result = await invokeScanListValues<RedisResult>({
@@ -510,6 +560,10 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         end,
         db,
       });
+
+      if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+        return;
+      }
 
       setAllValues(result.output);
       const hasMoreData = result.output.length === end - start + 1;
@@ -525,9 +579,14 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
               args: [currentSelectedKey],
               db,
             });
+            if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+              return;
+            }
             setTotalItemCount(Number(res.output));
           } catch (e) {
-            console.error(e);
+            if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+              console.error(e);
+            }
           }
         } else {
           setTotalItemCount(result.output.length);
@@ -536,13 +595,17 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
       // Log command to console
     } catch (e) {
-      console.error("Failed to fetch list values", e);
+      if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+        console.error("Failed to fetch list values", e);
+      }
 
       // Log error command
     } finally {
-      setValueLoading(false);
+      if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+        setValueLoading(false);
+      }
     }
-  }, [connectionId, db]);
+  }, [connectionId, createValueRequestToken, db]);
 
   // Precision control for fetchKeys using refs to handle Strict Mode and dependencies
   const propsRef = useRef({ connectionId, db, initialized: false });
@@ -586,8 +649,38 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     setValueFilter("");
     setTotalItemCount(null);
 
-    const currentKeyItem = keys.find((k) => k.key === selectedKey);
+    const currentKeyItem = selectedKeyItemRef.current;
     if (!currentKeyItem) return;
+
+    if (currentKeyItem.type === "string") {
+      const requestId = createValueRequestToken();
+      setValueLoading(true);
+
+      invokeRedisCommand<RedisResult>({
+        connectionId,
+        command: "GET",
+        args: [selectedKey],
+        db,
+      }).then((valRes) => {
+        if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== selectedKey) {
+          return;
+        }
+
+        setSelectedValue(valRes.output);
+      }).catch((error) => {
+        if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== selectedKey) {
+          return;
+        }
+
+        console.error("Failed to fetch value", error);
+        setSelectedValue(t('common.errorFetching'));
+      }).finally(() => {
+        if (requestId === valueRequestIdRef.current && selectedKeyRef.current === selectedKey) {
+          setValueLoading(false);
+        }
+      });
+      return;
+    }
 
     if (currentKeyItem.type === "list") {
       fetchListValues(0, 99);
@@ -598,8 +691,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       // Immediate fetch on key change
       fetchComplexValues(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey]);
+  }, [connectionId, createValueRequestToken, db, fetchComplexValues, fetchListValues, selectedKey, t]);
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const valueObserverTarget = useRef<HTMLDivElement>(null);
@@ -630,7 +722,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        const currentKeyItem = keys.find((k) => k.key === selectedKey);
+        const currentKeyItem = selectedKeyItemRef.current;
         
         // 检查列表是否有滚动条（内容超出容器）
         const parent = valueObserverTarget.current?.parentElement;
@@ -650,9 +742,9 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     }
 
     return () => observer.disconnect();
-  }, [valueHasMore, valueLoading, fetchComplexValues, selectedKey, keys]);
+  }, [valueHasMore, valueLoading, fetchComplexValues, selectedKey]);
 
-  const handleKeyClick = useCallback(async (keyItem: KeyDetail) => {
+  const handleKeyClick = useCallback((keyItem: KeyDetail) => {
     setSelectedKey(keyItem.key);
     setSelectedValue(null);
 
@@ -661,35 +753,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     setValueHasMore(true);
     setValueFilter("");
     setAllValues([]);
-
-    const type = keyItem.type || "string";
-
-    if (type === "string") {
-      // For string type, use original logic
-      setValueLoading(true);
-
-
-      try {
-        const valRes = await invokeRedisCommand<RedisResult>({
-          connectionId,
-          command: "GET",
-          args: [keyItem.key],
-          db,
-        });
-        setSelectedValue(valRes.output);
-
-        // Log command to console
-      } catch (error) {
-        console.error("Failed to fetch value", error);
-        setSelectedValue(t('common.errorFetching'));
-
-        // Log error command
-      } finally {
-        setValueLoading(false);
-      }
-    }
-    // List and complex types are handled by useEffect
-  }, [connectionId, db, t]);
+  }, []);
 
   const formatTTL = useCallback((seconds?: number): string => {
     if (seconds === undefined || seconds === null) return "-";
@@ -709,17 +773,13 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     return `${s}s`;
   }, [t]);
 
-  const selectedKeyItem = useMemo(
-    () => keys.find((k) => k.key === selectedKey),
-    [keys, selectedKey]
-  );
-
   // P1: Extract onRefresh callback to avoid recreation on each render
   const handleRefresh = useCallback(() => {
     const currentSelectedKey = selectedKeyRef.current;
-    const currentKeys = keysRef.current;
-    const currentKeyItem = currentKeys.find((k) => k.key === currentSelectedKey);
+    const currentKeyItem = selectedKeyItemRef.current;
     if (!currentSelectedKey || !currentKeyItem) return;
+
+    const requestId = createValueRequestToken();
 
     // Refresh key details (TTL, length, etc)
     invokeGetKeysDetails<KeyDetail[]>({
@@ -727,6 +787,10 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       keys: [currentSelectedKey],
       db,
     }).then(details => {
+      if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+        return;
+      }
+
       let updatedType = currentKeyItem.type;
       if (details && details.length > 0) {
         const isAutoDeleted = details[0].type === "none" && currentKeyItem.type !== "none";
@@ -753,11 +817,19 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           args: [currentSelectedKey],
           db,
         }).then(valRes => {
+          if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+            return;
+          }
           setSelectedValue(valRes.output);
         }).catch(error => {
+          if (requestId !== valueRequestIdRef.current || selectedKeyRef.current !== currentSelectedKey) {
+            return;
+          }
           console.error("Failed to refresh string value", error);
         }).finally(() => {
-          setValueLoading(false);
+          if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+            setValueLoading(false);
+          }
         });
       } else if (updatedType === "list") {
         fetchListValues(0, 99, updatedType);
@@ -765,9 +837,11 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         fetchComplexValues(true, updatedType);
       }
     }).catch(error => {
-      console.error("Failed to refresh key details", error);
+      if (requestId === valueRequestIdRef.current && selectedKeyRef.current === currentSelectedKey) {
+        console.error("Failed to refresh key details", error);
+      }
     });
-  }, [connectionId, db, fetchListValues, fetchComplexValues]);
+  }, [connectionId, createValueRequestToken, db, fetchListValues, fetchComplexValues]);
 
   // Virtual list parent ref
   const parentRef = useRef<HTMLDivElement>(null);

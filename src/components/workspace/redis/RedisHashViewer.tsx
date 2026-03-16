@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -67,10 +67,13 @@ export function RedisHashViewer({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parse flat array into objects for easier rendering
-  const pairs = [];
-  for (let i = 0; i < data.length; i += 2) {
-    pairs.push({ field: String(data[i]), value: String(data[i + 1]) });
-  }
+  const pairs = useMemo(() => {
+    const nextPairs = [];
+    for (let i = 0; i < data.length; i += 2) {
+      nextPairs.push({ field: String(data[i]), value: String(data[i + 1]) });
+    }
+    return nextPairs;
+  }, [data]);
 
   const handleSave = async (field: string, value: string) => {
     try {

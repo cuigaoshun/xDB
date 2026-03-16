@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -68,10 +68,13 @@ export function RedisZSetViewer({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parse flat array
-  const members = [];
-  for (let i = 0; i < data.length; i += 2) {
-    members.push({ member: String(data[i]), score: String(data[i + 1]) });
-  }
+  const members = useMemo(() => {
+    const nextMembers = [];
+    for (let i = 0; i < data.length; i += 2) {
+      nextMembers.push({ member: String(data[i]), score: String(data[i + 1]) });
+    }
+    return nextMembers;
+  }, [data]);
 
   const handleSave = async (member: string, score: string) => {
     try {

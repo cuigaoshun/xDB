@@ -1,29 +1,32 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button.tsx";
-import { Play, Loader2, FileCode, Hash, Type, Calendar, Binary, Trash2, Plus, Copy, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
-import { Textarea } from "@/components/ui/textarea.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table.tsx";
+import { Binary, Calendar, Hash, Type, CheckCircle2, X } from "lucide-react";
+import { format as formatSql } from "sql-formatter";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable.tsx";
-import { cn } from "@/lib/utils.ts";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from "@/components/theme/ThemeProvider.tsx";
+import { FilterBuilder } from "@/components/workspace/mysql/FilterBuilder.tsx";
+import { TextFormatterDialog } from "@/components/common/TextFormatterDialog.tsx";
+import { RowViewerDialog } from "@/components/common/RowViewerDialog.tsx";
+import { useIsDarkTheme } from "@/hooks/useIsDarkTheme.ts";
 import { useAppStore } from "@/store/useAppStore.ts";
-import { confirm } from "@/hooks/useToast.ts";
-import type { SqlResult } from "@/types/sql";
+import { confirm, toast } from "@/hooks/useToast.ts";
+import type { EditableState, EditingCell, SchemaColumnMeta, SqlResult } from "@/types/sql";
 import { DEFAULT_PAGE_SIZE, DEBOUNCE_DELAY } from "@/constants/workspace";
 import { autoAddLimit } from "@/hooks/usePagination";
+import { useDDLPanelResize } from "@/hooks/useDDLPanelResize";
 import { invokeSqliteSql } from "@/lib/api.ts";
+import {
+    buildFilteredRowEntries,
+    buildUniqueColumnValueMap,
+    extractSchemaMetadata,
+    haveColumnsChanged,
+    mergeSqlResultWithSchema,
+    resolveEditableState,
+} from "@/components/workspace/mysql/utils/resultTable";
+import { MysqlWorkspaceToolbar } from "@/components/workspace/mysql/components/MysqlWorkspaceToolbar.tsx";
+import { MysqlQueryEditor } from "@/components/workspace/mysql/components/MysqlQueryEditor.tsx";
+import { MysqlResultTable } from "@/components/workspace/mysql/components/MysqlResultTable.tsx";
+import { MysqlPaginationBar } from "@/components/workspace/mysql/components/MysqlPaginationBar.tsx";
+import { MysqlDdlPanel } from "@/components/workspace/mysql/components/MysqlDdlPanel.tsx";
 
 interface SqliteWorkspaceProps {
     tabId: string;
@@ -36,825 +39,854 @@ interface SqliteWorkspaceProps {
     savedResult?: SqlResult;
 }
 
-export function SqliteWorkspace({ tabId, name, connectionId, initialSql, savedSql, dbName, tableName, savedResult }: SqliteWorkspaceProps) {
-    const { t } = useTranslation();
-    const { theme } = useTheme();
-    const updateTab = useAppStore(state => state.updateTab);
+type RowViewerMode = "view" | "edit" | "create";
+type ViewingRowSource = "existing" | "new";
 
-    const [sql, setSql] = useState(savedSql || initialSql || "SELECT * FROM sqlite_master LIMIT 10;");
+function escapeSqliteIdentifier(identifier: string) {
+    return `"${identifier.replace(/"/g, "\"\"")}"`;
+}
+
+function toSqliteLiteral(value: any) {
+    if (value === null || value === undefined) {
+        return "NULL";
+    }
+    const rawValue = typeof value === "object" ? JSON.stringify(value) : String(value);
+    return `'${rawValue.replace(/'/g, "''")}'`;
+}
+
+function normalizeSqliteValue(value: any) {
+    return value === "" ? null : value;
+}
+
+export function SqliteWorkspace({
+    tabId,
+    name,
+    connectionId,
+    initialSql,
+    savedSql,
+    dbName,
+    tableName,
+    savedResult,
+}: SqliteWorkspaceProps) {
+    const { t } = useTranslation();
+    const isDark = useIsDarkTheme();
+    const updateTab = useAppStore((state) => state.updateTab);
+    const connection = useAppStore((state) => state.connections.find((item) => item.id === connectionId));
+
+    const connectionName = connection?.name || name;
+    const defaultSqlRef = useRef(savedSql || initialSql || "SELECT * FROM sqlite_master LIMIT 10;");
+    const editorRef = useRef<any>(null);
+    const sqlSyncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const schemaColumnsRef = useRef<SchemaColumnMeta[]>([]);
+    const initialSqlExecuted = useRef(false);
+
     const [result, setResult] = useState<SqlResult | null>(savedResult || null);
+    const [executedSql, setExecutedSql] = useState(savedSql || initialSql || "SELECT * FROM sqlite_master LIMIT 10;");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // 编辑状态
-    const [editingCell, setEditingCell] = useState<{ rowIdx: number, colName: string, isNewRow: boolean } | null>(null);
-    const [editValue, setEditValue] = useState<string>('');
-    const [, setOriginalRows] = useState<Record<string, any>[]>([]);
-
-    // 新增行状态
-    const [newRows, setNewRows] = useState<Record<string, any>[]>([]);
-    const [selectedRowIndices, setSelectedRowIndices] = useState<number[]>([]);
-
-    // 分页状态
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [pageSizeInput, setPageSizeInput] = useState(String(DEFAULT_PAGE_SIZE));
-
-    // 主键信息
+    const [inlineFilters, setInlineFilters] = useState<Record<string, string>>({});
+    const [showDDL, setShowDDL] = useState(false);
+    const [ddl, setDdl] = useState("");
+    const [isLoadingDDL, setIsLoadingDDL] = useState(false);
     const [primaryKeys, setPrimaryKeys] = useState<string[]>([]);
+    const [filterColumns, setFilterColumns] = useState(result?.columns || []);
+    const [isLoadingFilterColumns, setIsLoadingFilterColumns] = useState(false);
+    const [editableState, setEditableState] = useState<EditableState>({ isEditable: false, reason: "" });
+    const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+    const [editValue, setEditValue] = useState("");
+    const [newRows, setNewRows] = useState<Record<string, any>[]>([]);
+    const [selectedRowIndices, setSelectedRowIndices] = useState<number[]>([]);
+    const [rowViewerOpen, setRowViewerOpen] = useState(false);
+    const [rowViewerMode, setRowViewerMode] = useState<RowViewerMode>("view");
+    const [viewingRowSource, setViewingRowSource] = useState<ViewingRowSource>("existing");
+    const [viewingRow, setViewingRow] = useState<Record<string, any> | null>(null);
+    const [viewingRowIndex, setViewingRowIndex] = useState(-1);
+    const [formatterOpen, setFormatterOpen] = useState(false);
+    const [formatterContent, setFormatterContent] = useState("");
+    const [formatterReadOnly, setFormatterReadOnly] = useState(false);
+    const [formatterOnSave, setFormatterOnSave] = useState<((val: string) => Promise<void>) | undefined>(undefined);
+    const [formatterTitle, setFormatterTitle] = useState("");
 
-    // Sync SQL changes to global store (debounced)
+    const selectedRowIndexSet = useMemo(() => new Set(selectedRowIndices), [selectedRowIndices]);
+    const filteredRowEntries = useMemo(() => (result ? buildFilteredRowEntries(result.rows, inlineFilters) : []), [inlineFilters, result]);
+    const hasActiveInlineFilters = useMemo(() => Object.values(inlineFilters).some((value) => value.trim() !== ""), [inlineFilters]);
+    const uniqueColumnValueMap = useMemo(() => (result ? buildUniqueColumnValueMap(result.columns, result.rows) : {}), [result]);
+    const ddlPanelRef = useDDLPanelResize(ddl, showDDL, isLoadingDDL);
+    const noPrimaryKeyMessage = t("common.noPrimaryKey", "无法更新/删除：表没有主键");
+
+    const setEditorSqlValue = useCallback((sql: string) => {
+        if (editorRef.current) {
+            editorRef.current.setValue(sql);
+        } else {
+            defaultSqlRef.current = sql;
+        }
+    }, []);
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            updateTab(tabId, { currentSql: sql, savedResult: result });
+            updateTab(tabId, { savedResult: result });
         }, DEBOUNCE_DELAY);
         return () => clearTimeout(timer);
-    }, [sql, result, tabId, updateTab]);
+    }, [result, tabId, updateTab]);
 
-    // Determine effective theme for syntax highlighter
-    const [isDark, setIsDark] = useState(true);
-
-    useEffect(() => {
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            setIsDark(mediaQuery.matches);
-
-            const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
-            mediaQuery.addEventListener('change', handler);
-            return () => mediaQuery.removeEventListener('change', handler);
-        } else {
-            setIsDark(theme === 'dark');
+    const detectPrimaryKeys = useCallback(async () => {
+        if (!tableName) {
+            setPrimaryKeys([]);
+            setFilterColumns([]);
+            schemaColumnsRef.current = [];
+            return [];
         }
-    }, [theme]);
-
-    // Helper to remove background from theme for seamless integration
-    const transparentTheme = (theme: any) => {
-        const newTheme = { ...theme };
-        // Override pre and code blocks to be transparent
-        const transparent = { background: 'transparent', textShadow: 'none' };
-
-        if (newTheme['pre[class*="language-"]']) {
-            newTheme['pre[class*="language-"]'] = { ...newTheme['pre[class*="language-"]'], ...transparent };
+        setIsLoadingFilterColumns(true);
+        try {
+            const schemaResult = await invokeSqliteSql<SqlResult>({
+                connectionId,
+                sql: `PRAGMA table_info(${toSqliteLiteral(tableName)})`,
+            });
+            const metadata = extractSchemaMetadata(
+                schemaResult.rows.map((row) => ({
+                    Field: row.name,
+                    Type: row.type,
+                    Key: Number(row.pk) > 0 ? "PRI" : "",
+                    Comment: "",
+                })),
+            );
+            schemaColumnsRef.current = metadata.schemaColumns;
+            setFilterColumns(metadata.columns);
+            setPrimaryKeys(metadata.primaryKeys);
+            return metadata.primaryKeys;
+        } catch (schemaError) {
+            console.error("Failed to detect SQLite primary keys:", schemaError);
+            setPrimaryKeys([]);
+            return [];
+        } finally {
+            setIsLoadingFilterColumns(false);
         }
-        if (newTheme['code[class*="language-"]']) {
-            newTheme['code[class*="language-"]'] = { ...newTheme['code[class*="language-"]'], ...transparent };
+    }, [connectionId, tableName]);
+
+    const buildWhereClause = useCallback((row: Record<string, any>) => {
+        if (primaryKeys.length === 0) {
+            throw new Error(noPrimaryKeyMessage);
         }
-        return newTheme;
-    };
+        return primaryKeys.map((key) => {
+            const value = row[key];
+            return value === null || value === undefined
+                ? `${escapeSqliteIdentifier(key)} IS NULL`
+                : `${escapeSqliteIdentifier(key)} = ${toSqliteLiteral(value)}`;
+        }).join(" AND ");
+    }, [noPrimaryKeyMessage, primaryKeys]);
 
-    // DDL related state
-    const [showDDL, setShowDDL] = useState(false);
-    const [ddl, setDdl] = useState<string>("");
-    const [isLoadingDDL, setIsLoadingDDL] = useState(false);
-
-    const initialSqlExecuted = useRef(false);
-
-    // If initialSql is provided (e.g. when opening a table), update state and run it
-    useEffect(() => {
-        if (initialSql && !savedSql && !initialSqlExecuted.current) {
-            // 移除可能存在的默认 LIMIT 子句（主要用于显示）
-            let displaySql = initialSql.trim();
-            if (displaySql.endsWith(';')) {
-                displaySql = displaySql.slice(0, -1).trim();
+    const runQuery = useCallback(async (query: string, options?: { skipExecutedSqlUpdate?: boolean; isInitialOpen?: boolean; knownKeys?: string[] }) => {
+        if (!query.trim()) {
+            return null;
+        }
+        if (!options?.skipExecutedSqlUpdate) {
+            setExecutedSql(query);
+        }
+        setIsLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const prefetchedKeys = tableName && schemaColumnsRef.current.length === 0
+                ? await detectPrimaryKeys()
+                : undefined;
+            const rawData = await invokeSqliteSql<SqlResult>({ connectionId, sql: query });
+            const mergedData = mergeSqlResultWithSchema(rawData, schemaColumnsRef.current, options?.isInitialOpen);
+            if (!haveColumnsChanged(result?.columns, mergedData.columns) && result?.columns) {
+                mergedData.columns = result.columns;
             }
-            const limitRegex = /\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?$/i;
-            displaySql = displaySql.replace(limitRegex, '');
-            displaySql += ';';
+            setResult(mergedData);
+            if (mergedData.columns.length > 0) {
+                setFilterColumns(mergedData.columns);
+            }
+            const trimmedUpper = query.trim().replace(/^[\s;]+/, "").toUpperCase();
+            const isNonSelectStatement =
+                !trimmedUpper.startsWith("SELECT") &&
+                !trimmedUpper.startsWith("PRAGMA") &&
+                !trimmedUpper.startsWith("EXPLAIN");
+            if (isNonSelectStatement && mergedData.columns.length === 0) {
+                const statementType = trimmedUpper.split(/\s+/)[0];
+                const affectedInfo = mergedData.affected_rows > 0 ? `，影响行数: ${mergedData.affected_rows}` : "";
+                const message = `${statementType} 语句执行成功${affectedInfo}`;
+                setSuccessMessage(message);
+                toast({
+                    title: t("common.success", "执行成功"),
+                    description: message,
+                    duration: 3000,
+                });
+            }
+            const keys = tableName ? (options?.knownKeys || prefetchedKeys || await detectPrimaryKeys()) : [];
+            setEditableState(resolveEditableState(query, keys, Boolean(tableName), {
+                noPrimaryKey: t("common.noPrimaryKeyEditable", "表没有主键，无法编辑"),
+                multiTable: t("common.multiTableNotEditable", "多表查询不支持直接编辑，请使用 UPDATE 语句"),
+                unsupported: t("common.queryNotEditable", "当前查询不支持编辑"),
+            }));
+            return mergedData;
+        } catch (queryError: any) {
+            console.error("Execute SQLite SQL failed:", queryError);
+            setError(typeof queryError === "string" ? queryError : JSON.stringify(queryError));
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [connectionId, detectPrimaryKeys, result?.columns, t, tableName]);
 
-            setSql(displaySql);
+    const refresh = useCallback(async (query = executedSql) => {
+        return runQuery(query, { skipExecutedSqlUpdate: true });
+    }, [executedSql, runQuery]);
 
-            // 如果只是注释，不自动执行
-            const isJustComments = displaySql.trim().split('\n').every(line => line.trim().startsWith('--') || line.trim() === '');
-            if (isJustComments) {
-                initialSqlExecuted.current = true;
+    const ensureTableColumns = useCallback(async () => {
+        if (result?.columns?.length) {
+            return result.columns;
+        }
+        if (!tableName) {
+            return [];
+        }
+        const schemaResult = await invokeSqliteSql<SqlResult>({
+            connectionId,
+            sql: `PRAGMA table_info(${toSqliteLiteral(tableName)})`,
+        });
+        const columns = schemaResult.rows.map((row) => ({
+            name: String(row.name),
+            type_name: String(row.type || "text"),
+        }));
+        setResult({ columns, rows: [], affected_rows: 0 });
+        setFilterColumns(columns);
+        return columns;
+    }, [connectionId, result?.columns, tableName]);
+
+    const loadDDL = useCallback(async () => {
+        if (!tableName) {
+            return;
+        }
+        setIsLoadingDDL(true);
+        try {
+            const ddlResult = await invokeSqliteSql<SqlResult>({
+                connectionId,
+                sql: `SELECT sql FROM sqlite_master WHERE type='table' AND name=${toSqliteLiteral(tableName)}`,
+            });
+            if (ddlResult.rows.length === 0) {
+                setDdl("-- No results returned for table DDL");
                 return;
             }
-
-            // 自动应用分页限制，避免默认显示太多
-            const processedSql = autoAddLimit(displaySql, pageSize, 0);
-            executeSql(processedSql);
-            initialSqlExecuted.current = true;
+            setDdl(ddlResult.rows[0].sql ? String(ddlResult.rows[0].sql) : "-- No DDL found");
+        } catch (ddlError: any) {
+            console.error("Failed to load SQLite DDL:", ddlError);
+            setDdl(`-- Failed to load DDL: ${typeof ddlError === "string" ? ddlError : JSON.stringify(ddlError)}`);
+        } finally {
+            setIsLoadingDDL(false);
         }
-    }, [initialSql]);
+    }, [connectionId, tableName]);
 
-    // 当 tableName 变化时检测主键
     useEffect(() => {
         if (tableName) {
             detectPrimaryKeys();
         }
-    }, [tableName]);
+    }, [detectPrimaryKeys, tableName]);
 
-    // Load DDL when panel is opened or table changes
     useEffect(() => {
         if (showDDL && tableName) {
             loadDDL();
         }
-    }, [showDDL, tableName]);
+    }, [loadDDL, showDDL, tableName]);
 
-
-    // 检测表的主键
-    const detectPrimaryKeys = async () => {
-        if (!tableName) {
-            setPrimaryKeys([]);
+    useEffect(() => {
+        if (!initialSql || savedSql || initialSqlExecuted.current) {
             return;
         }
-
-        try {
-            // SQLite 使用 PRAGMA table_info 来获取主键信息
-            const sql = `PRAGMA table_info("${tableName}")`;
-            const res = await invokeSqliteSql<SqlResult>({
-                            connectionId,
-                            sql
-                        });
-
-            // 尝试不同的列名（可能是 pk 或 PK）
-            const keys = res.rows
-                .filter(row => {
-                    const pkValue = row.pk ?? row.PK ?? row['pk'] ?? row['PK'];
-                    // pk 可能是字符串 "1" 或数字 1
-                    return pkValue && (pkValue === 1 || pkValue === '1' || Number(pkValue) > 0);
-                })
-                .map(row => {
-                    const nameValue = row.name ?? row.NAME ?? row['name'] ?? row['NAME'];
-                    return nameValue as string;
-                });
-
-            setPrimaryKeys(keys);
-        } catch (err) {
-            console.error("Failed to detect primary keys:", err);
-            setPrimaryKeys([]);
-        }
-    };
-
-    // 生成 WHERE 子句（基于主键）
-    const generateWhereClause = (row: Record<string, any>): string => {
-        if (primaryKeys.length === 0) {
-            throw new Error(t('common.noPrimaryKey', '无法更新/删除：表没有主键'));
-        }
-
-        const conditions = primaryKeys.map(key => {
-            const value = row[key];
-            if (value === null || value === undefined) {
-                return `"${key}" IS NULL`;
+        initialSqlExecuted.current = true;
+        const executeInitial = async () => {
+            let baseSql = initialSql.trim();
+            if (baseSql.endsWith(";")) {
+                baseSql = baseSql.slice(0, -1).trim();
             }
-            // 转义单引号
-            const escapedValue = String(value).replace(/'/g, "''");
-            return `"${key}" = '${escapedValue}'`;
-        });
-
-        return conditions.join(' AND ');
-    };
-
-    // 处理单元格编辑
-    const handleCellEdit = (rowIdx: number, colName: string, currentValue: any, isNewRow: boolean) => {
-        setEditingCell({ rowIdx, colName, isNewRow });
-        setEditValue(currentValue === null ? '' : String(currentValue));
-    };
-
-    // 提交单元格编辑
-    const handleCellSubmit = async () => {
-        if (!editingCell) return;
-
-        const { rowIdx, colName, isNewRow } = editingCell;
-
-        if (isNewRow) {
-            // 更新新增行的数据
-            const updatedNewRows = [...newRows];
-            updatedNewRows[rowIdx] = {
-                ...updatedNewRows[rowIdx],
-                [colName]: editValue === '' ? null : editValue
-            };
-            setNewRows(updatedNewRows);
-            setEditingCell(null);
-            return;
-        }
-
-        // 更新现有行
-        if (!result || !tableName) return;
-
-        const row = result.rows[rowIdx];
-        const oldValue = row[colName];
-        const newValue = editValue === '' ? null : editValue;
-
-        // 如果值没有变化，直接取消
-        if (oldValue === newValue) {
-            setEditingCell(null);
-            return;
-        }
-
-        try {
-            const whereClause = generateWhereClause(row);
-            const valueStr = newValue === null ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
-            const updateSql = `UPDATE "${tableName}" SET "${colName}" = ${valueStr} WHERE ${whereClause}`;
-
-            await invokeSqliteSql({
-                connectionId,
-                sql: updateSql
-            });
-            // 更新本地数据
-            const updatedRows = [...result.rows];
-            updatedRows[rowIdx] = { ...updatedRows[rowIdx], [colName]: newValue };
-            setResult({ ...result, rows: updatedRows });
-            setOriginalRows(updatedRows);
-
-            setEditingCell(null);
-        } catch (err: any) {
-            console.error("Update failed:", err);
-            setError(typeof err === 'string' ? err : JSON.stringify(err));
-        }
-    };
-
-    // 取消单元格编辑
-    const handleCellCancel = () => {
-        setEditingCell(null);
-        setEditValue('');
-    };
-
-    // 删除选中的行
-    const handleRowDelete = async () => {
-        if (!result || !tableName || selectedRowIndices.length === 0) return;
-
-        const confirmed = await confirm({
-            title: t('common.confirmDeletion'),
-            description: t('common.confirmDeleteRows', { count: selectedRowIndices.length }),
-            variant: 'destructive'
-        });
-        if (!confirmed) return;
-
-        try {
-            // 批量删除
-            for (const rowIdx of selectedRowIndices) {
-                const row = result.rows[rowIdx];
-                const whereClause = generateWhereClause(row);
-                const deleteSql = `DELETE FROM "${tableName}" WHERE ${whereClause}`;
-
-                await invokeSqliteSql({
-                    connectionId,
-                    sql: deleteSql
-                });
+            baseSql = baseSql.replace(/\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?$/i, "");
+            const isJustComments = baseSql.trim().split("\n").every((line) => line.trim().startsWith("--") || line.trim() === "");
+            if (isJustComments) {
+                setEditorSqlValue(`${baseSql};`);
+                return;
             }
-
-            // 更新本地数据
-            const updatedRows = result.rows.filter((_, idx) => !selectedRowIndices.includes(idx));
-            setResult({ ...result, rows: updatedRows });
-            setOriginalRows(updatedRows);
-            setSelectedRowIndices([]);
-        } catch (err: any) {
-            console.error("Delete failed:", err);
-            setError(typeof err === 'string' ? err : JSON.stringify(err));
-        }
-    };
-
-    // 添加新行
-    const handleAddNewRow = () => {
-        if (!result) return;
-
-        const emptyRow: Record<string, any> = {};
-        result.columns.forEach(col => {
-            emptyRow[col.name] = null;
-        });
-
-        setNewRows([...newRows, emptyRow]);
-    };
-
-    // 复制选中的行
-    const handleCopyRow = () => {
-        if (!result || selectedRowIndices.length === 0) return;
-
-        const copiedRows: Record<string, any>[] = [];
-
-        selectedRowIndices.forEach(rowIdx => {
-            const rowToCopy = result.rows[rowIdx];
-            const copiedRow = { ...rowToCopy };
-
-            // 清空主键字段（让数据库自动生成）
-            primaryKeys.forEach(key => {
-                copiedRow[key] = null;
-            });
-
-            copiedRows.push(copiedRow);
-        });
-
-        setNewRows([...newRows, ...copiedRows]);
-    };
-
-    // 提交新行
-    const handleNewRowSubmit = async (rowIdx: number) => {
-        if (!tableName || !result) return;
-
-        const row = newRows[rowIdx];
-
-        // 过滤掉值为 null 的字段
-        const fields: string[] = [];
-        const values: string[] = [];
-
-        Object.entries(row).forEach(([key, value]) => {
-            if (value !== null && value !== '') {
-                fields.push(`"${key}"`);
-                const escapedValue = String(value).replace(/'/g, "''");
-                values.push(`'${escapedValue}'`);
+            let finalSql = baseSql;
+            let keys: string[] = [];
+            if (tableName) {
+                keys = await detectPrimaryKeys();
+                if (keys.length > 0) {
+                    finalSql += ` ORDER BY ${escapeSqliteIdentifier(keys[0])} DESC`;
+                }
             }
-        });
+            finalSql += ` LIMIT ${pageSize};`;
+            setEditorSqlValue(finalSql);
+            setExecutedSql(finalSql);
+            await runQuery(finalSql, { skipExecutedSqlUpdate: true, isInitialOpen: true, knownKeys: keys });
+        };
+        executeInitial();
+    }, [detectPrimaryKeys, initialSql, pageSize, runQuery, savedSql, setEditorSqlValue, tableName]);
 
-        if (fields.length === 0) {
-            alert(t('common.atLeastOneField', '请至少填写一个字段'));
+    const handleEditorSqlChange = useCallback((sql: string) => {
+        if (sqlSyncTimer.current) {
+            clearTimeout(sqlSyncTimer.current);
+        }
+        sqlSyncTimer.current = setTimeout(() => {
+            updateTab(tabId, { currentSql: sql });
+        }, DEBOUNCE_DELAY);
+    }, [tabId, updateTab]);
+
+    const getEditorSql = () => {
+        if (editorRef.current) {
+            const selection = editorRef.current.getSelection();
+            if (selection && !selection.isEmpty()) {
+                const selectedText = editorRef.current.getModel().getValueInRange(selection);
+                if (selectedText.trim()) {
+                    return selectedText.trim();
+                }
+            }
+            return editorRef.current.getValue().trim();
+        }
+        return defaultSqlRef.current.trim();
+    };
+
+    const handleExecute = useCallback(async () => {
+        const nextPageSize = parseInt(pageSizeInput, 10);
+        if (!isNaN(nextPageSize) && nextPageSize > 0) {
+            setPageSize(nextPageSize);
+        }
+        let sqlToExecute = getEditorSql();
+        if (!sqlToExecute) {
             return;
         }
-
-        const insertSql = `INSERT INTO "${tableName}" (${fields.join(', ')}) VALUES (${values.join(', ')})`;
-
-        try {
-            await invokeSqliteSql({
-                connectionId,
-                sql: insertSql
-            });
-            // 移除新增行并刷新数据
-            const updatedNewRows = newRows.filter((_, idx) => idx !== rowIdx);
-            setNewRows(updatedNewRows);
-
-            // 重新执行查询以获取最新数据
-            handleExecute();
-        } catch (err: any) {
-            console.error("Insert failed:", err);
-            setError(typeof err === 'string' ? err : JSON.stringify(err));
-        }
-    };
-
-    // 删除新增行
-    const handleNewRowDelete = (rowIdx: number) => {
-        const updatedNewRows = newRows.filter((_, idx) => idx !== rowIdx);
-        setNewRows(updatedNewRows);
-    };
-
-    // 处理分页变化
-    const handlePageChange = (newPage: number) => {
-        setCurrentPage(newPage);
-        // 重新执行查询
-        const processedSql = autoAddLimit(sql, pageSize, newPage * pageSize);
-        executeSql(processedSql);
-    };
-
-    // 处理页面大小变化
-    const handlePageSizeChange = () => {
-        const newSize = parseInt(pageSizeInput);
-        if (isNaN(newSize) || newSize <= 0) {
-            alert(t('common.invalidNumber', '请输入有效的数字'));
-            return;
-        }
-        setPageSize(newSize);
-        setCurrentPage(0);
-        // 重新执行查询
-        const processedSql = autoAddLimit(sql, newSize, 0);
-        executeSql(processedSql);
-    };
-
-    const loadDDL = async () => {
-        if (!tableName) return;
-
-        setIsLoadingDDL(true);
-        const sql = `SELECT sql FROM sqlite_master WHERE type='table' AND name="${tableName}"`;
-
-        try {
-            const res = await invokeSqliteSql<SqlResult>({
-                connectionId,
-                sql
-            });
-
-            if (res.rows.length > 0) {
-                const ddlValue = res.rows[0].sql;
-                setDdl(ddlValue ? String(ddlValue) : "-- No DDL found");
-            } else {
-                setDdl("-- No results returned for table DDL");
-            }
-        } catch (err: any) {
-            console.error("Failed to load DDL:", err);
-            setDdl(`-- Failed to load DDL: ${typeof err === 'string' ? err : JSON.stringify(err)}`);
-        } finally {
-            setIsLoadingDDL(false);
-        }
-    };
-
-    const executeSql = async (query: string) => {
-        if (!query.trim()) return;
-
-        setIsLoading(true);
-        setError(null);
-        setResult(null);
-
-        try {
-            const data = await invokeSqliteSql<SqlResult>({
-                connectionId,
-                sql: query
-            });
-            setResult(data);
-            setOriginalRows(data.rows);
-        } catch (err: any) {
-            console.error("Execute SQL failed:", err);
-            setError(typeof err === 'string' ? err : JSON.stringify(err));
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleExecute = () => {
-        // 去除末尾分号以便正确添加 LIMIT
-        let sqlToExecute = sql.trim();
-        if (sqlToExecute.endsWith(';')) {
+        if (sqlToExecute.endsWith(";")) {
             sqlToExecute = sqlToExecute.slice(0, -1).trim();
         }
+        setCurrentPage(0);
+        await runQuery(`${sqlToExecute};`);
+    }, [pageSizeInput, runQuery]);
 
-        // 自动为 SELECT 语句添加 LIMIT
-        const processedSql = autoAddLimit(sqlToExecute, pageSize, currentPage * pageSize);
-        executeSql(processedSql);
-    };
+    const handleFormatSql = useCallback(() => {
+        try {
+            if (!editorRef.current) {
+                return;
+            }
+            const selection = editorRef.current.getSelection();
+            if (selection && !selection.isEmpty()) {
+                const selectedText = editorRef.current.getModel().getValueInRange(selection);
+                if (selectedText.trim()) {
+                    const formattedSelection = formatSql(selectedText, { language: "sqlite" });
+                    editorRef.current.executeEdits(null, [{
+                        range: selection,
+                        text: formattedSelection,
+                        forceMoveMarkers: true,
+                    }]);
+                    return;
+                }
+            }
+            const model = editorRef.current.getModel();
+            const formatted = formatSql(editorRef.current.getValue(), { language: "sqlite" });
+            editorRef.current.executeEdits(null, [{
+                range: model.getFullModelRange(),
+                text: formatted,
+                forceMoveMarkers: true,
+            }]);
+        } catch (formatError: any) {
+            setError(formatError?.message || String(formatError));
+        }
+    }, []);
 
-    const getColumnTypeIcon = (typeName: string) => {
-        const type = typeName.toUpperCase();
-        if (type.includes("INT") || type.includes("FLOAT") || type.includes("DOUBLE") || type.includes("DECIMAL") || type.includes("BOOL")) {
+    const handlePageChange = useCallback(async (nextPage: number) => {
+        setCurrentPage(nextPage);
+        await runQuery(autoAddLimit(executedSql, pageSize, nextPage * pageSize), {
+            skipExecutedSqlUpdate: true,
+        });
+    }, [executedSql, pageSize, runQuery]);
+
+    const handleFilterExecute = useCallback(async (whereClause: string, orderBy?: string) => {
+        if (!tableName) {
+            return;
+        }
+        const nextPageSize = parseInt(pageSizeInput, 10);
+        const effectivePageSize = !isNaN(nextPageSize) && nextPageSize > 0 ? nextPageSize : pageSize;
+        if (effectivePageSize !== pageSize) {
+            setPageSize(effectivePageSize);
+        }
+        let query = `SELECT * FROM ${escapeSqliteIdentifier(tableName)}`;
+        if (whereClause) {
+            query += ` WHERE ${whereClause}`;
+        }
+        if (orderBy) {
+            const [field, direction = "ASC"] = orderBy.split(" ");
+            query += ` ORDER BY ${escapeSqliteIdentifier(field)} ${direction}`;
+        }
+        const baseQuery = `${query};`;
+        setExecutedSql(baseQuery);
+        setCurrentPage(0);
+        await runQuery(autoAddLimit(baseQuery, effectivePageSize, 0), { skipExecutedSqlUpdate: true });
+    }, [pageSize, pageSizeInput, runQuery, tableName]);
+
+    const updateExistingRowLocally = useCallback((rowIdx: number, nextRow: Record<string, any>) => {
+        setResult((previousResult) => {
+            if (!previousResult) {
+                return previousResult;
+            }
+            const updatedRows = [...previousResult.rows];
+            updatedRows[rowIdx] = nextRow;
+            return { ...previousResult, rows: updatedRows };
+        });
+    }, []);
+
+    const updateExistingCellValue = useCallback(async (rowIdx: number, colName: string, value: any) => {
+        if (!result || !tableName) {
+            return;
+        }
+        const originalRow = result.rows[rowIdx];
+        const nextRow = { ...originalRow, [colName]: normalizeSqliteValue(value) };
+        const updates = Object.keys(nextRow).filter((key) => normalizeSqliteValue(nextRow[key]) !== normalizeSqliteValue(originalRow[key]));
+        if (updates.length === 0) {
+            return;
+        }
+        const updateSql = `UPDATE ${escapeSqliteIdentifier(tableName)} SET ${updates
+            .map((key) => `${escapeSqliteIdentifier(key)} = ${toSqliteLiteral(normalizeSqliteValue(nextRow[key]))}`)
+            .join(", ")} WHERE ${buildWhereClause(originalRow)}`;
+        await invokeSqliteSql({ connectionId, sql: updateSql });
+        updateExistingRowLocally(rowIdx, nextRow);
+    }, [buildWhereClause, connectionId, result, tableName, updateExistingRowLocally]);
+
+    const handleCellEdit = useCallback((rowIdx: number, colName: string, currentValue: any, isNewRow: boolean) => {
+        setEditingCell({ rowIdx, colName, isNewRow });
+        setEditValue(currentValue === null ? "" : typeof currentValue === "object" ? JSON.stringify(currentValue) : String(currentValue));
+    }, []);
+
+    const handleCellCancel = useCallback(() => {
+        setEditingCell(null);
+        setEditValue("");
+    }, []);
+
+    const handleCellSubmit = useCallback(async () => {
+        if (!editingCell) {
+            return;
+        }
+        const { rowIdx, colName, isNewRow } = editingCell;
+        if (isNewRow) {
+            setNewRows((previousRows) => {
+                const nextRows = [...previousRows];
+                nextRows[rowIdx] = { ...nextRows[rowIdx], [colName]: normalizeSqliteValue(editValue) };
+                return nextRows;
+            });
+            setEditingCell(null);
+            return;
+        }
+        try {
+            await updateExistingCellValue(rowIdx, colName, editValue);
+            setEditingCell(null);
+        } catch (updateError: any) {
+            setError(typeof updateError === "string" ? updateError : JSON.stringify(updateError));
+        }
+    }, [editValue, editingCell, updateExistingCellValue]);
+
+    const openExistingRowViewer = useCallback((row: Record<string, any>, rowIdx: number) => {
+        setViewingRow(row);
+        setViewingRowIndex(rowIdx);
+        setViewingRowSource("existing");
+        setRowViewerMode("view");
+        setRowViewerOpen(true);
+    }, []);
+
+    const openNewBufferedRowViewer = useCallback((row: Record<string, any>, rowIdx: number) => {
+        setViewingRow(row);
+        setViewingRowIndex(rowIdx);
+        setViewingRowSource("new");
+        setRowViewerMode("create");
+        setRowViewerOpen(true);
+    }, []);
+
+    const handleAddNewRow = useCallback(async () => {
+        try {
+            const columns = await ensureTableColumns();
+            if (columns.length === 0) {
+                setError(t("common.noColumnsFound", "未找到表的列信息，无法新增行"));
+                return;
+            }
+            const emptyRow = columns.reduce<Record<string, any>>((row, column) => {
+                row[column.name] = null;
+                return row;
+            }, {});
+            setViewingRow(emptyRow);
+            setViewingRowIndex(-1);
+            setViewingRowSource("new");
+            setRowViewerMode("create");
+            setRowViewerOpen(true);
+        } catch (schemaError: any) {
+            setError(schemaError?.message || String(schemaError));
+        }
+    }, [ensureTableColumns, t]);
+
+    const handleCopySingleRow = useCallback((rowIdx: number) => {
+        if (!result) {
+            return;
+        }
+        const copiedRow = { ...result.rows[rowIdx] };
+        primaryKeys.forEach((key) => {
+            copiedRow[key] = null;
+        });
+        const nextIndex = newRows.length;
+        setNewRows((previousRows) => [...previousRows, copiedRow]);
+        openNewBufferedRowViewer(copiedRow, nextIndex);
+    }, [newRows.length, openNewBufferedRowViewer, primaryKeys, result]);
+
+    const handleCopyRow = useCallback(() => {
+        if (!result || selectedRowIndices.length === 0) {
+            return;
+        }
+        if (selectedRowIndices.length === 1) {
+            handleCopySingleRow(selectedRowIndices[0]);
+            return;
+        }
+        const copiedRows = selectedRowIndices.map((rowIdx) => {
+            const copiedRow = { ...result.rows[rowIdx] };
+            primaryKeys.forEach((key) => {
+                copiedRow[key] = null;
+            });
+            return copiedRow;
+        });
+        setNewRows((previousRows) => [...previousRows, ...copiedRows]);
+    }, [handleCopySingleRow, primaryKeys, result, selectedRowIndices]);
+
+    const handleDeleteSingleRow = useCallback(async (rowIdx: number) => {
+        if (!result || !tableName) {
+            return;
+        }
+        const confirmed = await confirm({
+            title: t("common.confirmDeletion"),
+            description: t("common.confirmDeleteRow"),
+            variant: "destructive",
+        });
+        if (!confirmed) {
+            return;
+        }
+        try {
+            await invokeSqliteSql({
+                connectionId,
+                sql: `DELETE FROM ${escapeSqliteIdentifier(tableName)} WHERE ${buildWhereClause(result.rows[rowIdx])}`,
+            });
+            setResult((previousResult) => {
+                if (!previousResult) {
+                    return previousResult;
+                }
+                const updatedRows = previousResult.rows.filter((_, index) => index !== rowIdx);
+                return { ...previousResult, rows: updatedRows };
+            });
+            setSelectedRowIndices((previousIndices) => (
+                previousIndices.filter((index) => index !== rowIdx).map((index) => (index > rowIdx ? index - 1 : index))
+            ));
+        } catch (deleteError: any) {
+            setError(typeof deleteError === "string" ? deleteError : JSON.stringify(deleteError));
+        }
+    }, [buildWhereClause, connectionId, result, t, tableName]);
+
+    const handleRowDelete = useCallback(async () => {
+        if (!result || !tableName || selectedRowIndices.length === 0) {
+            return;
+        }
+        const confirmed = await confirm({
+            title: t("common.confirmDeletion"),
+            description: t("common.confirmDeleteRows", { count: selectedRowIndices.length }),
+            variant: "destructive",
+        });
+        if (!confirmed) {
+            return;
+        }
+        try {
+            await Promise.allSettled(selectedRowIndices.map((rowIdx) => invokeSqliteSql({
+                connectionId,
+                sql: `DELETE FROM ${escapeSqliteIdentifier(tableName)} WHERE ${buildWhereClause(result.rows[rowIdx])}`,
+            })));
+            await refresh(executedSql);
+            setSelectedRowIndices([]);
+        } catch (deleteError: any) {
+            setError(typeof deleteError === "string" ? deleteError : JSON.stringify(deleteError));
+        }
+    }, [buildWhereClause, connectionId, executedSql, refresh, result, selectedRowIndices, t, tableName]);
+
+    const handleSubmitChanges = useCallback(async () => {
+        if (!tableName || newRows.length === 0) {
+            return;
+        }
+        const failedRows: Record<string, any>[] = [];
+        const insertSqlList = newRows.map((row) => {
+            const fields = Object.keys(row).filter((key) => row[key] !== null && row[key] !== "");
+            if (fields.length === 0) {
+                return null;
+            }
+            return `INSERT INTO ${escapeSqliteIdentifier(tableName)} (${fields.map(escapeSqliteIdentifier).join(", ")}) VALUES (${fields.map((key) => toSqliteLiteral(row[key])).join(", ")})`;
+        });
+        const settled = await Promise.allSettled(insertSqlList.map((insertSql, index) => {
+            if (!insertSql) {
+                failedRows.push(newRows[index]);
+                return Promise.reject(new Error("Empty row"));
+            }
+            return invokeSqliteSql({ connectionId, sql: insertSql });
+        }));
+        settled.forEach((item, index) => {
+            if (item.status === "rejected" && insertSqlList[index]) {
+                failedRows.push(newRows[index]);
+            }
+        });
+        setNewRows(failedRows);
+        if (newRows.length > failedRows.length) {
+            await refresh(executedSql);
+        }
+        if (failedRows.length > 0) {
+            setError(t("common.someRowsFailed", "部分行提交失败，请检查数据。"));
+        }
+    }, [connectionId, executedSql, newRows, refresh, t, tableName]);
+
+    const handleCancelChanges = useCallback(async () => {
+        const confirmed = await confirm({
+            title: t("common.confirmDeletion"),
+            description: t("common.confirmCancelChanges"),
+            variant: "default",
+        });
+        if (confirmed) {
+            setNewRows([]);
+        }
+    }, [t]);
+
+    const handleRowViewerSave = useCallback(async (editedRow: Record<string, any>) => {
+        if (!tableName || !result) {
+            return;
+        }
+        if (viewingRowSource === "new" && viewingRowIndex >= 0) {
+            setNewRows((previousRows) => {
+                const nextRows = [...previousRows];
+                nextRows[viewingRowIndex] = editedRow;
+                return nextRows;
+            });
+            return;
+        }
+        if (rowViewerMode === "create") {
+            const fields = Object.keys(editedRow).filter((key) => editedRow[key] !== null && editedRow[key] !== "");
+            if (fields.length === 0) {
+                toast({
+                    title: t("common.error", "Error"),
+                    description: t("common.atLeastOneField", "Please fill in at least one field"),
+                    variant: "destructive",
+                });
+                throw new Error("Empty row");
+            }
+            const insertSql = `INSERT INTO ${escapeSqliteIdentifier(tableName)} (${fields.map(escapeSqliteIdentifier).join(", ")}) VALUES (${fields.map((key) => toSqliteLiteral(editedRow[key])).join(", ")})`;
+            await invokeSqliteSql({ connectionId, sql: insertSql });
+            toast({
+                title: t("common.success", "Success"),
+                description: t("common.insertSuccess", "Inserted successfully"),
+            });
+            await refresh(executedSql);
+            return;
+        }
+        if (viewingRowIndex < 0) {
+            return;
+        }
+        const originalRow = result.rows[viewingRowIndex];
+        const updates = Object.keys(editedRow).filter((key) => normalizeSqliteValue(editedRow[key]) !== normalizeSqliteValue(originalRow[key]));
+        if (updates.length === 0) {
+            return;
+        }
+        const updateSql = `UPDATE ${escapeSqliteIdentifier(tableName)} SET ${updates
+            .map((key) => `${escapeSqliteIdentifier(key)} = ${toSqliteLiteral(normalizeSqliteValue(editedRow[key]))}`)
+            .join(", ")} WHERE ${buildWhereClause(originalRow)}`;
+        await invokeSqliteSql({ connectionId, sql: updateSql });
+        updateExistingRowLocally(viewingRowIndex, editedRow);
+    }, [
+        buildWhereClause,
+        connectionId,
+        executedSql,
+        refresh,
+        result,
+        rowViewerMode,
+        t,
+        tableName,
+        updateExistingRowLocally,
+        viewingRowIndex,
+        viewingRowSource,
+    ]);
+
+    const handleOpenFormatter = useCallback((rowIdx: number, colName: string, value: any) => {
+        const content = value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
+        setFormatterContent(content);
+        setFormatterTitle(`Format value: ${colName}`);
+        setFormatterReadOnly(!editableState.isEditable);
+        if (editableState.isEditable && tableName) {
+            setFormatterOnSave(() => async (newValue: string) => {
+                await updateExistingCellValue(rowIdx, colName, newValue);
+            });
+        } else {
+            setFormatterOnSave(undefined);
+        }
+        setFormatterOpen(true);
+    }, [editableState.isEditable, tableName, updateExistingCellValue]);
+
+    const renderColumnTypeIcon = useCallback((typeName: string) => {
+        const upperType = typeName.toUpperCase();
+        if (upperType.includes("INT") || upperType.includes("FLOAT") || upperType.includes("DOUBLE") || upperType.includes("DECIMAL") || upperType.includes("BOOL")) {
             return <Hash className="h-3 w-3 text-blue-500" />;
         }
-        if (type.includes("CHAR") || type.includes("TEXT") || type.includes("ENUM")) {
+        if (upperType.includes("CHAR") || upperType.includes("TEXT") || upperType.includes("ENUM")) {
             return <Type className="h-3 w-3 text-orange-500" />;
         }
-        if (type.includes("DATE") || type.includes("TIME")) {
+        if (upperType.includes("DATE") || upperType.includes("TIME")) {
             return <Calendar className="h-3 w-3 text-green-500" />;
         }
-        if (type.includes("BLOB") || type.includes("BINARY")) {
+        if (upperType.includes("BLOB") || upperType.includes("BINARY")) {
             return <Binary className="h-3 w-3 text-purple-500" />;
         }
         return <Type className="h-3 w-3 text-gray-500" />;
-    };
-
-
-    const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
-    const connectionName = connection?.name || name;
+    }, []);
 
     return (
         <div className="h-full flex flex-col bg-background">
-            {/* Toolbar */}
-            <div className="p-2 flex gap-2 items-center bg-muted/30 justify-between">
-                <div className="flex gap-2 items-center">
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded">
-                        <span className="text-sm font-semibold text-foreground whitespace-nowrap">{connectionName}</span>
-                        {dbName && (
-                            <>
-                                <div className="h-3 w-[1px] bg-border mx-1"></div>
-                                <span className="text-sm text-muted-foreground whitespace-nowrap">{dbName}</span>
-                            </>
-                        )}
-                    </div>
-                    <div className="h-4 w-[1px] bg-border mx-2"></div>
-                    <Button
-                        size="sm"
-                        onClick={handleExecute}
-                        disabled={isLoading}
-                        className="bg-green-600 hover:bg-green-700 text-white gap-2"
-                    >
-                        {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                        {t('common.run', 'Run')}
-                    </Button>
+            <MysqlWorkspaceToolbar
+                connection={connection}
+                connectionName={connectionName}
+                dbName={dbName}
+                tableName={tableName}
+                isLoading={isLoading}
+                isEditable={editableState.isEditable}
+                editDisabledReason={editableState.reason}
+                selectedCount={selectedRowIndices.length}
+                newRowsCount={newRows.length}
+                showDDL={showDDL}
+                showSchemaButton={false}
+                onExecute={handleExecute}
+                onFormatSql={handleFormatSql}
+                onAddRow={handleAddNewRow}
+                onCopyRows={handleCopyRow}
+                onDeleteRows={handleRowDelete}
+                onSubmitChanges={handleSubmitChanges}
+                onCancelChanges={handleCancelChanges}
+                onOpenSchemaTab={() => undefined}
+                onToggleDDL={() => setShowDDL(!showDDL)}
+            />
 
-                    {/* 数据操作按钮 */}
-                    {result && tableName && (
-                        <>
-                            <div className="h-4 w-[1px] bg-border mx-2"></div>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleAddNewRow}
-                                className="gap-2"
-                                title={t('common.add', '新增')}
-                            >
-                                <Plus className="h-3 w-3" />
-                                {t('common.add', '新增')}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleCopyRow}
-                                disabled={selectedRowIndices.length === 0}
-                                title={t('common.duplicate', '复制') + ` ${selectedRowIndices.length} ` + t('common.items', '条')}
-                                className="gap-2"
-                            >
-                                <Copy className="h-3 w-3" />
-                                {t('common.duplicate', '复制')} {selectedRowIndices.length > 0 && `(${selectedRowIndices.length})`}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleRowDelete}
-                                disabled={primaryKeys.length === 0 || selectedRowIndices.length === 0}
-                                className="gap-2 text-red-600 hover:text-red-700"
-                                title={primaryKeys.length === 0 ? t('common.noPrimaryKey') : t('common.delete', '删除') + ` ${selectedRowIndices.length} ` + t('common.items', '条')}
-                            >
-                                <Trash2 className="h-3 w-3" />
-                                {t('common.delete', '删除')} {selectedRowIndices.length > 0 && `(${selectedRowIndices.length})`}
-                            </Button>
-                        </>
-                    )}
-
-                    {/* 数据操作按钮 */}
+            {tableName && (filterColumns.length > 0 || isLoadingFilterColumns) && (
+                <div className="px-4 py-1 bg-muted/20 border-b">
+                    <FilterBuilder
+                        columns={filterColumns}
+                        primaryKeys={primaryKeys}
+                        onChange={() => undefined}
+                        onExecute={handleFilterExecute}
+                    />
                 </div>
-
-                {/* Right Side Toolbar Actions */}
-                <div className="flex gap-2 items-center">
-                    {tableName && (
-                        <Button
-                            variant={showDDL ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setShowDDL(!showDDL)}
-                            title="Show DDL"
-                            className={cn(showDDL && "bg-muted")}
-                        >
-                            <FileCode className="h-4 w-4 mr-1" />
-                            DDL
-                        </Button>
-                    )}
-                </div>
-            </div>
+            )}
 
             <div className="flex-1 flex overflow-hidden">
-                <ResizablePanelGroup direction="horizontal">
-                    <ResizablePanel defaultSize={showDDL ? 70 : 100} minSize={30}>
+                <ResizablePanelGroup direction="vertical">
+                    <ResizablePanel defaultSize={showDDL ? 60 : 100} minSize={30}>
                         <div className="h-full flex flex-col">
-                            {/* Query Area */}
-                            <div className="h-1/3 p-4 bg-background">
-                                <Textarea
-                                    value={sql}
-                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSql(e.target.value)}
-                                    className="font-mono h-full resize-none"
-                                    placeholder={t('common.sqlPlaceholder', '在此输入 SQL 查询...')}
-                                />
-                            </div>
-
-                            {/* Result Area */}
-                            <div className="flex-1 overflow-auto p-4">
+                            <MysqlQueryEditor
+                                connectionId={connectionId}
+                                dbName={dbName}
+                                defaultValue={defaultSqlRef.current}
+                                isDark={isDark}
+                                schemaColumnsRef={schemaColumnsRef}
+                                onEditorMount={(editor) => {
+                                    editorRef.current = editor;
+                                }}
+                                onSqlChange={handleEditorSqlChange}
+                            />
+                            <div className="flex-1 pb-1 overflow-hidden">
                                 {error && (
-                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap">
-                                        Error: {error}
+                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
+                                        <span>Error: {error}</span>
+                                        <button
+                                            onClick={() => setError(null)}
+                                            className="text-red-400 hover:text-red-600 flex-shrink-0"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
                                     </div>
                                 )}
 
-                                {result && (
-                                    <div className="h-full flex flex-col">
-                                        <div className="mb-2 text-xs text-muted-foreground flex justify-between">
-                                            <span>{result.rows.length} {t('common.rowsReturned', 'rows returned')}</span>
-                                            {result.affected_rows > 0 && <span>{t('common.affectedRows', 'Affected Rows')}: {result.affected_rows}</span>}
-                                        </div>
-
-                                        <div className="border rounded-md bg-background overflow-auto flex-1">
-                                            <Table>
-                                                <TableHeader className="sticky top-0 bg-muted z-10">
-                                                    <TableRow>
-                                                        {result.columns.map((col, i) => (
-                                                            <TableHead key={i} className="whitespace-nowrap">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <span className="font-semibold text-foreground">{col.name}</span>
-                                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground font-normal">
-                                                                        {getColumnTypeIcon(col.type_name)}
-                                                                        <span className="lowercase">{col.type_name}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </TableHead>
-                                                        ))}
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {/* 新增行 */}
-                                                    {newRows.map((row, rowIdx) => (
-                                                        <TableRow key={`new-${rowIdx}`} className="bg-blue-50/50 dark:bg-blue-950/20">
-                                                            {result.columns.map((col, colIdx) => (
-                                                                <TableCell key={colIdx} className="whitespace-nowrap max-w-[300px]">
-                                                                    {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && editingCell?.isNewRow ? (
-                                                                        <div className="flex gap-1 items-center">
-                                                                            <Input
-                                                                                value={editValue}
-                                                                                onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="h-7 text-xs min-w-[200px]"
-                                                                                autoFocus
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === 'Enter') handleCellSubmit();
-                                                                                    if (e.key === 'Escape') handleCellCancel();
-                                                                                }}
-                                                                            />
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleCellSubmit}>
-                                                                                <Check className="h-3 w-3 text-green-600" />
-                                                                            </Button>
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleCellCancel}>
-                                                                                <X className="h-3 w-3 text-red-600" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div
-                                                                            className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded truncate"
-                                                                            onDoubleClick={() => handleCellEdit(rowIdx, col.name, row[col.name], true)}
-                                                                        >
-                                                                            {row[col.name] === null || row[col.name] === '' ? (
-                                                                                <span className="text-muted-foreground italic">NULL</span>
-                                                                            ) : (
-                                                                                String(row[col.name])
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </TableCell>
-                                                            ))}
-                                                            {tableName && (
-                                                                <TableCell>
-                                                                    <div className="flex gap-1">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="h-7 px-2 text-green-600 hover:text-green-700"
-                                                                            onClick={() => handleNewRowSubmit(rowIdx)}
-                                                                            title={t('common.save', '提交')}
-                                                                        >
-                                                                            <Check className="h-3 w-3" />
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="h-7 px-2 text-red-600 hover:text-red-700"
-                                                                            onClick={() => handleNewRowDelete(rowIdx)}
-                                                                            title={t('common.cancel', '取消')}
-                                                                        >
-                                                                            <X className="h-3 w-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                </TableCell>
-                                                            )}
-                                                        </TableRow>
-                                                    ))}
-
-                                                    {/* 现有行 */}
-                                                    {result.rows.map((row, rowIdx) => (
-                                                        <TableRow
-                                                            key={rowIdx}
-                                                            className={cn(
-                                                                "hover:bg-muted/50 cursor-pointer",
-                                                                selectedRowIndices.includes(rowIdx) && "bg-blue-100 dark:bg-blue-900/40"
-                                                            )}
-                                                            onClick={(e) => {
-                                                                // 支持 Ctrl/Cmd 多选
-                                                                if (e.ctrlKey || e.metaKey) {
-                                                                    if (selectedRowIndices.includes(rowIdx)) {
-                                                                        setSelectedRowIndices(selectedRowIndices.filter(idx => idx !== rowIdx));
-                                                                    } else {
-                                                                        setSelectedRowIndices([...selectedRowIndices, rowIdx]);
-                                                                    }
-                                                                } else {
-                                                                    // 单击选中单行
-                                                                    setSelectedRowIndices([rowIdx]);
-                                                                }
-                                                            }}
-                                                        >
-                                                            {result.columns.map((col, colIdx) => (
-                                                                <TableCell key={colIdx} className="whitespace-nowrap max-w-[300px]">
-                                                                    {editingCell?.rowIdx === rowIdx && editingCell?.colName === col.name && !editingCell?.isNewRow ? (
-                                                                        <div className="flex gap-1 items-center">
-                                                                            <Input
-                                                                                value={editValue}
-                                                                                onChange={(e) => setEditValue(e.target.value)}
-                                                                                className="h-7 text-xs"
-                                                                                autoFocus
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === 'Enter') handleCellSubmit();
-                                                                                    if (e.key === 'Escape') handleCellCancel();
-                                                                                }}
-                                                                            />
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleCellSubmit}>
-                                                                                <Check className="h-3 w-3 text-green-600" />
-                                                                            </Button>
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleCellCancel}>
-                                                                                <X className="h-3 w-3 text-red-600" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div
-                                                                            className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded truncate"
-                                                                            onDoubleClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                tableName && primaryKeys.length > 0 && handleCellEdit(rowIdx, col.name, row[col.name], false);
-                                                                            }}
-                                                                            title={tableName && primaryKeys.length === 0 ? "无主键，无法编辑" : "双击编辑"}
-                                                                        >
-                                                                            {row[col.name] === null ? (
-                                                                                <span className="text-muted-foreground italic">NULL</span>
-                                                                            ) : (
-                                                                                <TextFormatterWrapper
-                                                                                    content={String(row[col.name])}
-                                                                                    onSave={tableName && primaryKeys.length > 0 ? async (newValue) => {
-                                                                                        const whereClause = generateWhereClause(row);
-                                                                                        const valueStr = newValue === null ? 'NULL' : `'${String(newValue).replace(/'/g, "''")}'`;
-                                                                                        const updateSql = `UPDATE "${tableName}" SET "${col.name}" = ${valueStr} WHERE ${whereClause}`;
-                                                                                        try {
-                                                                                            await invokeSqliteSql({
-                                                                                                connectionId,
-                                                                                                sql: updateSql
-                                                                                            });
-                                                                                            // Update local data
-                                                                                            const updatedRows = [...result.rows];
-                                                                                            updatedRows[rowIdx] = { ...updatedRows[rowIdx], [col.name]: newValue };
-                                                                                            setResult({ ...result, rows: updatedRows });
-                                                                                            setOriginalRows(updatedRows);
-                                                                                        } catch (err: any) {
-                                                                                            console.error("Update failed:", err);
-                                                                                        }
-                                                                                    } : undefined}
-                                                                                    readonly={!tableName || primaryKeys.length === 0}
-                                                                                    title="Format value"
-                                                                                >
-                                                                                    <div className="flex items-center gap-2 cursor-context-menu">
-                                                                                        <span className="flex-1 truncate">{String(row[col.name])}</span>
-                                                                                    </div>
-                                                                                </TextFormatterWrapper>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </TableCell>
-                                                            ))}
-                                                        </TableRow>
-                                                    ))}
-                                                    {result.rows.length === 0 && newRows.length === 0 && (
-                                                        <TableRow>
-                                                            <TableCell colSpan={result.columns.length || 1} className="text-center h-24 text-muted-foreground">
-                                                                {t('common.noResults', 'No results')}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-
-                                        {/* 分页控件 */}
-                                        {result.rows.length > 0 && (
-                                            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                                                <div className="flex items-center gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handlePageChange(currentPage - 1)}
-                                                        disabled={currentPage === 0}
-                                                        className="h-7"
-                                                    >
-                                                        <ChevronLeft className="h-3 w-3" />
-                                                        {t('common.prevPage', '上一页')}
-                                                    </Button>
-                                                    <span>{t('common.page', '第')} {currentPage + 1} {t('common.page', '页')}</span>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handlePageChange(currentPage + 1)}
-                                                        disabled={result.rows.length < pageSize}
-                                                        className="h-7"
-                                                    >
-                                                        {t('common.nextPage', '下一页')}
-                                                        <ChevronRight className="h-3 w-3" />
-                                                    </Button>
-
-                                                    <div className="h-4 w-[1px] bg-border mx-2"></div>
-
-                                                    {/* LIMIT 控制 */}
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-muted-foreground">Limit:</span>
-                                                        <Input
-                                                            type="number"
-                                                            value={pageSizeInput}
-                                                            onChange={(e) => setPageSizeInput(e.target.value)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    handlePageSizeChange();
-                                                                }
-                                                            }}
-                                                            className="w-16 h-7 text-xs"
-                                                            min="1"
-                                                        />
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={handlePageSizeChange}
-                                                            className="h-7 w-7 p-0"
-                                                            title="应用 Limit"
-                                                        >
-                                                            <Check className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    {t('common.show', '显示')} {currentPage * pageSize + 1} - {currentPage * pageSize + result.rows.length} {t('common.items', '条')}
-                                                    {primaryKeys.length === 0 && tableName && (
-                                                        <span className="ml-4 text-yellow-600 dark:text-yellow-400">
-                                                            ⚠️ {t('common.noPrimaryKey')}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                {result && result.columns.length === 0 && successMessage && (
+                                    <div className="h-full flex items-center justify-center">
+                                        <div className="flex flex-col items-center gap-3 text-center p-8">
+                                            <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                                                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
                                             </div>
+                                            <div className="space-y-1">
+                                                <p className="text-base font-medium text-foreground">{successMessage}</p>
+                                                {result.affected_rows > 0 && (
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {t("common.affectedRows", "Affected Rows")}: {result.affected_rows}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {result && (result.columns.length > 0 || !successMessage) && (
+                                    <div className="h-full flex flex-col">
+                                        <MysqlResultTable
+                                            result={result}
+                                            isEditable={editableState.isEditable}
+                                            newRows={newRows}
+                                            editingCell={editingCell}
+                                            editValue={editValue}
+                                            filteredRowEntries={filteredRowEntries}
+                                            hasActiveInlineFilters={hasActiveInlineFilters}
+                                            inlineFilters={inlineFilters}
+                                            uniqueColumnValueMap={uniqueColumnValueMap}
+                                            selectedRowIndices={selectedRowIndices}
+                                            selectedRowIndexSet={selectedRowIndexSet}
+                                            onEditValueChange={setEditValue}
+                                            onCellEdit={handleCellEdit}
+                                            onCellSubmit={handleCellSubmit}
+                                            onCellCancel={handleCellCancel}
+                                            onOpenExistingRow={openExistingRowViewer}
+                                            onOpenNewRow={openNewBufferedRowViewer}
+                                            onDeleteNewRow={(rowIdx) => setNewRows((previousRows) => previousRows.filter((_, index) => index !== rowIdx))}
+                                            onCopySingleRow={handleCopySingleRow}
+                                            onDeleteSingleRow={handleDeleteSingleRow}
+                                            onToggleRowSelection={(rowIdx) => {
+                                                setSelectedRowIndices((previousIndices) => (
+                                                    previousIndices.includes(rowIdx)
+                                                        ? previousIndices.filter((index) => index !== rowIdx)
+                                                        : [...previousIndices, rowIdx]
+                                                ));
+                                            }}
+                                            onSelectAllRows={setSelectedRowIndices}
+                                            onClearSelection={() => setSelectedRowIndices([])}
+                                            onInlineFilterChange={(columnName, value) => {
+                                                setInlineFilters((previousFilters) => ({
+                                                    ...previousFilters,
+                                                    [columnName]: value,
+                                                }));
+                                            }}
+                                            onOpenFormatter={handleOpenFormatter}
+                                            renderColumnTypeIcon={renderColumnTypeIcon}
+                                        />
+
+                                        {result.rows.length > 0 && (
+                                            <MysqlPaginationBar
+                                                currentPage={currentPage}
+                                                pageSize={pageSize}
+                                                pageSizeInput={pageSizeInput}
+                                                totalRows={result.rows.length}
+                                                filteredRows={filteredRowEntries.length}
+                                                affectedRows={result.affected_rows}
+                                                hasActiveInlineFilters={hasActiveInlineFilters}
+                                                isEditable={editableState.isEditable}
+                                                editDisabledReason={editableState.reason}
+                                                onPageChange={handlePageChange}
+                                                onPageSizeInputChange={setPageSizeInput}
+                                            />
                                         )}
                                     </div>
                                 )}
 
                                 {!result && !error && !isLoading && (
                                     <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                                        {t('common.noResults')}
+                                        {t("common.noResults")}
                                     </div>
                                 )}
                             </div>
@@ -863,35 +895,47 @@ export function SqliteWorkspace({ tabId, name, connectionId, initialSql, savedSq
 
                     {showDDL && (
                         <>
-                            <ResizableHandle />
-                            <ResizablePanel defaultSize={25} minSize={20} maxSize={60}>
-                                <div className="h-full flex flex-col bg-background border-l">
-                                    <div className="p-2 border-b bg-muted/10 text-sm font-medium flex justify-between items-center">
-                                        <span>Table DDL: {tableName}</span>
-                                    </div>
-                                    <div className="flex-1 overflow-auto p-4 bg-background">
-                                        {isLoadingDDL ? (
-                                            <div className="flex items-center justify-center h-full text-muted-foreground">
-                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                Loading...
-                                            </div>
-                                        ) : (
-                                            <SyntaxHighlighter
-                                                language="sql"
-                                                style={transparentTheme(isDark ? vscDarkPlus : vs)}
-                                                customStyle={{ margin: 0, height: '100%', borderRadius: 0, fontSize: '14px', backgroundColor: 'transparent' }}
-                                                wrapLongLines={true}
-                                            >
-                                                {ddl}
-                                            </SyntaxHighlighter>
-                                        )}
-                                    </div>
-                                </div>
-                            </ResizablePanel>
+                            <ResizableHandle withHandle />
+                            <MysqlDdlPanel
+                                ddl={ddl}
+                                isDark={isDark}
+                                isLoading={isLoadingDDL}
+                                panelRef={ddlPanelRef}
+                            />
                         </>
                     )}
                 </ResizablePanelGroup>
             </div>
-        </div >
+
+            <TextFormatterDialog
+                open={formatterOpen}
+                onOpenChange={setFormatterOpen}
+                content={formatterContent}
+                title={formatterTitle}
+                readonly={formatterReadOnly}
+                onSave={formatterOnSave}
+            />
+
+            <RowViewerDialog
+                open={rowViewerOpen}
+                onOpenChange={setRowViewerOpen}
+                row={viewingRow}
+                columns={result?.columns || []}
+                title={
+                    rowViewerMode === "create" && viewingRowIndex === -1
+                        ? t("common.addRow", "新增行")
+                        : ((editableState.isEditable || rowViewerMode === "create")
+                            ? t("common.editRow", "编辑行")
+                            : t("common.viewRow", "查看行数据"))
+                }
+                submitLabel={
+                    rowViewerMode === "create" && viewingRowIndex === -1
+                        ? t("common.add", "新增")
+                        : t("common.save", "保存")
+                }
+                editable={editableState.isEditable || rowViewerMode === "create"}
+                onSave={handleRowViewerSave}
+            />
+        </div>
     );
 }
