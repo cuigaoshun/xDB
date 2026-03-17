@@ -163,7 +163,11 @@ export function useMysqlWorkspaceQuery({
             }
 
             setResult(mergedData);
-            setFilterColumns(mergedData.columns || []);
+            if (mergedData.columns && mergedData.columns.length > 0) {
+                setFilterColumns(mergedData.columns);
+            } else if (!dbName || !tableName) {
+                setFilterColumns([]);
+            }
 
             const trimmedUpper = query.trim().replace(/^[\s;]+/, "").toUpperCase();
             const isNonSelectStatement =
