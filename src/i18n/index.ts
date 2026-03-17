@@ -375,7 +375,11 @@ const resources = {
         "clearHistory": "Clear History",
         "folder": "folder",
         "folders": "folders",
-        "keyCount": "{{count}} keys"
+        "keyCount": "{{count}} keys",
+        "asc": "ASC",
+        "desc": "DESC",
+        "sortAsc": "Sort Ascending",
+        "sortDesc": "Sort Descending"
       },
       "memcached": {
         "searchKey": "Search Key",
@@ -842,7 +846,11 @@ const resources = {
         "clearHistory": "清空历史",
         "folder": "文件夹",
         "folders": "文件夹",
-        "keyCount": "{{count}} 个键"
+        "keyCount": "{{count}} 个键",
+        "asc": "正序",
+        "desc": "倒序",
+        "sortAsc": "按分数正序排列",
+        "sortDesc": "按分数倒序排列"
       },
       "memcached": {
         "searchKey": "搜索键",

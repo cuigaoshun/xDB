@@ -193,18 +193,18 @@ export function RedisZSetViewer({
                 size="sm"
                 className="h-7 px-2 text-xs gap-1"
                 onClick={() => onSortOrderChange('asc')}
-                title={t('redis.sortAsc', 'Ascending')}
+                title={t('redis.sortAsc')}
               >
-                {t('redis.asc', 'ASC')}
+                {t('redis.asc')}
               </Button>
               <Button
                 variant={sortOrder === 'desc' ? 'secondary' : 'ghost'}
                 size="sm"
                 className="h-7 px-2 text-xs gap-1"
                 onClick={() => onSortOrderChange('desc')}
-                title={t('redis.sortDesc', 'Descending')}
+                title={t('redis.sortDesc')}
               >
-                {t('redis.desc', 'DESC')}
+                {t('redis.desc')}
               </Button>
             </div>
           )}

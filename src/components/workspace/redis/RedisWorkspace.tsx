@@ -1251,31 +1251,25 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
                 {/* Value Content */}
                 <div className="flex-1 overflow-hidden flex flex-col">
-                  {valueLoading ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      {t('redis.loadingValue', 'Loading value...')}
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0">
-                      <ValueViewer
-                        connectionId={connectionId}
-                        db={db}
-                        keyName={selectedKey || ""}
-                        value={selectedValue}
-                        type={selectedKeyItem?.type}
-                        allValues={allValues}
-                        hasMore={valueHasMore}
-                        loading={valueLoading}
-                        filter={valueFilter}
-                        onFilterChange={setValueFilter}
-                        onSearch={() => fetchComplexValues(true)}
-                        onRefresh={handleRefresh}
-                        observerTarget={valueObserverTarget}
-                        zsetOrder={zsetOrder}
-                        onZsetOrderChange={setZsetOrder}
-                      />
-                    </div>
-                  )}
+                  <div className="flex-1 min-h-0">
+                    <ValueViewer
+                      connectionId={connectionId}
+                      db={db}
+                      keyName={selectedKey || ""}
+                      value={selectedValue}
+                      type={selectedKeyItem?.type}
+                      allValues={allValues}
+                      hasMore={valueHasMore}
+                      loading={valueLoading}
+                      filter={valueFilter}
+                      onFilterChange={setValueFilter}
+                      onSearch={() => fetchComplexValues(true)}
+                      onRefresh={handleRefresh}
+                      observerTarget={valueObserverTarget}
+                      zsetOrder={zsetOrder}
+                      onZsetOrderChange={setZsetOrder}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
