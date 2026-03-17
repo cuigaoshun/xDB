@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -67,11 +67,6 @@ export function RedisSetViewer({
   // Inline edit state
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
-
-  const members = useMemo(
-    () => data.map((member) => String(member)),
-    [data]
-  );
 
   const handleAdd = async () => {
     try {
@@ -191,11 +186,12 @@ export function RedisSetViewer({
           <TableHeader className="sticky top-0 bg-muted z-10">
             <TableRow>
               <TableHead>{t('redis.member')}</TableHead>
-              <TableHead className="w-[100px] text-right">{t('common.actions')}</TableHead>
+              <TableHead className="w-[100px] text-right pr-8">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {members.map((memberStr, i) => {
+            {data.map((member, i) => {
+              const memberStr = String(member);
               const isEditing = editingMember === memberStr;
               return (
                 <TableRow key={`${memberStr}-${i}`} className="group hover:bg-muted/50">
@@ -219,7 +215,7 @@ export function RedisSetViewer({
                       </TextFormatterWrapper>
                     )}
                   </TableCell>
-                  <TableCell className="text-right align-top">
+                  <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">
                         <Button
@@ -284,7 +280,7 @@ export function RedisSetViewer({
                 </TableRow>
               );
             })}
-            {members.length === 0 && !loading && (
+            {data.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={2} className="text-center text-muted-foreground h-24">
                   {t('redis.noMembers')}

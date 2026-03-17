@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -45,6 +45,8 @@ interface RedisZSetViewerProps {
   onSearch: () => void;
   onRefresh: () => void;
   observerTarget: React.RefObject<HTMLDivElement | null>;
+  sortOrder?: 'asc' | 'desc';
+  onSortOrderChange?: (order: 'asc' | 'desc') => void;
 }
 
 export function RedisZSetViewer({
@@ -58,6 +60,8 @@ export function RedisZSetViewer({
   onSearch,
   onRefresh,
   observerTarget,
+  sortOrder = 'desc',
+  onSortOrderChange,
 }: RedisZSetViewerProps) {
   const { t } = useTranslation();
   const [inlineEditMember, setInlineEditMember] = useState<string | null>(null);
@@ -68,13 +72,10 @@ export function RedisZSetViewer({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parse flat array
-  const members = useMemo(() => {
-    const nextMembers = [];
-    for (let i = 0; i < data.length; i += 2) {
-      nextMembers.push({ member: String(data[i]), score: String(data[i + 1]) });
-    }
-    return nextMembers;
-  }, [data]);
+  const members = [];
+  for (let i = 0; i < data.length; i += 2) {
+    members.push({ member: String(data[i]), score: String(data[i + 1]) });
+  }
 
   const handleSave = async (member: string, score: string) => {
     try {
@@ -184,9 +185,33 @@ export function RedisZSetViewer({
             <Search className="h-4 w-4" />
           </Button>
         </div>
-        <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
-          <Plus className="h-4 w-4" /> {t("redis.addMember")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {onSortOrderChange && (
+            <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border">
+              <Button
+                variant={sortOrder === 'asc' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={() => onSortOrderChange('asc')}
+                title={t('redis.sortAsc', 'Ascending')}
+              >
+                {t('redis.asc', 'ASC')}
+              </Button>
+              <Button
+                variant={sortOrder === 'desc' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={() => onSortOrderChange('desc')}
+                title={t('redis.sortDesc', 'Descending')}
+              >
+                {t('redis.desc', 'DESC')}
+              </Button>
+            </div>
+          )}
+          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
+            <Plus className="h-4 w-4" /> {t("redis.addMember")}
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -196,7 +221,7 @@ export function RedisZSetViewer({
             <TableRow>
               <TableHead className="w-1/2">{t("redis.member")}</TableHead>
               <TableHead className="w-1/3">{t("redis.score")}</TableHead>
-              <TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
+              <TableHead className="w-[100px] text-right pr-8">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -235,7 +260,7 @@ export function RedisZSetViewer({
                       item.score
                     )}
                   </TableCell>
-                  <TableCell className="text-right align-top">
+                  <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">
                         <Button

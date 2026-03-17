@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -67,13 +67,10 @@ export function RedisHashViewer({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parse flat array into objects for easier rendering
-  const pairs = useMemo(() => {
-    const nextPairs = [];
-    for (let i = 0; i < data.length; i += 2) {
-      nextPairs.push({ field: String(data[i]), value: String(data[i + 1]) });
-    }
-    return nextPairs;
-  }, [data]);
+  const pairs = [];
+  for (let i = 0; i < data.length; i += 2) {
+    pairs.push({ field: String(data[i]), value: String(data[i + 1]) });
+  }
 
   const handleSave = async (field: string, value: string) => {
     try {
@@ -163,7 +160,7 @@ export function RedisHashViewer({
             <TableRow>
               <TableHead className="w-1/3">{t('redis.field')}</TableHead>
               <TableHead className="w-1/2">{t('redis.value')}</TableHead>
-              <TableHead className="w-[100px] text-right">{t('common.actions')}</TableHead>
+              <TableHead className="w-[100px] text-right pr-8">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -196,7 +193,7 @@ export function RedisHashViewer({
                       </TextFormatterWrapper>
                     )}
                   </TableCell>
-                  <TableCell className="text-right align-top">
+                  <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">
                         <Button
