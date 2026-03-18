@@ -298,7 +298,9 @@ const resources = {
         "modifyIndex": "Modify Index",
         "dropIndex": "Drop Index",
         "executing": "Executing...",
-        "execute": "Execute"
+        "execute": "Execute",
+        "statementExecutedSuccessfully": "statement executed successfully",
+        "affectedRows": "affected rows"
       },
       "redis": {
         "connected": "Connected",
@@ -769,7 +771,9 @@ const resources = {
         "modifyIndex": "修改索引",
         "dropIndex": "删除索引",
         "executing": "执行中...",
-        "execute": "执行"
+        "execute": "执行",
+        "statementExecutedSuccessfully": "语句执行成功",
+        "affectedRows": "受影响行数"
       },
       "redis": {
         "connected": "已连接",
