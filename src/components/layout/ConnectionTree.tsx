@@ -14,14 +14,17 @@ import {
     ChevronsDownUp,
     GripHorizontal,
     RotateCcw,
+    RefreshCw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CreateTableDialog } from "@/components/workspace/mysql/CreateTableDialog.tsx";
 import { CreateDatabaseDialog } from "@/components/workspace/mysql/CreateDatabaseDialog.tsx";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { invokeRedisPipeline, invokeSql, invokeSqliteSql } from "@/lib/api.ts";
+import { invokeSql, invokeSqliteSql } from "@/lib/api.ts";
+import { useMysqlDatabases } from "@/components/workspace/mysql/hooks/useMysqlDatabases";
+import { useRedisDatabases } from "@/components/workspace/redis/hooks/useRedisDatabases";
+import { useSqliteDatabases } from "@/components/workspace/sqlite/hooks/useSqliteDatabases";
 
-const SYSTEM_DBS = new Set(["information_schema", "mysql", "performance_schema", "sys"]);
 const EMPTY_ARRAY: string[] = [];
 
 function HighlightText({ text, highlight }: { text: string; highlight?: string }) {
@@ -116,6 +119,10 @@ export function ConnectionTreeItem({
     const prefetchLoadingRef = useRef(false);
     const lastPrefetchSignatureRef = useRef<string | null>(null);
     const virtualListRef = useRef<HTMLDivElement>(null);
+
+    const { fetchMysqlDatabases } = useMysqlDatabases();
+    const { fetchRedisDatabases } = useRedisDatabases();
+    const { fetchSqliteDatabases } = useSqliteDatabases();
 
     const storedHeight = heightMap[connection.id];
     const actualHeight = dragHeight ?? storedHeight;
@@ -232,122 +239,43 @@ export function ConnectionTreeItem({
 
         loadingDatabasesRef.current = { connectionId: connection.id, loading: true };
         setError(null);
-
-        if (isSqlite) {
-            setDatabases(["main"]);
-            loadingDatabasesRef.current.loading = false;
-            return;
-        }
-
-        if (isRedis) {
-            try {
-                interface PipelineResult {
-                    outputs: any[];
-                }
-
-                const result = await invokeRedisPipeline<PipelineResult>({
-                    connectionId: connection.id,
-                    commands: [
-                        { command: "INFO", args: ["keyspace"] },
-                        { command: "CONFIG", args: ["GET", "databases"] },
-                    ],
-                    db: 0,
-                });
-
-                const [infoOutput, configOutput] = result.outputs;
-                const parsedDbs: string[] = [];
-                const newKeysCount: Record<string, number> = {};
-
-                const parseInfo = (infoString: string) => {
-                    const lines = infoString.split("\n");
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed.startsWith("db")) continue;
-
-                        const colonIdx = trimmed.indexOf(":");
-                        if (colonIdx === -1) continue;
-
-                        const dbStr = trimmed.substring(2, colonIdx);
-                        const statsMatch = trimmed.match(/keys=(\d+)/);
-                        if (!statsMatch) continue;
-
-                        parsedDbs.push(dbStr);
-                        newKeysCount[dbStr] = parseInt(statsMatch[1], 10);
-                    }
-                };
-
-                let infoStr = "";
-                if (typeof infoOutput === "string") {
-                    infoStr = infoOutput;
-                } else if (Array.isArray(infoOutput) && typeof infoOutput[0] === "string") {
-                    infoStr = infoOutput[0];
-                }
-
-                if (infoStr) {
-                    parseInfo(infoStr);
-                }
-
-                let totalDatabases = 16;
-                if (Array.isArray(configOutput) && configOutput.length >= 2) {
-                    totalDatabases = parseInt(configOutput[1], 10) || 16;
-                }
-
-                const dbsWithKeys = new Set(parsedDbs);
-                const dbsWithoutKeys: string[] = [];
-
-                for (let i = 0; i < totalDatabases; i++) {
-                    const dbStr = String(i);
-                    if (!dbsWithKeys.has(dbStr)) {
-                        dbsWithoutKeys.push(dbStr);
-                        newKeysCount[dbStr] = 0;
-                    }
-                }
-
-                setDatabases([...parsedDbs, ...dbsWithoutKeys]);
-                setRedisKeysCount(newKeysCount);
-            } catch (err: any) {
-                const errorMsg = String(err);
-                if (errorMsg.toLowerCase().includes("failed to connect") || errorMsg.toLowerCase().includes("connection refused")) {
-                    setError(errorMsg);
-                    setDatabases([]);
-                    setRedisKeysCount({});
-                } else {
-                    console.warn("Failed to fetch Redis info keyspace:", err);
-                    setDatabases(["0"]);
-                    setRedisKeysCount({ "0": 0 });
-                }
-            } finally {
-                if (loadingDatabasesRef.current?.connectionId === connection.id) {
-                    loadingDatabasesRef.current.loading = false;
-                }
-            }
-            return;
-        }
-
         setIsLoadingDatabases(true);
+
         try {
-            const result = await invokeSql<SqlResult>({
-                connectionId: connection.id,
-                sql: "SHOW DATABASES",
-            });
-
-            const dbs = result.rows
-                .map((row) => Object.values(row)[0] as string)
-                .filter(Boolean)
-                .filter((db) => showSystemDatabases || !SYSTEM_DBS.has(db.toLowerCase()));
-
-            setDatabases(dbs);
-        } catch (err) {
+            if (isSqlite) {
+                const dbs = await fetchSqliteDatabases(connection.id);
+                setDatabases(dbs);
+            } else if (isRedis) {
+                const { databases, keysCount } = await fetchRedisDatabases(connection.id);
+                setDatabases(databases);
+                setRedisKeysCount(keysCount);
+            } else {
+                const dbs = await fetchMysqlDatabases(connection.id, showSystemDatabases);
+                setDatabases(dbs);
+            }
+        } catch (err: any) {
             console.error("Failed to load databases:", err);
-            setError(String(err));
-            setDatabases([]);
+            const errorMsg = String(err);
+            setError(errorMsg);
+            setDatabases(isRedis ? ["0"] : []);
+            if (isRedis) {
+                setRedisKeysCount(errorMsg.toLowerCase().includes("failed to connect") || errorMsg.toLowerCase().includes("connection refused") ? {} : { "0": 0 });
+            }
         } finally {
             setIsLoadingDatabases(false);
             if (loadingDatabasesRef.current?.connectionId === connection.id) {
                 loadingDatabasesRef.current.loading = false;
             }
         }
-    }, [connection.id, isRedis, isSqlite, showSystemDatabases]);
+    }, [
+        connection.id,
+        isRedis,
+        isSqlite,
+        showSystemDatabases,
+        fetchMysqlDatabases,
+        fetchRedisDatabases,
+        fetchSqliteDatabases,
+    ]);
 
     const loadTables = useCallback(
         async (dbName: string, options?: { force?: boolean }) => {
@@ -431,12 +359,13 @@ export function ConnectionTreeItem({
         [connection.id, mysqlPrefetchDbCount, recentDatabases, showSystemDatabases],
     );
 
-    const prefetchAllTables = useCallback(async () => {
+    const prefetchAllTables = useCallback(async (options?: { force?: boolean }) => {
+        const force = options?.force ?? false;
         if (!isMySql || prefetchLoadingRef.current || databases.length === 0) {
             return;
         }
 
-        if (lastPrefetchSignatureRef.current === prefetchSignature) {
+        if (!force && lastPrefetchSignatureRef.current === prefetchSignature) {
             return;
         }
 
@@ -486,7 +415,7 @@ export function ConnectionTreeItem({
             });
 
             Object.entries(newTables).forEach(([dbName, tableList]) => {
-                if (getCachedTables(dbName).length === 0) {
+                if (force || getCachedTables(dbName).length === 0) {
                     setTablesCache(connection.id, dbName, tableList);
                 }
             });
@@ -841,23 +770,40 @@ export function ConnectionTreeItem({
                     <HighlightText text={connection.name} highlight={filterTerm} />
                 </span>
 
-                {isExpanded &&
-                    (((isMySql || isSqlite) && expandedDatabases.size > 0) || isRedis) && (
+                {isExpanded && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                            className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (isMySql || isSqlite) {
-                                    setExpandedDatabases(new Set());
-                                } else {
-                                    collapseConnection();
-                                }
+                                void loadDatabases().then(() => {
+                                    if (isMySql) {
+                                        void prefetchAllTables({ force: true });
+                                    }
+                                });
                             }}
-                            title={t("common.collapseAll", "收起全部")}
+                            title={t("common.refresh", "刷新")}
                         >
-                            <ChevronsDownUp className="h-3.5 w-3.5" />
+                            <RefreshCw className="h-3.5 w-3.5" />
                         </button>
-                    )}
+                        {(((isMySql || isSqlite) && expandedDatabases.size > 0) || isRedis) && (
+                            <button
+                                className="p-0.5 rounded-sm hover:bg-background/50 text-muted-foreground"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isMySql || isSqlite) {
+                                        setExpandedDatabases(new Set());
+                                    } else {
+                                        collapseConnection();
+                                    }
+                                }}
+                                title={t("common.collapseAll", "收起全部")}
+                            >
+                                <ChevronsDownUp className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {isExpanded && (
