@@ -7,6 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  ContextMenuShortcut,
 } from "@/components/ui/context-menu";
 import { useTranslation } from "react-i18next";
 import { useRef, useState, useEffect, useMemo } from "react";
@@ -92,6 +93,22 @@ export function TabBar() {
       }, 100);
     }
   }, [activeTabId]);
+
+  // Add shortcut for closing active tab (Ctrl+W / Cmd+W)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isW = e.key.toLowerCase() === 'w';
+      const isModifierPressed = e.ctrlKey || e.metaKey;
+
+      if (isModifierPressed && isW && activeTabId) {
+        e.preventDefault();
+        closeTab(activeTabId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTabId, closeTab]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -185,6 +202,7 @@ export function TabBar() {
             <ContextMenuContent>
               <ContextMenuItem onClick={() => closeTab(tab.id)}>
                 {t('common.close')}
+                <ContextMenuShortcut>{/Mac|iPod|iPhone|iPad/.test(navigator.userAgent) ? '⌘W' : 'Ctrl+W'}</ContextMenuShortcut>
               </ContextMenuItem>
               <ContextMenuItem onClick={() => closeOtherTabs(tab.id)}>
                 {t('common.closeOthers')}
