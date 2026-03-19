@@ -3,7 +3,7 @@ use crate::models::{ColumnInfo, Connection, SqlResult};
 use crate::state::AppState;
 use serde_json::{Map, Value};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteRow};
-use sqlx::{Column, Row, SqlitePool, TypeInfo};
+use sqlx::{Column, Row, SqlitePool, Statement, TypeInfo};
 use tauri::{command, State};
 
 // 辅助函数：获取或创建 SQLite 连接池
@@ -109,6 +109,15 @@ pub async fn execute_sqlite_sql(
                     name: col.name().to_string(),
                     type_name: col.type_info().name().to_string(),
                 });
+            }
+        } else {
+            if let Ok(stmt) = sqlx::Executor::prepare(&pool, sql.as_str()).await {
+                for col in stmt.columns() {
+                    columns.push(ColumnInfo {
+                        name: col.name().to_string(),
+                        type_name: col.type_info().name().to_string(),
+                    });
+                }
             }
         }
 

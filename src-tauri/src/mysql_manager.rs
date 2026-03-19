@@ -5,7 +5,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::{Map, Value};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
-use sqlx::{Column, MySqlPool, Row, TypeInfo};
+use sqlx::{Column, MySqlPool, Row, Statement, TypeInfo};
 use tauri::{command, State};
 use urlencoding::encode;
 
@@ -368,6 +368,16 @@ pub async fn execute_sql(
                     name: col.name().to_string(),
                     type_name: col.type_info().name().to_string(),
                 });
+            }
+        } else {
+            // Try to prepare the statement to fetch column metadata if there are no rows
+            if let Ok(stmt) = sqlx::Executor::prepare(&pool, sql.as_str()).await {
+                for col in stmt.columns() {
+                    columns.push(ColumnInfo {
+                        name: col.name().to_string(),
+                        type_name: col.type_info().name().to_string(),
+                    });
+                }
             }
         }
 
