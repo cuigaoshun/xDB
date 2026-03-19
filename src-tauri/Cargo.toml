@@ -1,6 +1,6 @@
 [package]
 name = "xDB"
-version = "1.0.14"
+version = "1.0.15"
 description = "A modern database management tool"
 authors = ["alan"]
 edition = "2021"

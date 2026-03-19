@@ -135,6 +135,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   const [allValues, setAllValues] = useState<any[]>(savedResult?.allValues || []);
   const [totalItemCount, setTotalItemCount] = useState<number | null>(null);
   const [zsetOrder, setZsetOrder] = useState<'asc' | 'desc'>(savedResult?.zsetOrder || 'desc');
+  const [valueExactSearch, setValueExactSearch] = useState(savedResult?.valueExactSearch ?? false);
 
   const [lastScannedFilter, setLastScannedFilter] = useState<string>(savedResult?.lastScannedFilter || "");
 
@@ -206,12 +207,13 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           selectedValue,
           allValues,
           valueCursor,
-          zsetOrder
+          zsetOrder,
+          valueExactSearch
         }
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [selectedKey, selectedValue, allValues, valueCursor, zsetOrder, tabId, updateTab]);
+  }, [selectedKey, selectedValue, allValues, valueCursor, zsetOrder, valueExactSearch, tabId, updateTab]);
 
   // Refs for stable access in callbacks
   const loadingRef = useRef(loading);
@@ -240,6 +242,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   keysRef.current = keys;
   const zsetOrderRef = useRef(zsetOrder);
   zsetOrderRef.current = zsetOrder;
+  const valueExactSearchRef = useRef(valueExactSearch);
+  valueExactSearchRef.current = valueExactSearch;
 
   const fetchKeys = useCallback(async (reset = false) => {
     if (loadingRef.current) return;
@@ -395,59 +399,74 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
     // Determine search strategy for complex values
     const currentValueFilter = valueFilterRef.current;
+    const isExact = valueExactSearchRef.current;
 
-    // Use substring match by default if no wildcard is present, as is standard UI behavior.
-    const searchPattern = currentValueFilter.trim() === ""
-      ? "*"
-      : (currentValueFilter.includes('*') ? currentValueFilter : `*${currentValueFilter}*`);
+    let searchPattern = "*";
+    if (currentValueFilter.trim() !== "") {
+      if (isExact) {
+        searchPattern = currentValueFilter.trim();
+      } else {
+        searchPattern = currentValueFilter.includes('*') ? currentValueFilter : `*${currentValueFilter}*`;
+      }
+    }
 
     const type = forcedType || currentKeyItem.type;
 
 
 
     try {
-      let result;
+      let result: ValueScanResult = { cursor: "0", values: [] };
 
-      if (type === "hash") {
-        result = await invokeScanHashValues<ValueScanResult>({
-          connectionId,
-          key: currentSelectedKey,
-          cursor: currentCursor,
-          count: 100,
-          pattern: searchPattern,
-          db,
-        });
-      } else if (type === "set") {
-        result = await invokeScanSetMembers<ValueScanResult>({
-          connectionId,
-          key: currentSelectedKey,
-          cursor: currentCursor,
-          count: 100,
-          pattern: searchPattern,
-          db,
-        });
-      } else if (type === "zset") {
-        const currentZsetOrder = zsetOrderRef.current;
-        if (searchPattern === "*") {
-          // If no pattern, use ZRANGE/ZREVRANGE for score sorting
-          const start = reset ? 0 : allValues.length / 2;
-          const end = start + 99;
-          const command = currentZsetOrder === 'desc' ? "ZREVRANGE" : "ZRANGE";
-
-          const res = await invokeRedisCommand<RedisResult>({
+      if (isExact && type !== "list") {
+        const searchTerm = currentValueFilter.trim();
+        if (searchTerm) {
+          if (type === "hash") {
+            const val = await invokeRedisCommand<RedisResult>({
+              connectionId,
+              command: "HGET",
+              args: [currentSelectedKey, searchTerm],
+              db,
+            });
+            if (val.output !== null) {
+              result.values = [searchTerm, val.output];
+            }
+          } else if (type === "set") {
+            const exists = await invokeRedisCommand<RedisResult>({
+              connectionId,
+              command: "SISMEMBER",
+              args: [currentSelectedKey, searchTerm],
+              db,
+            });
+            if (exists.output === 1) {
+              result.values = [searchTerm];
+            }
+          } else if (type === "zset") {
+            const score = await invokeRedisCommand<RedisResult>({
+              connectionId,
+              command: "ZSCORE",
+              args: [currentSelectedKey, searchTerm],
+              db,
+            });
+            if (score.output !== null) {
+              result.values = [searchTerm, score.output];
+            }
+          }
+        } else {
+          // If search term is empty but exact match is on, just do a normal scan
+          const res = await (type === "hash" ? invokeScanHashValues : type === "set" ? invokeScanSetMembers : invokeScanZsetMembers)<ValueScanResult>({
             connectionId,
-            command,
-            args: [currentSelectedKey, start.toString(), end.toString(), "WITHSCORES"],
+            key: currentSelectedKey,
+            cursor: currentCursor,
+            count: 100,
+            pattern: "*",
             db,
           });
-
-          result = {
-            cursor: res.output.length >= 200 ? String(start + 100) : "0", // Cursor used as offset here
-            values: res.output
-          };
-        } else {
-          // Use ZSCAN when there's a pattern
-          result = await invokeScanZsetMembers<ValueScanResult>({
+          result = res;
+        }
+      } else {
+        // Original logic
+        if (type === "hash") {
+          result = await invokeScanHashValues<ValueScanResult>({
             connectionId,
             key: currentSelectedKey,
             cursor: currentCursor,
@@ -455,9 +474,46 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
             pattern: searchPattern,
             db,
           });
+        } else if (type === "set") {
+          result = await invokeScanSetMembers<ValueScanResult>({
+            connectionId,
+            key: currentSelectedKey,
+            cursor: currentCursor,
+            count: 100,
+            pattern: searchPattern,
+            db,
+          });
+        } else if (type === "zset") {
+          const currentZsetOrder = zsetOrderRef.current;
+          if (searchPattern === "*") {
+            // If no pattern, use ZRANGE/ZREVRANGE for score sorting
+            const start = reset ? 0 : allValues.length / 2;
+            const end = start + 99;
+            const command = currentZsetOrder === 'desc' ? "ZREVRANGE" : "ZRANGE";
+
+            const res = await invokeRedisCommand<RedisResult>({
+              connectionId,
+              command,
+              args: [currentSelectedKey, start.toString(), end.toString(), "WITHSCORES"],
+              db,
+            });
+
+            result = {
+              cursor: res.output.length >= 200 ? String(start + 100) : "0", // Cursor used as offset here
+              values: res.output
+            };
+          } else {
+            // Use ZSCAN when there's a pattern
+            result = await invokeScanZsetMembers<ValueScanResult>({
+              connectionId,
+              key: currentSelectedKey,
+              cursor: currentCursor,
+              count: 100,
+              pattern: searchPattern,
+              db,
+            });
+          }
         }
-      } else {
-        return;
       }
 
       let filteredValues = result.values;
@@ -1268,6 +1324,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                       observerTarget={valueObserverTarget}
                       zsetOrder={zsetOrder}
                       onZsetOrderChange={setZsetOrder}
+                      exactSearch={valueExactSearch}
+                      onExactSearchChange={setValueExactSearch}
                     />
                   </div>
                 </div>
@@ -1354,7 +1412,9 @@ function ValueViewer({
   onRefresh,
   observerTarget,
   zsetOrder,
-  onZsetOrderChange
+  onZsetOrderChange,
+  exactSearch,
+  onExactSearchChange
 }: {
   connectionId: number;
   db: number;
@@ -1371,6 +1431,8 @@ function ValueViewer({
   observerTarget: React.RefObject<HTMLDivElement | null>;
   zsetOrder: 'asc' | 'desc';
   onZsetOrderChange: (order: 'asc' | 'desc') => void;
+  exactSearch: boolean;
+  onExactSearchChange: (exact: boolean) => void;
 }) {
   const { t } = useTranslation();
   if (!type) return <div className="text-muted-foreground italic p-4">{t('common.selectKeyToView')}</div>;
@@ -1401,6 +1463,8 @@ function ValueViewer({
         onSearch={onSearch}
         onRefresh={onRefresh}
         observerTarget={observerTarget}
+        exactSearch={exactSearch}
+        onExactSearchChange={onExactSearchChange}
       />
     );
   }
@@ -1419,6 +1483,8 @@ function ValueViewer({
         onSearch={onSearch}
         onRefresh={onRefresh}
         observerTarget={observerTarget}
+        exactSearch={exactSearch}
+        onExactSearchChange={onExactSearchChange}
       />
     );
   }
@@ -1439,6 +1505,8 @@ function ValueViewer({
         observerTarget={observerTarget}
         sortOrder={zsetOrder}
         onSortOrderChange={onZsetOrderChange}
+        exactSearch={exactSearch}
+        onExactSearchChange={onExactSearchChange}
       />
     );
   }

@@ -2,7 +2,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { Search, Plus, Trash2, Pencil, Check, X, Square, CheckSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import {
   Table,
@@ -45,6 +46,8 @@ interface RedisHashViewerProps {
   onSearch: () => void;
   onRefresh: () => void;
   observerTarget: React.RefObject<HTMLDivElement | null>;
+  exactSearch?: boolean;
+  onExactSearchChange?: (exact: boolean) => void;
 }
 
 export function RedisHashViewer({
@@ -58,6 +61,8 @@ export function RedisHashViewer({
   onSearch,
   onRefresh,
   observerTarget,
+  exactSearch = false,
+  onExactSearchChange,
 }: RedisHashViewerProps) {
   const { t } = useTranslation();
   const [inlineEditField, setInlineEditField] = useState<string | null>(null);
@@ -126,9 +131,19 @@ export function RedisHashViewer({
       {/* Toolbar */}
       <div className="p-2 border-b flex justify-between items-center gap-2">
         <div className="relative flex-1 max-w-sm flex items-center">
+          <button
+            className={cn(
+              "absolute left-1.5 top-1.5 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-accent z-10 transition-colors",
+              exactSearch && "text-primary hover:text-primary bg-primary/10 hover:bg-primary/20"
+            )}
+            onClick={() => onExactSearchChange?.(!exactSearch)}
+            title={t('redis.exactSearch')}
+          >
+            {exactSearch ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+          </button>
           <Input
             placeholder={t('redis.filterKeys')}
-            className="pr-9 h-9"
+            className="pl-8 pr-9 h-9 w-full"
             value={filter}
             onChange={(e) => onFilterChange(e.target.value)}
             onKeyDown={(e) => {
