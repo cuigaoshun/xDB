@@ -38,7 +38,7 @@ jobs:
         run: |
           import os
           # 直接读取 secret 并按字符拆分打印
-          secret = """${{ secrets.TAURI_SIGNING_PRIVATE_KEY_TEST }}"""
+          secret = """${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"""
           if not secret:
               print("SECRET IS EMPTY!")
           else:
