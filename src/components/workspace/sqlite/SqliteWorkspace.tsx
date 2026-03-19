@@ -792,6 +792,7 @@ export function SqliteWorkspace({
                                     editorRef.current = editor;
                                 }}
                                 onSqlChange={handleEditorSqlChange}
+                                onExecute={handleExecute}
                             />
                             <div className="flex-1 min-h-0 pb-1 overflow-hidden">
                                 {error && (

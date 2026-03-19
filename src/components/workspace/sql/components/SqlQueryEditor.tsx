@@ -12,6 +12,7 @@ interface SqlQueryEditorProps {
     schemaColumnsRef: MutableRefObject<SchemaColumnMeta[]>;
     onEditorMount: (editor: any) => void;
     onSqlChange: (sql: string) => void;
+    onExecute?: () => void;
 }
 
 export function SqlQueryEditor({
@@ -22,9 +23,15 @@ export function SqlQueryEditor({
     schemaColumnsRef,
     onEditorMount,
     onSqlChange,
+    onExecute,
 }: SqlQueryEditorProps) {
     const completionDisposableRef = useRef<any>(null);
     const editorRef = useRef<any>(null);
+    const onExecuteRef = useRef(onExecute);
+
+    useEffect(() => {
+        onExecuteRef.current = onExecute;
+    }, [onExecute]);
 
     useEffect(() => {
         return () => {
@@ -48,6 +55,13 @@ export function SqlQueryEditor({
 
                     editor.onDidChangeModelContent(() => {
                         onSqlChange(editor.getValue());
+                    });
+
+                    // Add command for Cmd+Enter (Mac) and Ctrl+Enter (Win/Linux)
+                    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                        if (onExecuteRef.current) {
+                            onExecuteRef.current();
+                        }
                     });
 
                     completionDisposableRef.current = monaco.languages.registerCompletionItemProvider("mysql", {
