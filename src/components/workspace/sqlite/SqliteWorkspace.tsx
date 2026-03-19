@@ -9,10 +9,10 @@ import { RowViewerDialog } from "@/components/common/RowViewerDialog.tsx";
 import { useIsDarkTheme } from "@/hooks/useIsDarkTheme.ts";
 import { useAppStore } from "@/store/useAppStore.ts";
 import { confirm, toast } from "@/hooks/useToast.ts";
-import type { EditableState, EditingCell, SchemaColumnMeta, SqlResult } from "@/types/sql";
-import { DEFAULT_PAGE_SIZE, DEBOUNCE_DELAY } from "@/constants/workspace";
-import { autoAddLimit } from "@/hooks/usePagination";
-import { useDDLPanelResize } from "@/hooks/useDDLPanelResize";
+import type { EditableState, EditingCell, SchemaColumnMeta, SqlResult } from "@/types/sql.ts";
+import { DEFAULT_PAGE_SIZE, DEBOUNCE_DELAY } from "@/constants/workspace.ts";
+import { autoAddLimit } from "@/hooks/usePagination.ts";
+import { useDDLPanelResize } from "@/hooks/useDDLPanelResize.ts";
 import { invokeSqliteSql } from "@/lib/api.ts";
 import {
     buildFilteredRowEntries,
@@ -21,7 +21,7 @@ import {
     haveColumnsChanged,
     mergeSqlResultWithSchema,
     resolveEditableState,
-} from "@/components/workspace/sql/utils/resultTable";
+} from "@/components/workspace/sql/utils/resultTable.ts";
 import { SqlWorkspaceToolbar } from "@/components/workspace/sql/components/SqlWorkspaceToolbar.tsx";
 import { SqlQueryEditor } from "@/components/workspace/sql/components/SqlQueryEditor.tsx";
 import { SqlResultTable } from "@/components/workspace/sql/components/SqlResultTable.tsx";

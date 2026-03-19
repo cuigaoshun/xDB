@@ -2,7 +2,7 @@ import { TabBar } from "./TabBar";
 import { MysqlWorkspace } from "../workspace/mysql/MysqlWorkspace.tsx";
 import { RedisWorkspace } from "../workspace/redis/RedisWorkspace.tsx";
 import { MemcachedWorkspace } from "../workspace/memcached/MemcachedWorkspace.tsx";
-import { SqliteWorkspace } from "../workspace/sqllite/SqliteWorkspace.tsx";
+import { SqliteWorkspace } from "../workspace/sqlite/SqliteWorkspace.tsx";
 import { TableSchemaTab } from "../workspace/mysql/TableSchemaTab.tsx";
 import { DatabaseTablesTab } from "../workspace/mysql/DatabaseTablesTab.tsx";
 import { ConnectionManager } from "../workspace/ConnectionManager";
