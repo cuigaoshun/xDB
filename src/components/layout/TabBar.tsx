@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useTranslation } from "react-i18next";
 import { useRef, useState, useEffect, useMemo } from "react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 export function TabBar() {
   const { t } = useTranslation();
@@ -24,6 +25,13 @@ export function TabBar() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const connections = useAppStore((state) => state.connections);
   const connectionGroups = useAppStore((state) => state.connectionGroups);
+
+  // Add shortcut for closing active tab (Ctrl+W / Cmd+W)
+  useKeyboardShortcut('w', () => {
+    if (activeTabId) {
+      closeTab(activeTabId);
+    }
+  }, { mod: true, enabled: !!activeTabId });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -94,21 +102,6 @@ export function TabBar() {
     }
   }, [activeTabId]);
 
-  // Add shortcut for closing active tab (Ctrl+W / Cmd+W)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isW = e.key.toLowerCase() === 'w';
-      const isModifierPressed = e.ctrlKey || e.metaKey;
-
-      if (isModifierPressed && isW && activeTabId) {
-        e.preventDefault();
-        closeTab(activeTabId);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, closeTab]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
