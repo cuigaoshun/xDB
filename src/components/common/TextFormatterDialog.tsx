@@ -69,8 +69,12 @@ export function TextFormatterDialog({
             const formats = detectFormats(sourceContent);
             setAvailableFormats(formats);
 
-            // Sync selection with prop when reopening
-            setSelectedFormat(initialFormat);
+            // Sync selection with prop when reopening, or auto-select json if detected
+            if (formats.includes('json') && initialFormat === 'raw') {
+                setSelectedFormat('json');
+            } else {
+                setSelectedFormat(initialFormat);
+            }
         }
     }, [sourceContent, open, initialFormat]);
 
@@ -126,7 +130,7 @@ export function TextFormatterDialog({
                             <SelectContent>
                                 {availableFormats.map((format) => (
                                     <SelectItem key={format} value={format}>
-                                        {format === 'raw' ? t('common.originalData') : getFormatLabel(format)}
+                                        {format === 'raw' ? t('common.originalData') : getFormatLabel(format, t)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

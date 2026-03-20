@@ -55,8 +55,20 @@ export function RedisStringViewer({
     }
     const valStr = String(value);
     setContent(valStr);
+    
+    const formats = detectFormats(valStr);
+    setAvailableFormats(formats);
+
+    if (formats.includes('json')) {
+      const result = applyFormat(valStr, 'json');
+      if (result.success) {
+        setDisplayedContent(result.content);
+        setSelectedFormat("json");
+        return;
+      }
+    }
+
     setDisplayedContent(valStr);
-    setAvailableFormats(detectFormats(valStr));
     setSelectedFormat("raw");
   }, [value]);
 
@@ -112,7 +124,7 @@ export function RedisStringViewer({
               </SelectItem>
               {availableFormats.filter(f => f !== 'raw').map((format) => (
                 <SelectItem key={format} value={format} className="text-xs">
-                  {getFormatLabel(format)}
+                  {getFormatLabel(format, t)}
                 </SelectItem>
               ))}
             </SelectContent>

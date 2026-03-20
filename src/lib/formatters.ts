@@ -468,17 +468,20 @@ export function applyFormat(text: string, format: FormatType): FormatResult {
 /**
  * Get human-readable label for format type
  */
-export function getFormatLabel(format: FormatType): string {
+export function getFormatLabel(format: FormatType, t?: any): string {
+    const defaultT = (_key: string, defaultVal: string) => defaultVal;
+    const translate = t || defaultT;
+
     const labels: Record<FormatType, string> = {
         'raw': 'Raw',
-        'json': 'JSON (Formatted)',
-        'json-minified': 'JSON (Minified)',
-        'php-serialize': 'PHP Serialize',
+        'json': translate('formats.jsonFormatted', 'JSON (Formatted)'),
+        'json-minified': translate('formats.jsonMinified', 'JSON (Minified)'),
+        'php-serialize': translate('formats.phpSerialize', 'PHP Serialize'),
         'xml': 'XML',
-        'base64-decode': 'Base64 Decode',
-        'base64-encode': 'Base64 Encode',
-        'url-decode': 'URL Decode',
-        'url-encode': 'URL Encode'
+        'base64-decode': translate('formats.base64Decode', 'Base64 Decode'),
+        'base64-encode': translate('formats.base64Encode', 'Base64 Encode'),
+        'url-decode': translate('formats.urlDecode', 'URL Decode'),
+        'url-encode': translate('formats.urlEncode', 'URL Encode')
     };
     return labels[format] || format;
 }

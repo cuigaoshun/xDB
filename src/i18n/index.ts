@@ -188,6 +188,17 @@ const resources = {
         "exportSuccess": "Export successful",
         "exportFailed": "Export failed"
       },
+      "formats": {
+        "jsonFormatted": "JSON (Formatted)",
+        "jsonMinified": "JSON (Minified)",
+        "phpSerialize": "PHP Serialize",
+        "base64Decode": "Base64 Decode",
+        "base64Encode": "Base64 Encode",
+        "urlDecode": "URL Decode",
+        "urlEncode": "URL Encode",
+        "xml": "XML",
+        "raw": "Raw"
+      },
       "menu": {
         "home": "Home",
         "file": "File",
@@ -664,6 +675,17 @@ const resources = {
         "exportJSON": "导出 JSON",
         "exportSuccess": "导出成功",
         "exportFailed": "导出失败"
+      },
+      "formats": {
+        "jsonFormatted": "JSON (格式化)",
+        "jsonMinified": "JSON (压缩)",
+        "phpSerialize": "PHP 序列化",
+        "base64Decode": "Base64 解码",
+        "base64Encode": "Base64 编码",
+        "urlDecode": "URL 解码",
+        "urlEncode": "URL 编码",
+        "xml": "XML",
+        "raw": "原始数据"
       },
       "menu": {
         "home": "首页",
