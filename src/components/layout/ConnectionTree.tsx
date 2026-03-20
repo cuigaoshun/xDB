@@ -848,8 +848,12 @@ export function ConnectionTreeItem({
                     }}
                 >
                     <div
-                        className="absolute w-32 bg-popover border rounded-md shadow-md py-1 z-50"
-                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                        className="absolute w-32 bg-popover border rounded-md shadow-lg py-1 z-50 transition-opacity"
+                        style={{ 
+                            left: contextMenu.x, 
+                            top: contextMenu.y,
+                            transform: `translate(${contextMenu.x + 140 > window.innerWidth ? '-100%' : '2px'}, ${contextMenu.y + 240 > window.innerHeight ? '-100%' : '2px'})`
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {contextMenu.type === "connection" && (

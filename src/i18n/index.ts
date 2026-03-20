@@ -527,7 +527,7 @@ const resources = {
         "browse": "浏览",
         "confirm": "确认",
         "failedToReadFile": "读取文件失败",
-        "searchPlaceholder": "搜索键...",
+        "searchPlaceholder": "搜索连接...",
         "searchExplorer": "搜索库/表...",
         "noConnectionsFound": "未找到连接。",
         "confirmDelete": "确定要删除此连接吗？",
