@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import {
     Loader2, Plus, Trash2, RefreshCw, Edit2, Key,
@@ -93,47 +93,55 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
         columns: [] as string[]
     });
 
+    const lastLoadedRef = useRef<string>("");
+
     useEffect(() => {
         if (dbName && tableName) {
+            const signature = `${connectionId}-${dbName}-${tableName}`;
+            if (lastLoadedRef.current === signature) return;
             loadSchema();
         }
-    }, [dbName, tableName]);
+    }, [connectionId, dbName, tableName]);
 
-    const loadSchema = async () => {
+    const loadSchema = async (force = false) => {
+        if (!dbName || !tableName) return;
+
+        const signature = `${connectionId}-${dbName}-${tableName}`;
+        if (!force && lastLoadedRef.current === signature) {
+            return;
+        }
+        lastLoadedRef.current = signature;
+
         setIsLoading(true);
         setError(null);
 
         try {
-            // 加载列信息
-            const columnsQuery = `SHOW FULL COLUMNS FROM \`${dbName}\`.\`${tableName}\``;
-            const columnsResult = await invokeSql<any>({
-                connectionId,
-                sql: columnsQuery
-            });
+            const [columnsResult, indexesResult, tableStatusResult] = await Promise.all([
+                invokeSql<any>({
+                    connectionId,
+                    sql: `SHOW FULL COLUMNS FROM \`${dbName}\`.\`${tableName}\``
+                }),
+                invokeSql<any>({
+                    connectionId,
+                    sql: `SHOW INDEX FROM \`${dbName}\`.\`${tableName}\``
+                }),
+                invokeSql<any>({
+                    connectionId,
+                    sql: `SHOW TABLE STATUS FROM \`${dbName}\` WHERE Name = '${tableName}'`
+                })
+            ]);
+
             setColumns(columnsResult.rows || []);
-
-            // 加载索引信息
-            const indexesQuery = `SHOW INDEX FROM \`${dbName}\`.\`${tableName}\``;
-
-            const indexesResult = await invokeSql<any>({
-                connectionId,
-                sql: indexesQuery
-            });
             setIndexes(indexesResult.rows || []);
 
-            // 加载表注释
-            const tableStatusQuery = `SHOW TABLE STATUS FROM \`${dbName}\` WHERE Name = '${tableName}'`;
-
-            const tableStatusResult = await invokeSql<any>({
-                connectionId,
-                sql: tableStatusQuery
-            });
             if (tableStatusResult.rows && tableStatusResult.rows.length > 0) {
                 setTableComment(tableStatusResult.rows[0].Comment || '');
             }
         } catch (err: any) {
             console.error("Failed to load schema:", err);
             setError(typeof err === 'string' ? err : JSON.stringify(err));
+            // Reset signature on error to allow retry
+            lastLoadedRef.current = "";
         } finally {
             setIsLoading(false);
         }
@@ -418,7 +426,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
             // 清空队列
             setPendingSqlOperations([]);
             // 重新加载结构
-            loadSchema();
+            loadSchema(true);
             onRefresh?.();
         } catch (err: any) {
             console.error("Failed to execute SQL:", err);
@@ -458,7 +466,7 @@ export function TableSchemaManager({ connectionId, dbName, tableName, onRefresh 
                     <Button
                         size="sm"
                         variant="ghost"
-                        onClick={loadSchema}
+                        onClick={() => loadSchema(true)}
                         disabled={isLoading}
                         className="h-7 whitespace-nowrap shrink-0"
                     >
