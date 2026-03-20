@@ -1,7 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 
 interface SqlPaginationBarProps {
     currentPage: number;
@@ -15,6 +21,7 @@ interface SqlPaginationBarProps {
     editDisabledReason: string;
     onPageChange: (nextPage: number) => void;
     onPageSizeInputChange: (value: string) => void;
+    onExportData?: (format: 'csv' | 'excel' | 'json') => void;
 }
 
 export function SqlPaginationBar({
@@ -29,6 +36,7 @@ export function SqlPaginationBar({
     editDisabledReason,
     onPageChange,
     onPageSizeInputChange,
+    onExportData,
 }: SqlPaginationBarProps) {
     const { t } = useTranslation();
 
@@ -74,6 +82,34 @@ export function SqlPaginationBar({
                 min="1"
                 className="w-20 h-6 text-xs"
             />
+            
+            <div className="h-4 w-[1px] bg-border"></div>
+            
+            {onExportData && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 w-6 p-0"
+                            title={t("common.exportData", "Export Data")}
+                        >
+                            <Upload className="h-3.5 w-3.5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onExportData('csv')}>
+                            {t("common.exportCSV", "Export CSV")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExportData('excel')}>
+                            {t("common.exportExcel", "Export Excel")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExportData('json')}>
+                            {t("common.exportJSON", "Export JSON")}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
         </div>
     );
 }

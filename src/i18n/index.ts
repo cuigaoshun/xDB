@@ -181,6 +181,12 @@ const resources = {
         "deleteRow": "Delete Row",
         "execute": "Execute",
         "executing": "Executing...",
+        "exportData": "Export Data",
+        "exportCSV": "Export as CSV",
+        "exportExcel": "Export as Excel",
+        "exportJSON": "Export as JSON",
+        "exportSuccess": "Export successful",
+        "exportFailed": "Export failed"
       },
       "menu": {
         "home": "Home",
@@ -652,6 +658,12 @@ const resources = {
         "deleteRow": "删除行",
         "execute": "执行",
         "executing": "执行中...",
+        "exportData": "导出数据",
+        "exportCSV": "导出 CSV",
+        "exportExcel": "导出 Excel",
+        "exportJSON": "导出 JSON",
+        "exportSuccess": "导出成功",
+        "exportFailed": "导出失败"
       },
       "menu": {
         "home": "首页",

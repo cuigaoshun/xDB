@@ -2,6 +2,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Binary, Calendar, Hash, Type, CheckCircle2, X } from "lucide-react";
 import { format as formatSql } from "sql-formatter";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile, writeFile } from "@tauri-apps/plugin-fs";
+import * as xlsx from "xlsx";
+import { toast } from "@/hooks/useToast.ts";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable.tsx";
 import { FilterBuilder } from "@/components/workspace/mysql/FilterBuilder.tsx";
 import { TextFormatterDialog } from "@/components/common/TextFormatterDialog.tsx";
@@ -257,6 +261,71 @@ export function MysqlWorkspace({
         });
     }, [addTab, connection, dbName, t, tableName]);
 
+    const handleExportData = useCallback(async (format: 'csv' | 'excel' | 'json') => {
+        if (!result || result.rows.length === 0) {
+            toast({
+                title: t("common.error"),
+                description: t("common.noResults"),
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            const defaultFilename = `${tableName || 'export'}_${new Date().getTime()}`;
+            
+            let filters: any[] = [];
+            let extension = '';
+            
+            if (format === 'csv') {
+                filters = [{ name: 'CSV', extensions: ['csv'] }];
+                extension = 'csv';
+            } else if (format === 'excel') {
+                filters = [{ name: 'Excel', extensions: ['xlsx'] }];
+                extension = 'xlsx';
+            } else {
+                filters = [{ name: 'JSON', extensions: ['json'] }];
+                extension = 'json';
+            }
+
+            const filePath = await save({
+                defaultPath: `${defaultFilename}.${extension}`,
+                filters,
+            });
+
+            if (!filePath) return;
+
+            if (format === 'json') {
+                const jsonContent = JSON.stringify(result.rows, null, 2);
+                await writeTextFile(filePath, jsonContent);
+            } else {
+                const ws = xlsx.utils.json_to_sheet(result.rows);
+                if (format === 'csv') {
+                    const csvContent = xlsx.utils.sheet_to_csv(ws);
+                    await writeTextFile(filePath, '\ufeff' + csvContent);
+                } else {
+                    const wb = xlsx.utils.book_new();
+                    xlsx.utils.book_append_sheet(wb, ws, "Data");
+                    const excelBuffer = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
+                    const uint8Array = excelBuffer instanceof Uint8Array ? excelBuffer : new Uint8Array(excelBuffer);
+                    await writeFile(filePath, uint8Array);
+                }
+            }
+
+            toast({
+                title: t("common.success"),
+                description: t("common.exportSuccess", "Export successful"),
+            });
+        } catch (err: any) {
+            console.error("Export failed:", err);
+            toast({
+                title: t("common.error"),
+                description: err.message || t("common.exportFailed", "Export failed"),
+                variant: "destructive",
+            });
+        }
+    }, [result, t, tableName]);
+
     const handleOpenFormatter = useCallback((rowIdx: number, colName: string, value: any) => {
         const content = value === null || value === undefined
             ? ""
@@ -428,6 +497,7 @@ export function MysqlWorkspace({
                                                 editDisabledReason={editableState.reason}
                                                 onPageChange={handlePageChange}
                                                 onPageSizeInputChange={setPageSizeInput}
+                                                onExportData={handleExportData}
                                             />
                                         )}
                                     </div>
