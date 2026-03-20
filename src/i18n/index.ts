@@ -191,7 +191,9 @@ const resources = {
         "exportExcel": "Export as Excel",
         "exportJSON": "Export as JSON",
         "exportSuccess": "Export successful",
-        "exportFailed": "Export failed"
+        "exportFailed": "Export failed",
+        "language_zh": "Chinese",
+        "language_en": "English"
       },
       "formats": {
         "jsonFormatted": "JSON (Formatted)",
@@ -683,7 +685,9 @@ const resources = {
         "exportExcel": "导出 Excel",
         "exportJSON": "导出 JSON",
         "exportSuccess": "导出成功",
-        "exportFailed": "导出失败"
+        "exportFailed": "导出失败",
+        "language_zh": "中文",
+        "language_en": "English"
       },
       "formats": {
         "jsonFormatted": "JSON (格式化)",

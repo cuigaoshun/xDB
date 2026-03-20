@@ -49,7 +49,7 @@ export function SettingsMenu() {
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" title={t('common.settings')}>
                         <Settings className="h-4 w-4" />
-                        <span className="sr-only">Settings</span>
+                        <span className="sr-only">{t('common.settings')}</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -63,17 +63,17 @@ export function SettingsMenu() {
                         <DropdownMenuSubContent>
                             <DropdownMenuItem onClick={() => setTheme("light")}>
                                 <Sun className="mr-2 h-4 w-4" />
-                                <span>Light</span>
+                                <span>{t('common.light')}</span>
                                 {theme === 'light' && <span className="ml-auto text-xs">✓</span>}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setTheme("dark")}>
                                 <Moon className="mr-2 h-4 w-4" />
-                                <span>Dark</span>
+                                <span>{t('common.dark')}</span>
                                 {theme === 'dark' && <span className="ml-auto text-xs">✓</span>}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setTheme("system")}>
                                 <Laptop className="mr-2 h-4 w-4" />
-                                <span>System</span>
+                                <span>{t('common.system')}</span>
                                 {theme === 'system' && <span className="ml-auto text-xs">✓</span>}
                             </DropdownMenuItem>
                         </DropdownMenuSubContent>
@@ -88,10 +88,10 @@ export function SettingsMenu() {
                         <DropdownMenuSubContent>
                             <DropdownMenuRadioGroup value={i18n.language}>
                                 <DropdownMenuRadioItem value="zh" onClick={() => i18n.changeLanguage('zh')}>
-                                    中文
+                                    {t('common.language_zh')}
                                 </DropdownMenuRadioItem>
                                 <DropdownMenuRadioItem value="en" onClick={() => i18n.changeLanguage('en')}>
-                                    English
+                                    {t('common.language_en')}
                                 </DropdownMenuRadioItem>
                             </DropdownMenuRadioGroup>
                         </DropdownMenuSubContent>

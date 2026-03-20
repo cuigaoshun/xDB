@@ -87,7 +87,7 @@ export function RedisZSetViewer({
     members.push({ member: String(data[i]), score: String(data[i + 1]) });
   }
 
-  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched && hasMore;
+  const showScanMore = !exactSearch && hasSearched && hasMore;
 
   const handleSave = async (member: string, score: string) => {
     try {

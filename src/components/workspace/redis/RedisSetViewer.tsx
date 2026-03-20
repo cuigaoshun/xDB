@@ -78,7 +78,7 @@ export function RedisSetViewer({
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched && hasMore;
+  const showScanMore = !exactSearch && hasSearched && hasMore;
 
   const handleAdd = async () => {
     try {

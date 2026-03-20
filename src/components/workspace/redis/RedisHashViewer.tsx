@@ -82,7 +82,7 @@ export function RedisHashViewer({
     pairs.push({ field: String(data[i]), value: String(data[i + 1]) });
   }
 
-  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched && hasMore;
+  const showScanMore = !exactSearch && hasSearched && hasMore;
 
   const handleSave = async (field: string, value: string) => {
     try {

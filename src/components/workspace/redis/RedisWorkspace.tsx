@@ -529,7 +529,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       }
 
       setLastScannedValueFilter(currentValueFilter);
-      if (reset) setHasValueSearched(true);
+      // setHasValueSearched is now only triggered explicitly by user search action
 
       setValueCursor(result.cursor);
       const hasMoreData = result.cursor !== "0";
@@ -1328,7 +1328,10 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                       loading={valueLoading}
                       filter={valueFilter}
                       onFilterChange={setValueFilter}
-                      onSearch={() => fetchComplexValues(true)}
+                      onSearch={() => {
+                        setHasValueSearched(true);
+                        fetchComplexValues(true);
+                      }}
                       onScanMore={() => {
                         if (valueHasMore && valueFilter === lastScannedValueFilter && valueCursor !== "0") {
                           fetchComplexValues(false);
