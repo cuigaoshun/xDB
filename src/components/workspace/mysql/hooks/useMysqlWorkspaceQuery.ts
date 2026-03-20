@@ -51,7 +51,7 @@ export function useMysqlWorkspaceQuery({
     setEditorSqlValue,
 }: UseMysqlWorkspaceQueryOptions) {
     const initialEditorSql = useMemo(
-        () => savedSql || initialSql || "SELECT * FROM users",
+        () => savedSql || initialSql || `-- ${t("common.sqlPlaceholder", "Enter your SQL query here...")}`,
         [initialSql, savedSql],
     );
 

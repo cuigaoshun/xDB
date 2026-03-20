@@ -44,6 +44,8 @@ interface RedisZSetViewerProps {
   filter: string;
   onFilterChange: (value: string) => void;
   onSearch: () => void;
+  onScanMore: () => void;
+  hasSearched: boolean;
   onRefresh: () => void;
   observerTarget: React.RefObject<HTMLDivElement | null>;
   sortOrder?: 'asc' | 'desc';
@@ -58,9 +60,12 @@ export function RedisZSetViewer({
   keyName,
   data,
   loading,
+  hasMore,
   filter,
   onFilterChange,
   onSearch,
+  onScanMore,
+  hasSearched,
   onRefresh,
   observerTarget,
   sortOrder = 'desc',
@@ -82,13 +87,15 @@ export function RedisZSetViewer({
     members.push({ member: String(data[i]), score: String(data[i + 1]) });
   }
 
+  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched && hasMore;
+
   const handleSave = async (member: string, score: string) => {
     try {
       setIsSubmitting(true);
       await invokeRedisCommand({
               connectionId,
               command: "ZADD",
-              args: [keyName, score, member],
+              args: [keyName, score, member], // Correct order for ZADD: key score member
               db,
             });
       onRefresh();
@@ -166,67 +173,86 @@ export function RedisZSetViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="p-2 border-b flex justify-between items-center gap-2">
-        <div className="relative flex-1 max-w-sm flex items-center">
-          <button
-            className={cn(
-              "absolute left-1.5 top-1.5 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-accent z-10 transition-colors",
-              exactSearch && "text-primary hover:text-primary bg-primary/10 hover:bg-primary/20"
+      <div className="p-2 border-b flex flex-col gap-2">
+        <div className="flex justify-between items-center gap-2">
+          <div className="relative flex-1 max-w-sm flex items-center">
+            <button
+              className={cn(
+                "absolute left-1.5 top-1.5 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-accent z-10 transition-colors",
+                exactSearch && "text-primary hover:text-primary bg-primary/10 hover:bg-primary/20"
+              )}
+              onClick={() => onExactSearchChange?.(!exactSearch)}
+              title={t('redis.exactSearch')}
+            >
+              {exactSearch ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+            </button>
+            <Input
+              placeholder={t("redis.filterKeys")}
+              className="pl-8 pr-9 h-9 w-full"
+              value={filter}
+              onChange={(e) => onFilterChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearch();
+                }
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0.5 h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={onSearch}
+              title={t('redis.search', 'Search')}
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            {onSortOrderChange && (
+              <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border">
+                <Button
+                  variant={sortOrder === 'asc' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1"
+                  onClick={() => onSortOrderChange('asc')}
+                  title={t('redis.sortAsc')}
+                >
+                  {t('redis.asc')}
+                </Button>
+                <Button
+                  variant={sortOrder === 'desc' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1"
+                  onClick={() => onSortOrderChange('desc')}
+                  title={t('redis.sortDesc')}
+                >
+                  {t('redis.desc')}
+                </Button>
+              </div>
             )}
-            onClick={() => onExactSearchChange?.(!exactSearch)}
-            title={t('redis.exactSearch')}
-          >
-            {exactSearch ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-          </button>
-          <Input
-            placeholder={t("redis.filterKeys")}
-            className="pl-8 pr-9 h-9 w-full"
-            value={filter}
-            onChange={(e) => onFilterChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onSearch();
-              }
-            }}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-0.5 h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={onSearch}
-            title={t('redis.search', 'Search')}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+            <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
+              <Plus className="h-4 w-4" /> {t("redis.addMember")}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onSortOrderChange && (
-            <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border">
-              <Button
-                variant={sortOrder === 'asc' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 px-2 text-xs gap-1"
-                onClick={() => onSortOrderChange('asc')}
-                title={t('redis.sortAsc')}
-              >
-                {t('redis.asc')}
-              </Button>
-              <Button
-                variant={sortOrder === 'desc' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 px-2 text-xs gap-1"
-                onClick={() => onSortOrderChange('desc')}
-                title={t('redis.sortDesc')}
-              >
-                {t('redis.desc')}
-              </Button>
-            </div>
-          )}
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-1 bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
-            <Plus className="h-4 w-4" /> {t("redis.addMember")}
-          </Button>
-        </div>
+
+        {showScanMore && (
+          <div className="flex items-center px-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-6 px-2 text-[11px] font-medium ${hasMore
+                ? "text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                : "text-muted-foreground border-muted"
+                }`}
+              onClick={onScanMore}
+              disabled={loading || !hasMore}
+            >
+              {loading ? t('common.scanning') : t('common.scanMore')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table */}

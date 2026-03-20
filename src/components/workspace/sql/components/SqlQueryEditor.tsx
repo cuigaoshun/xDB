@@ -43,7 +43,7 @@ export function SqlQueryEditor({
     }, []);
 
     return (
-        <div className="h-1/3 py-1 bg-background border-b z-10 relative">
+        <div className="h-full py-1 bg-background border-b z-10 relative">
             <Editor
                 height="100%"
                 language="mysql"

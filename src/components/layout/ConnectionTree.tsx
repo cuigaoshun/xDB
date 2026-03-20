@@ -893,7 +893,7 @@ export function ConnectionTreeItem({
                                         <button
                                             className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
                                             onClick={() => {
-                                                handleNewQueryTab(contextMenu.db!);
+                                                handleOpenDatabaseTab(contextMenu.db!);
                                                 setContextMenu(null);
                                             }}
                                         >

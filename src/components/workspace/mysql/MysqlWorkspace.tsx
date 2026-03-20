@@ -53,7 +53,7 @@ export function MysqlWorkspace({
     const connection = useAppStore((state) => state.connections.find((item) => item.id === connectionId));
 
     const connectionName = connection?.name || name;
-    const defaultSqlRef = useRef(savedSql || initialSql || "SELECT * FROM users");
+    const defaultSqlRef = useRef(savedSql || initialSql || `-- ${t("common.sqlPlaceholder", "Enter your SQL query here...")}`);
     const editorRef = useRef<any>(null);
     const sqlSyncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -403,115 +403,127 @@ export function MysqlWorkspace({
             <div className="flex-1 flex overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                     <ResizablePanel defaultSize={showDDL ? 60 : 100} minSize={30}>
-                        <div className="h-full min-h-0 flex flex-col">
-                            <SqlQueryEditor
-                                connectionId={connectionId}
-                                dbName={dbName}
-                                defaultValue={defaultSqlRef.current}
-                                isDark={isDark}
-                                schemaColumnsRef={schemaColumnsRef}
-                                onEditorMount={(editor) => {
-                                    editorRef.current = editor;
-                                    if (defaultSqlRef.current) {
-                                        editor.setValue(defaultSqlRef.current);
-                                    }
-                                }}
-                                onSqlChange={handleEditorSqlChange}
-                                onExecute={handleExecute}
-                            />
+                        <div className="h-full flex flex-col">
+                            <ResizablePanelGroup direction="vertical">
+                                <ResizablePanel defaultSize={70} minSize={10}>
+                                    <SqlQueryEditor
+                                        connectionId={connectionId}
+                                        dbName={dbName}
+                                        defaultValue={defaultSqlRef.current}
+                                        isDark={isDark}
+                                        schemaColumnsRef={schemaColumnsRef}
+                                        onEditorMount={(editor) => {
+                                            editorRef.current = editor;
+                                            if (defaultSqlRef.current) {
+                                                editor.setValue(defaultSqlRef.current);
+                                            }
+                                        }}
+                                        onSqlChange={handleEditorSqlChange}
+                                        onExecute={handleExecute}
+                                    />
+                                </ResizablePanel>
 
-                            <div className="flex-1 min-h-0 pb-1 overflow-hidden">
-                                {error && (
-                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2">
-                                        <span>Error: {error}</span>
-                                        <button
-                                            onClick={() => setError(null)}
-                                            className="text-red-400 hover:text-red-600 flex-shrink-0"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                )}
+                                {(result || error || isLoading) && (
+                                    <>
+                                        <ResizableHandle withHandle />
+                                        <ResizablePanel defaultSize={30} minSize={10}>
+                                            <div className="flex-1 h-full min-h-0 pb-1 overflow-hidden flex flex-col pt-1">
+                                                {error && (
+                                                    <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2 overflow-auto mx-2">
+                                                        <span>Error: {error}</span>
+                                                        <button
+                                                            onClick={() => setError(null)}
+                                                            className="text-red-400 hover:text-red-600 flex-shrink-0"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
 
-                                {result && result.columns.length === 0 && successMessage && (
-                                    <div className="h-full flex items-center justify-center">
-                                        <div className="flex flex-col items-center gap-3 text-center p-8">
-                                            <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
-                                                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-base font-medium text-foreground">{successMessage}</p>
-                                                {result.affected_rows > 0 && (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {t("common.affectedRows", "Affected Rows")}: {result.affected_rows}
-                                                    </p>
+                                                {result && result.columns.length === 0 && successMessage && (
+                                                    <div className="h-full flex items-center justify-center">
+                                                        <div className="flex flex-col items-center gap-3 text-center p-8">
+                                                            <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-3">
+                                                                <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <p className="text-base font-medium text-foreground">{successMessage}</p>
+                                                                {result.affected_rows > 0 && (
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        {t("common.affectedRows", "Affected Rows")}: {result.affected_rows}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {result && (result.columns.length > 0 || (!successMessage && !isLoading)) && (
+                                                    <div className="h-full min-h-0 flex flex-col">
+                                                        <SqlResultTable
+                                                            result={result}
+                                                            isEditable={editableState.isEditable}
+                                                            newRows={rowEditing.newRows}
+                                                            editingCell={rowEditing.editingCell}
+                                                            editValue={rowEditing.editValue}
+                                                            filteredRowEntries={filteredRowEntries}
+                                                            hasActiveInlineFilters={hasActiveInlineFilters}
+                                                            inlineFilters={inlineFilters}
+                                                            uniqueColumnValueMap={uniqueColumnValueMap}
+                                                            selectedRowIndices={rowEditing.selectedRowIndices}
+                                                            selectedRowIndexSet={rowEditing.selectedRowIndexSet}
+                                                            onEditValueChange={rowEditing.setEditValue}
+                                                            onCellEdit={rowEditing.handleCellEdit}
+                                                            onCellSubmit={rowEditing.handleCellSubmit}
+                                                            onCellCancel={rowEditing.handleCellCancel}
+                                                            onOpenExistingRow={rowEditing.openExistingRowViewer}
+                                                            onOpenNewRow={rowEditing.openNewBufferedRowViewer}
+                                                            onDeleteNewRow={rowEditing.removeNewRow}
+                                                            onCopySingleRow={rowEditing.handleCopySingleRow}
+                                                            onDeleteSingleRow={rowEditing.handleDeleteSingleRow}
+                                                            onToggleRowSelection={rowEditing.toggleRowSelection}
+                                                            onSelectAllRows={rowEditing.selectAllRows}
+                                                            onClearSelection={rowEditing.clearSelection}
+                                                            onInlineFilterChange={(columnName, value) => {
+                                                                setInlineFilters((previousFilters) => ({
+                                                                    ...previousFilters,
+                                                                    [columnName]: value,
+                                                                }));
+                                                            }}
+                                                            onOpenFormatter={handleOpenFormatter}
+                                                            renderColumnTypeIcon={renderColumnTypeIcon}
+                                                        />
+
+                                                        {result.rows.length > 0 && (
+                                                            <SqlPaginationBar
+                                                                currentPage={currentPage}
+                                                                pageSize={pageSize}
+                                                                pageSizeInput={pageSizeInput}
+                                                                totalRows={result.rows.length}
+                                                                filteredRows={filteredRowEntries.length}
+                                                                affectedRows={result.affected_rows}
+                                                                hasActiveInlineFilters={hasActiveInlineFilters}
+                                                                isEditable={editableState.isEditable}
+                                                                editDisabledReason={editableState.reason}
+                                                                onPageChange={handlePageChange}
+                                                                onPageSizeInputChange={setPageSizeInput}
+                                                                onExportData={handleExportData}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {isLoading && (
+                                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm gap-2">
+                                                        <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                        {t("common.running", "Running...")}
+                                                    </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    </div>
+                                        </ResizablePanel>
+                                    </>
                                 )}
-
-                                {result && (result.columns.length > 0 || !successMessage) && (
-                                    <div className="h-full min-h-0 flex flex-col">
-                                        <SqlResultTable
-                                            result={result}
-                                            isEditable={editableState.isEditable}
-                                            newRows={rowEditing.newRows}
-                                            editingCell={rowEditing.editingCell}
-                                            editValue={rowEditing.editValue}
-                                            filteredRowEntries={filteredRowEntries}
-                                            hasActiveInlineFilters={hasActiveInlineFilters}
-                                            inlineFilters={inlineFilters}
-                                            uniqueColumnValueMap={uniqueColumnValueMap}
-                                            selectedRowIndices={rowEditing.selectedRowIndices}
-                                            selectedRowIndexSet={rowEditing.selectedRowIndexSet}
-                                            onEditValueChange={rowEditing.setEditValue}
-                                            onCellEdit={rowEditing.handleCellEdit}
-                                            onCellSubmit={rowEditing.handleCellSubmit}
-                                            onCellCancel={rowEditing.handleCellCancel}
-                                            onOpenExistingRow={rowEditing.openExistingRowViewer}
-                                            onOpenNewRow={rowEditing.openNewBufferedRowViewer}
-                                            onDeleteNewRow={rowEditing.removeNewRow}
-                                            onCopySingleRow={rowEditing.handleCopySingleRow}
-                                            onDeleteSingleRow={rowEditing.handleDeleteSingleRow}
-                                            onToggleRowSelection={rowEditing.toggleRowSelection}
-                                            onSelectAllRows={rowEditing.selectAllRows}
-                                            onClearSelection={rowEditing.clearSelection}
-                                            onInlineFilterChange={(columnName, value) => {
-                                                setInlineFilters((previousFilters) => ({
-                                                    ...previousFilters,
-                                                    [columnName]: value,
-                                                }));
-                                            }}
-                                            onOpenFormatter={handleOpenFormatter}
-                                            renderColumnTypeIcon={renderColumnTypeIcon}
-                                        />
-
-                                        {result.rows.length > 0 && (
-                                            <SqlPaginationBar
-                                                currentPage={currentPage}
-                                                pageSize={pageSize}
-                                                pageSizeInput={pageSizeInput}
-                                                totalRows={result.rows.length}
-                                                filteredRows={filteredRowEntries.length}
-                                                affectedRows={result.affected_rows}
-                                                hasActiveInlineFilters={hasActiveInlineFilters}
-                                                isEditable={editableState.isEditable}
-                                                editDisabledReason={editableState.reason}
-                                                onPageChange={handlePageChange}
-                                                onPageSizeInputChange={setPageSizeInput}
-                                                onExportData={handleExportData}
-                                            />
-                                        )}
-                                    </div>
-                                )}
-
-                                {!result && !error && !isLoading && (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                                        {t("common.noResults")}
-                                    </div>
-                                )}
-                            </div>
+                            </ResizablePanelGroup>
                         </div>
                     </ResizablePanel>
 

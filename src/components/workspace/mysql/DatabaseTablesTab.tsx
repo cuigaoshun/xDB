@@ -12,8 +12,17 @@ import {
     Plus,
     Trash2,
     FileCode,
-    Play
+    Play,
+    PanelTop,
+    PanelBottom
 } from "lucide-react";
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from "@/components/ui/resizable.tsx";
+import { MysqlWorkspace } from "@/components/workspace/mysql/MysqlWorkspace.tsx";
+import { SqliteWorkspace } from "@/components/workspace/sqlite/SqliteWorkspace.tsx";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -42,7 +51,7 @@ interface DatabaseTablesTabProps {
     dbType: string;
 }
 
-export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTablesTabProps) {
+export function DatabaseTablesTab({ tabId, connectionId, dbName, dbType }: DatabaseTablesTabProps) {
     const { t } = useTranslation();
     const addTab = useAppStore(state => state.addTab);
     const connection = useAppStore(state => state.connections.find(c => c.id === connectionId));
@@ -57,6 +66,24 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+
+    // Split view state
+    const [showTables, setShowTables] = useState(() => {
+        const saved = localStorage.getItem(`xdb-show-tables-${tabId}`);
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [showQuery, setShowQuery] = useState(() => {
+        const saved = localStorage.getItem(`xdb-show-query-${tabId}`);
+        return saved !== null ? saved === 'true' : true;
+    });
+
+    useEffect(() => {
+        localStorage.setItem(`xdb-show-tables-${tabId}`, String(showTables));
+    }, [showTables, tabId]);
+
+    useEffect(() => {
+        localStorage.setItem(`xdb-show-query-${tabId}`, String(showQuery));
+    }, [showQuery, tabId]);
 
     // Create table dialog state
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
@@ -260,115 +287,195 @@ export function DatabaseTablesTab({ connectionId, dbName, dbType }: DatabaseTabl
             {/* Toolbar */}
             <div className="p-2 border-b flex gap-2 items-center bg-muted/30 justify-between">
                 <div className="flex items-center gap-2 flex-1">
-                    <div className="relative max-w-sm flex-1">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder={t('common.searchTables', 'Search Tables')}
-                            className="pl-8 h-8 text-sm"
-                        />
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {filteredTables.length} {t('common.items', 'items')}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => loadTables()}
-                        title={t('common.refresh', 'Refresh')}
-                    >
-                        <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-                    </Button>
-                    {dbType === 'mysql' && (
+                    <div className="flex items-center border rounded-md overflow-hidden bg-background mr-2">
                         <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="h-8 gap-1"
-                            onClick={() => setShowCreateTableDialog(true)}
+                            className={cn(
+                                "h-7 px-2 rounded-none border-r",
+                                showTables ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                            )}
+                            onClick={() => {
+                                if (showTables && !showQuery) return;
+                                setShowTables(!showTables);
+                            }}
+                            title={t('mysql.tables', 'Tables')}
                         >
-                            <Plus className="h-3.5 w-3.5" />
-                            {t('mysql.createTable', 'Create Table')}
+                            <PanelBottom className="h-3.5 w-3.5 mr-1" />
+                            <span className="text-[10px]">{t('mysql.tables', 'Tables')}</span>
                         </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                                "h-7 px-2 rounded-none",
+                                showQuery ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                            )}
+                            onClick={() => {
+                                if (showQuery && !showTables) return;
+                                setShowQuery(!showQuery);
+                            }}
+                            title={t('mysql.query', 'Query')}
+                        >
+                            <PanelTop className="h-3.5 w-3.5 mr-1" />
+                            <span className="text-[10px]">{t('mysql.query', 'Query')}</span>
+                        </Button>
+                    </div>
+
+                    {showTables && (
+                        <>
+                            <div className="relative max-w-[200px] flex-1">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={t('common.searchTables', 'Search Tables')}
+                                    className="pl-8 h-7 text-xs"
+                                />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:inline">
+                                {filteredTables.length} {t('common.items', 'items')}
+                            </span>
+                        </>
+                    )}
+                </div>
+                <div className="flex items-center gap-1">
+                    {showTables && (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => loadTables()}
+                                title={t('common.refresh', 'Refresh')}
+                            >
+                                <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                            </Button>
+                            {dbType === 'mysql' && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 gap-1 px-2"
+                                    onClick={() => setShowCreateTableDialog(true)}
+                                >
+                                    <Plus className="h-3 w-3" />
+                                    <span className="text-xs">{t('mysql.createTable', 'Create Table')}</span>
+                                </Button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-4">
-                {error && (
-                    <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md text-sm border border-destructive/20">
-                        {error}
-                    </div>
-                )}
+            {/* Content with Split View */}
+            <div className="flex-1 overflow-hidden">
+                <ResizablePanelGroup direction="vertical">
+                    {showQuery && (
+                        <ResizablePanel defaultSize={50} minSize={20}>
+                            <div className="h-full flex flex-col relative group/query">
+                                <div className="flex-1 overflow-hidden">
+                                    {dbType === 'mysql' ? (
+                                        <MysqlWorkspace
+                                            tabId={tabId}
+                                            name={dbName}
+                                            connectionId={connectionId}
+                                            dbName={dbName}
+                                        />
+                                    ) : (
+                                        <SqliteWorkspace
+                                            tabId={tabId}
+                                            name={dbName}
+                                            connectionId={connectionId}
+                                            dbName={dbName}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </ResizablePanel>
+                    )}
 
-                {isLoading && tables.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        <span>{t('common.loading', 'Loading...')}</span>
-                    </div>
-                ) : filteredTables.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-                        <TableIcon className="h-10 w-10 opacity-20" />
-                        <span>{searchTerm ? t('common.noMatches', 'No matches found') : t('common.noTables', 'No tables found')}</span>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2 content-start">
-                        {filteredTables.map(table => (
-                            <ContextMenu key={table.name}>
-                                <ContextMenuTrigger>
-                                    <div
-                                        className="group flex flex-col items-start p-2 rounded-lg bg-card hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors relative"
-                                        onClick={() => handleSelectTable(table.name)}
-                                    >
-                                        <div className="flex items-center gap-2 w-full">
-                                            <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-background/80 transition-colors shrink-0">
-                                                <TableIcon className="h-4 w-4" />
-                                            </div>
-                                            <div className="flex flex-col min-w-0 flex-1">
-                                                <div className="flex items-baseline gap-2 w-full">
-                                                    <span className="font-medium truncate text-sm flex-1" title={table.name}>{table.name}</span>
-                                                    {table.rowCount !== undefined && (
-                                                        <span className="text-xs text-muted-foreground/70 shrink-0">
-                                                            {table.rowCount}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {table.comment && (
-                                                    <span className="text-xs text-muted-foreground truncate" title={table.comment}>
-                                                        {table.comment}
-                                                    </span>
-                                                )}
-                                            </div>
+                    {showTables && showQuery && <ResizableHandle withHandle />}
+
+                    {showTables && (
+                        <ResizablePanel defaultSize={50} minSize={20}>
+                            <div className="h-full flex flex-col relative group/panel">
+                                <div className="flex-1 overflow-auto p-4">
+                                    {error && (
+                                        <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded-md text-sm border border-destructive/20 text-center">
+                                            {error}
                                         </div>
-                                    </div>
-                                </ContextMenuTrigger>
-                                <ContextMenuContent className="w-48">
-                                    <ContextMenuItem onClick={() => handleSelectTable(table.name)}>
-                                        <TableIcon className="mr-2 h-4 w-4" />
-                                        {t('mysql.viewData', 'View Data')}
-                                    </ContextMenuItem>
-                                    <ContextMenuItem onClick={() => handleViewTableSchema(table.name)}>
-                                        <FileCode className="mr-2 h-4 w-4" />
-                                        {t('mysql.viewSchema', 'View Structure')}
-                                    </ContextMenuItem>
-                                    <ContextMenuItem onClick={() => handleNewQueryTab(table.name)}>
-                                        <Play className="mr-2 h-4 w-4" />
-                                        {t('mysql.newQueryTab', 'New Query')}
-                                    </ContextMenuItem>
-                                    <ContextMenuSeparator />
-                                    <ContextMenuItem onClick={() => handleDeleteTable(table.name)} className="text-red-600 focus:text-red-600">
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        {t('mysql.deleteTable', 'Delete Table')}
-                                    </ContextMenuItem>
-                                </ContextMenuContent>
-                            </ContextMenu>
-                        ))}
-                    </div>
-                )}
+                                    )}
+
+                                    {isLoading && tables.length === 0 ? (
+                                        <div className="flex items-center justify-center h-full text-muted-foreground gap-2">
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                            <span>{t('common.loading', 'Loading...')}</span>
+                                        </div>
+                                    ) : filteredTables.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                                            <TableIcon className="h-10 w-10 opacity-20" />
+                                            <span>{searchTerm ? t('common.noMatches', 'No matches found') : t('common.noTables', 'No tables found')}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2 content-start">
+                                            {filteredTables.map(table => (
+                                                <ContextMenu key={table.name}>
+                                                    <ContextMenuTrigger>
+                                                        <div
+                                                            className="group flex flex-col items-start p-2 rounded-lg bg-card hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors relative border border-transparent hover:border-border"
+                                                            onClick={() => handleSelectTable(table.name)}
+                                                        >
+                                                            <div className="flex items-center gap-2 w-full">
+                                                                <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-500 group-hover:bg-background/80 transition-colors shrink-0">
+                                                                    <TableIcon className="h-4 w-4" />
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0 flex-1">
+                                                                    <div className="flex items-baseline gap-2 w-full">
+                                                                        <span className="font-medium truncate text-sm flex-1" title={table.name}>{table.name}</span>
+                                                                        {table.rowCount !== undefined && (
+                                                                            <span className="text-[10px] text-muted-foreground/70 shrink-0">
+                                                                                {table.rowCount}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {table.comment && (
+                                                                        <span className="text-[10px] text-muted-foreground truncate" title={table.comment}>
+                                                                            {table.comment}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </ContextMenuTrigger>
+                                                    <ContextMenuContent className="w-48">
+                                                        <ContextMenuItem onClick={() => handleSelectTable(table.name)}>
+                                                            <TableIcon className="mr-2 h-4 w-4" />
+                                                            {t('mysql.viewData', 'View Data')}
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem onClick={() => handleViewTableSchema(table.name)}>
+                                                            <FileCode className="mr-2 h-4 w-4" />
+                                                            {t('mysql.viewSchema', 'View Structure')}
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem onClick={() => handleNewQueryTab(table.name)}>
+                                                            <Play className="mr-2 h-4 w-4" />
+                                                            {t('mysql.newQueryTab', 'New Query')}
+                                                        </ContextMenuItem>
+                                                        <ContextMenuSeparator />
+                                                        <ContextMenuItem onClick={() => handleDeleteTable(table.name)} className="text-red-600 focus:text-red-600">
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            {t('mysql.deleteTable', 'Delete Table')}
+                                                        </ContextMenuItem>
+                                                    </ContextMenuContent>
+                                                </ContextMenu>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </ResizablePanel>
+                    )}
+
+                </ResizablePanelGroup>
             </div>
 
             {/* Create Table Dialog */}

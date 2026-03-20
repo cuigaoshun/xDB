@@ -138,6 +138,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   const [valueExactSearch, setValueExactSearch] = useState(savedResult?.valueExactSearch ?? false);
 
   const [lastScannedFilter, setLastScannedFilter] = useState<string>(savedResult?.lastScannedFilter || "");
+  const [hasValueSearched, setHasValueSearched] = useState(savedResult?.hasValueSearched ?? false);
+  const [lastScannedValueFilter, setLastScannedValueFilter] = useState<string>(savedResult?.lastScannedValueFilter || "");
 
   const updateTab = useAppStore(state => state.updateTab);
   const redisScanCount = useSettingsStore(state => state.redisScanCount);
@@ -180,7 +182,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
   // 显示 Scan More 按钮的条件：非精确搜索 + 搜索框非空 + 已搜索
   // hasMore 只决定按钮是否可点击，不决定是否显示
-  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched;
+  const showScanMore = !exactSearch && filter.trim() !== '' && hasSearched && hasMore;
 
   // Sync keys state to global store
   useEffect(() => {
@@ -208,12 +210,14 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           allValues,
           valueCursor,
           zsetOrder,
-          valueExactSearch
+          valueExactSearch,
+          hasValueSearched,
+          lastScannedValueFilter
         }
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [selectedKey, selectedValue, allValues, valueCursor, zsetOrder, valueExactSearch, tabId, updateTab]);
+  }, [selectedKey, selectedValue, allValues, valueCursor, zsetOrder, valueExactSearch, hasValueSearched, lastScannedValueFilter, tabId, updateTab]);
 
   // Refs for stable access in callbacks
   const loadingRef = useRef(loading);
@@ -524,6 +528,9 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         setAllValues((prev) => [...prev, ...filteredValues]);
       }
 
+      setLastScannedValueFilter(currentValueFilter);
+      if (reset) setHasValueSearched(true);
+
       setValueCursor(result.cursor);
       const hasMoreData = result.cursor !== "0";
       setValueHasMore(hasMoreData);
@@ -570,7 +577,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     } finally {
       setValueLoading(false);
     }
-  }, [connectionId, db]);
+  }, [connectionId, db, allValues.length]);
 
   const fetchListValues = useCallback(async (start = 0, end = 99, forcedType?: string) => {
     const currentSelectedKey = selectedKeyRef.current;
@@ -678,6 +685,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       setValueHasMore(false);
       setValueFilter("");
       setTotalItemCount(null);
+      setHasValueSearched(false);
+      setLastScannedValueFilter("");
     }
 
     if (currentKeyItem.type === "list") {
@@ -1320,6 +1329,14 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                       filter={valueFilter}
                       onFilterChange={setValueFilter}
                       onSearch={() => fetchComplexValues(true)}
+                      onScanMore={() => {
+                        if (valueHasMore && valueFilter === lastScannedValueFilter && valueCursor !== "0") {
+                          fetchComplexValues(false);
+                        } else {
+                          fetchComplexValues(true);
+                        }
+                      }}
+                      hasSearched={hasValueSearched}
                       onRefresh={handleRefresh}
                       observerTarget={valueObserverTarget}
                       zsetOrder={zsetOrder}
@@ -1409,6 +1426,8 @@ function ValueViewer({
   filter,
   onFilterChange,
   onSearch,
+  onScanMore,
+  hasSearched,
   onRefresh,
   observerTarget,
   zsetOrder,
@@ -1427,6 +1446,8 @@ function ValueViewer({
   filter: string;
   onFilterChange: (filter: string) => void;
   onSearch: () => void;
+  onScanMore: () => void;
+  hasSearched: boolean;
   onRefresh: () => void;
   observerTarget: React.RefObject<HTMLDivElement | null>;
   zsetOrder: 'asc' | 'desc';
@@ -1461,6 +1482,8 @@ function ValueViewer({
         filter={filter}
         onFilterChange={onFilterChange}
         onSearch={onSearch}
+        onScanMore={onScanMore}
+        hasSearched={hasSearched}
         onRefresh={onRefresh}
         observerTarget={observerTarget}
         exactSearch={exactSearch}
@@ -1481,6 +1504,8 @@ function ValueViewer({
         filter={filter}
         onFilterChange={onFilterChange}
         onSearch={onSearch}
+        onScanMore={onScanMore}
+        hasSearched={hasSearched}
         onRefresh={onRefresh}
         observerTarget={observerTarget}
         exactSearch={exactSearch}
@@ -1501,6 +1526,8 @@ function ValueViewer({
         filter={filter}
         onFilterChange={onFilterChange}
         onSearch={onSearch}
+        onScanMore={onScanMore}
+        hasSearched={hasSearched}
         onRefresh={onRefresh}
         observerTarget={observerTarget}
         sortOrder={zsetOrder}
