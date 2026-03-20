@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -104,7 +106,6 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
                             <SelectItem value="mysql">MySQL</SelectItem>
                             <SelectItem value="redis">Redis</SelectItem>
                             <SelectItem value="memcached">Memcached</SelectItem>
-                            <SelectItem value="postgres">PostgreSQL</SelectItem>
                             <SelectItem value="sqlite">SQLite</SelectItem>
                         </SelectContent>
                     </Select>
@@ -183,12 +184,54 @@ export function ConnectionForm({ initialData, onSubmit, onCancel, submitLabel }:
 
             <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium">{t('common.database')}</label>
-                <Input
-                    value={formData.database}
-                    onChange={(e) => handleChange('database', e.target.value)}
-                    className="col-span-3"
-                    placeholder={formData.db_type === 'sqlite' ? "/path/to/db.sqlite" : "default_db"}
-                />
+                <div className="col-span-3 flex gap-2">
+                    <Input
+                        value={formData.database}
+                        onChange={(e) => handleChange('database', e.target.value)}
+                        className="flex-1"
+                        placeholder={formData.db_type === 'sqlite' ? "/path/to/db.sqlite" : "default_db"}
+                    />
+                    {formData.db_type === 'sqlite' && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            title={t('common.selectFile', 'Select File')}
+                            onClick={async () => {
+                                try {
+                                    const selected = await openDialog({
+                                        filters: [{
+                                            name: 'SQLite Database',
+                                            extensions: ['sqlite', 'db', 'sqlite3', 'db3', 'xdb']
+                                        }, {
+                                            name: 'All Files',
+                                            extensions: ['*']
+                                        }],
+                                        multiple: false
+                                    });
+                                    if (selected) {
+                                        const path = selected as string;
+                                        // Update database path
+                                        handleChange('database', path);
+                                        
+                                        // Auto-fill name if it's currently empty
+                                        if (!formData.name) {
+                                            const filename = path.split(/[/\\]/).pop() || '';
+                                            const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
+                                            if (nameWithoutExt) {
+                                                handleChange('name', nameWithoutExt);
+                                            }
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error("Failed to select file:", err);
+                                }
+                            }}
+                        >
+                            <FolderOpen className="w-4 h-4" />
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {error && (
