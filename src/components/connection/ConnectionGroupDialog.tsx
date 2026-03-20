@@ -59,7 +59,7 @@ export function ConnectionGroupDialog({ initialData, onSubmit, onCancel, submitL
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="col-span-3"
-                    placeholder={t('common.connectionGroupPlaceholder', 'e.g. Development')}
+                    placeholder={t('common.connectionGroupPlaceholder')}
                 />
             </div>
 
@@ -75,7 +75,7 @@ export function ConnectionGroupDialog({ initialData, onSubmit, onCancel, submitL
             </div>
 
             <div className="grid grid-cols-4 items-start gap-4">
-                <label className="text-right text-sm font-medium pt-2">{t('common.color', 'Color')}</label>
+                <label className="text-right text-sm font-medium pt-2">{t('common.groupColor')}</label>
                 <div className="col-span-3 space-y-3">
                     <div className="flex flex-wrap gap-2">
                         {PRESET_COLORS.map((preset) => (

@@ -364,7 +364,7 @@ export function ConnectionTreeItem({
                 ? ""
                 : "WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')";
             sql = `
-                SELECT TABLE_SCHEMA, TABLE_NAME
+                SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_COMMENT, TABLE_ROWS
                 FROM information_schema.TABLES
                 ${systemDbFilter}
             `;
@@ -377,7 +377,7 @@ export function ConnectionTreeItem({
 
             const dbList = dbsToQuery.map((db) => `'${db.replace(/'/g, "''")}'`).join(",");
             sql = `
-                SELECT TABLE_SCHEMA, TABLE_NAME
+                SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_COMMENT, TABLE_ROWS
                 FROM information_schema.TABLES
                 WHERE TABLE_SCHEMA IN (${dbList})
             `;
@@ -398,7 +398,11 @@ export function ConnectionTreeItem({
                 if (!newTables[schema]) {
                     newTables[schema] = [];
                 }
-                newTables[schema].push({ name });
+                newTables[schema].push({
+                    name,
+                    comment: row["TABLE_COMMENT"] as string,
+                    rowCount: row["TABLE_ROWS"] !== null ? Number(row["TABLE_ROWS"]) : undefined
+                });
             });
 
             Object.entries(newTables).forEach(([dbName, tableList]) => {
@@ -820,6 +824,7 @@ export function ConnectionTreeItem({
                                                             y: e.clientY,
                                                         });
                                                     }}
+                                                    title={node.table.comment}
                                                 >
                                                     <TableIcon className="h-3 w-3 text-blue-500 shrink-0" />
                                                     <span className="truncate">

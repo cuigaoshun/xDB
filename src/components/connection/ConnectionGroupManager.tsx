@@ -155,7 +155,7 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
                             </div>
                         ) : connectionGroups.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
-                                {t('common.noGroup')}
+                                {t('common.noGroupsFound')}
                             </div>
                         ) : (
                             <div className="space-y-2">
@@ -173,7 +173,7 @@ export function ConnectionGroupManager({ open, onOpenChange, onSuccess }: Connec
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium">{group.name}</span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    ({getConnectionCount(group.id)} {t('common.connectionsCount', 'connections')})
+                                                    ({t('common.connectionsCount', { count: getConnectionCount(group.id) })})
                                                 </span>
                                             </div>
                                             {group.description && (
