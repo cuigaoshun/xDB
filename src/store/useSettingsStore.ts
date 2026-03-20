@@ -18,8 +18,7 @@ export interface Settings {
   mysqlPrefetchDbCount: number | 'all';
   // 最近访问的数据库: key 格式为 connectionId, 值为数据库名数组（按访问时间倒序）
   recentDatabases: Record<number, string[]>;
-  // Connection list heights: key is connectionId, value is height in pixels
-  connectionListHeights: Record<number, number>;
+
   // 是否展示系统数据库
   showSystemDatabases: boolean;
 }
@@ -42,10 +41,7 @@ interface SettingsState extends Settings {
   // 最近访问数据库方法
   getRecentDatabases: (connectionId: number) => string[];
   addRecentDatabase: (connectionId: number, dbName: string) => void;
-  // Connection list height methods
-  setConnectionListHeight: (connectionId: number, height: number) => void;
-  getConnectionListHeight: (connectionId: number) => number | undefined;
-  resetConnectionListHeight: (connectionId: number) => void;
+
 }
 
 const defaultViewPreference: RedisViewPreference = {
@@ -59,7 +55,7 @@ const defaultSettings: Settings = {
   redisSearchHistory: {},
   mysqlPrefetchDbCount: 'all',
   recentDatabases: {},
-  connectionListHeights: {},
+
   showSystemDatabases: false,
 };
 
@@ -167,26 +163,7 @@ export const useSettingsStore = create<SettingsState>()(
         });
       },
 
-      setConnectionListHeight: (connectionId, height) => {
-        set((state) => ({
-          connectionListHeights: {
-            ...state.connectionListHeights,
-            [connectionId]: height,
-          },
-        }));
-      },
 
-      getConnectionListHeight: (connectionId) => {
-        return get().connectionListHeights[connectionId];
-      },
-
-      resetConnectionListHeight: (connectionId) => {
-        set((state) => {
-          const newHeights = { ...state.connectionListHeights };
-          delete newHeights[connectionId];
-          return { connectionListHeights: newHeights };
-        });
-      },
     }),
     {
       name: 'neodb-settings',

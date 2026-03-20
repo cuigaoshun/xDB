@@ -12,8 +12,6 @@ import {
     Loader2,
     FileCode,
     ChevronsDownUp,
-    GripHorizontal,
-    RotateCcw,
     RefreshCw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -94,14 +92,6 @@ export function ConnectionTreeItem({
     const [expandedDatabases, setExpandedDatabases] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
 
-    const heightMap = useSettingsStore((state) => state.connectionListHeights);
-    const setConnectionListHeight = useSettingsStore((state) => state.setConnectionListHeight);
-    const resetConnectionListHeight = useSettingsStore((state) => state.resetConnectionListHeight);
-
-    const [isResizing, setIsResizing] = useState(false);
-    const [dragHeight, setDragHeight] = useState<number | undefined>(undefined);
-    const resizingRef = useRef<{ startY: number; startHeight: number } | null>(null);
-    const currentDragHeightRef = useRef<number | undefined>(undefined);
 
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
     const [createTableDbName, setCreateTableDbName] = useState<string>("");
@@ -122,8 +112,7 @@ export function ConnectionTreeItem({
     const { fetchRedisDatabases } = useRedisDatabases();
     const { fetchSqliteDatabases } = useSqliteDatabases();
 
-    const storedHeight = heightMap[connection.id];
-    const actualHeight = dragHeight ?? storedHeight;
+
     const filterTermLower = useMemo(() => filterTerm?.toLowerCase() || "", [filterTerm]);
     const recentDatabases = recentDatabasesMap[connection.id] ?? EMPTY_ARRAY;
     const isMySql = connection.db_type === "mysql";
@@ -443,40 +432,7 @@ export function ConnectionTreeItem({
         }
     }, [connection.id, globalExpandedId, setExpandedConnectionId]);
 
-    const handleResizeMove = useCallback((moveEvent: MouseEvent) => {
-        if (!resizingRef.current) return;
 
-        const deltaY = moveEvent.clientY - resizingRef.current.startY;
-        const newHeight = Math.max(100, resizingRef.current.startHeight + deltaY);
-        setDragHeight(newHeight);
-        currentDragHeightRef.current = newHeight;
-    }, []);
-
-    const finishResize = useCallback(() => {
-        if (currentDragHeightRef.current !== undefined) {
-            setConnectionListHeight(connection.id, currentDragHeightRef.current);
-        }
-
-        setIsResizing(false);
-        setDragHeight(undefined);
-        resizingRef.current = null;
-        currentDragHeightRef.current = undefined;
-    }, [connection.id, setConnectionListHeight]);
-
-    useEffect(() => {
-        if (!isResizing) {
-            return;
-        }
-
-        const handleMouseUp = () => finishResize();
-        document.addEventListener("mousemove", handleResizeMove);
-        document.addEventListener("mouseup", handleMouseUp);
-
-        return () => {
-            document.removeEventListener("mousemove", handleResizeMove);
-            document.removeEventListener("mouseup", handleMouseUp);
-        };
-    }, [finishResize, handleResizeMove, isResizing]);
 
     useEffect(() => {
         if (globalExpandedId === connection.id) {
@@ -512,20 +468,7 @@ export function ConnectionTreeItem({
         }
     }, [expandedDatabases, filterTermLower, filteredDatabasesMap, isMySql]);
 
-    const handleResizeStart = (e: React.MouseEvent) => {
-        if (filterTerm) return;
 
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentRef = virtualListRef.current;
-        const startHeight = actualHeight || (currentRef ? currentRef.offsetHeight : 300);
-
-        setIsResizing(true);
-        setDragHeight(startHeight);
-        currentDragHeightRef.current = startHeight;
-        resizingRef.current = { startY: e.clientY, startHeight };
-    };
 
     const handleToggleExpand = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -797,9 +740,8 @@ export function ConnectionTreeItem({
                             ref={virtualListRef}
                             className={cn(
                                 "overflow-y-auto transition-all duration-75 scrollbar-thin",
-                                !actualHeight && (isMySql || isSqlite ? "max-h-[600px]" : "max-h-[320px]"),
+                                isRedis ? "max-h-[320px]" : "max-h-[600px]",
                             )}
-                            style={actualHeight ? { height: actualHeight } : undefined}
                         >
                             <div
                                 style={{
@@ -892,29 +834,7 @@ export function ConnectionTreeItem({
                         </div>
                     )}
 
-                    {!filterTerm && (
-                        <div
-                            className="absolute bottom-0 left-0 right-0 flex items-center justify-center z-10 cursor-ns-resize group h-1 hover:h-4 transition-all duration-200"
-                            onMouseDown={handleResizeStart}
-                        >
-                            <div className="absolute inset-0 bg-transparent group-hover:bg-accent/50 transition-colors rounded-sm" />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <GripHorizontal className="w-4 h-4 text-muted-foreground/50" />
-                            </div>
-                            {storedHeight && (
-                                <button
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-sm hover:bg-background/80 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        resetConnectionListHeight(connection.id);
-                                    }}
-                                    title={t("common.resetHeight", "恢复默认高度")}
-                                >
-                                    <RotateCcw className="w-3 h-3" />
-                                </button>
-                            )}
-                        </div>
-                    )}
+
                 </div>
             )}
 
