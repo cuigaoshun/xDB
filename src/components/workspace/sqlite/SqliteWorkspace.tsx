@@ -790,6 +790,9 @@ export function SqliteWorkspace({
                                 schemaColumnsRef={schemaColumnsRef}
                                 onEditorMount={(editor) => {
                                     editorRef.current = editor;
+                                    if (defaultSqlRef.current) {
+                                        editor.setValue(defaultSqlRef.current);
+                                    }
                                 }}
                                 onSqlChange={handleEditorSqlChange}
                                 onExecute={handleExecute}
@@ -806,7 +809,6 @@ export function SqliteWorkspace({
                                         </button>
                                     </div>
                                 )}
-
                                 {result && result.columns.length === 0 && successMessage && (
                                     <div className="h-full flex items-center justify-center">
                                         <div className="flex flex-col items-center gap-3 text-center p-8">
@@ -824,7 +826,6 @@ export function SqliteWorkspace({
                                         </div>
                                     </div>
                                 )}
-
                                 {result && (result.columns.length > 0 || !successMessage) && (
                                     <div className="h-full min-h-0 flex flex-col">
                                         <SqlResultTable
@@ -845,28 +846,18 @@ export function SqliteWorkspace({
                                             onCellCancel={handleCellCancel}
                                             onOpenExistingRow={openExistingRowViewer}
                                             onOpenNewRow={openNewBufferedRowViewer}
-                                            onDeleteNewRow={(rowIdx) => setNewRows((previousRows) => previousRows.filter((_, index) => index !== rowIdx))}
+                                            onDeleteNewRow={(idx) => setNewRows((rows) => rows.filter((_, i) => i !== idx))}
                                             onCopySingleRow={handleCopySingleRow}
                                             onDeleteSingleRow={handleDeleteSingleRow}
-                                            onToggleRowSelection={(rowIdx) => {
-                                                setSelectedRowIndices((previousIndices) => (
-                                                    previousIndices.includes(rowIdx)
-                                                        ? previousIndices.filter((index) => index !== rowIdx)
-                                                        : [...previousIndices, rowIdx]
-                                                ));
+                                            onToggleRowSelection={(idx) => {
+                                                setSelectedRowIndices((prev) => prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]);
                                             }}
-                                            onSelectAllRows={setSelectedRowIndices}
+                                            onSelectAllRows={() => setSelectedRowIndices(result.rows.map((_, i) => i))}
                                             onClearSelection={() => setSelectedRowIndices([])}
-                                            onInlineFilterChange={(columnName, value) => {
-                                                setInlineFilters((previousFilters) => ({
-                                                    ...previousFilters,
-                                                    [columnName]: value,
-                                                }));
-                                            }}
+                                            onInlineFilterChange={(col, val) => setInlineFilters((prev) => ({ ...prev, [col]: val }))}
                                             onOpenFormatter={handleOpenFormatter}
                                             renderColumnTypeIcon={renderColumnTypeIcon}
                                         />
-
                                         {result.rows.length > 0 && (
                                             <SqlPaginationBar
                                                 currentPage={currentPage}
@@ -880,11 +871,11 @@ export function SqliteWorkspace({
                                                 editDisabledReason={editableState.reason}
                                                 onPageChange={handlePageChange}
                                                 onPageSizeInputChange={setPageSizeInput}
+                                                onExportData={() => undefined}
                                             />
                                         )}
                                     </div>
                                 )}
-
                                 {!result && !error && !isLoading && (
                                     <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                                         {t("common.noResults")}
@@ -893,47 +884,23 @@ export function SqliteWorkspace({
                             </div>
                         </div>
                     </ResizablePanel>
-
                     {showDDL && (
                         <>
                             <ResizableHandle withHandle />
-                            <SqlDdlPanel
-                                ddl={ddl}
-                                isDark={isDark}
-                                isLoading={isLoadingDDL}
-                                panelRef={ddlPanelRef}
-                            />
+                            <SqlDdlPanel ddl={ddl} isDark={isDark} isLoading={isLoadingDDL} panelRef={ddlPanelRef} />
                         </>
                     )}
                 </ResizablePanelGroup>
             </div>
 
-            <TextFormatterDialog
-                open={formatterOpen}
-                onOpenChange={setFormatterOpen}
-                content={formatterContent}
-                title={formatterTitle}
-                readonly={formatterReadOnly}
-                onSave={formatterOnSave}
-            />
-
+            <TextFormatterDialog open={formatterOpen} onOpenChange={setFormatterOpen} content={formatterContent} title={formatterTitle} readonly={formatterReadOnly} onSave={formatterOnSave} />
             <RowViewerDialog
                 open={rowViewerOpen}
                 onOpenChange={setRowViewerOpen}
                 row={viewingRow}
                 columns={result?.columns || []}
-                title={
-                    rowViewerMode === "create" && viewingRowIndex === -1
-                        ? t("common.addRow", "新增行")
-                        : ((editableState.isEditable || rowViewerMode === "create")
-                            ? t("common.editRow", "编辑行")
-                            : t("common.viewRow", "查看行数据"))
-                }
-                submitLabel={
-                    rowViewerMode === "create" && viewingRowIndex === -1
-                        ? t("common.add", "新增")
-                        : t("common.save", "保存")
-                }
+                title={rowViewerMode === "create" && viewingRowIndex === -1 ? t("common.addRow") : (editableState.isEditable || rowViewerMode === "create" ? t("common.editRow") : t("common.viewRow"))}
+                submitLabel={rowViewerMode === "create" && viewingRowIndex === -1 ? t("common.add") : t("common.save")}
                 editable={editableState.isEditable || rowViewerMode === "create"}
                 onSave={handleRowViewerSave}
             />

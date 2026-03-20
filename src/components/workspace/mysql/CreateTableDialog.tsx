@@ -21,7 +21,8 @@ import {
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Plus, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { invokeSql } from "@/lib/api.ts";
+import { invokeSql, invokeSqliteSql } from "@/lib/api.ts";
+import { cn } from "@/lib/utils.ts";
 
 interface CreateTableDialogProps {
     open: boolean;
@@ -29,6 +30,7 @@ interface CreateTableDialogProps {
     connectionId: number;
     dbName: string;
     onSuccess?: () => void;
+    dbType?: "mysql" | "sqlite";
 }
 
 interface TableColumn {
@@ -41,17 +43,20 @@ interface TableColumn {
 }
 
 const DATA_TYPES = ['INT', 'VARCHAR', 'TEXT', 'DATETIME', 'DECIMAL', 'BIGINT', 'FLOAT', 'DOUBLE', 'DATE', 'TIME', 'TIMESTAMP', 'CHAR', 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'BOOLEAN', 'JSON'];
+const SQLITE_DATA_TYPES = ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC', 'BOOLEAN', 'DATETIME'];
 const ENGINES = ['InnoDB', 'MyISAM', 'MEMORY', 'CSV', 'ARCHIVE'];
 const CHARSETS = ['utf8mb4', 'utf8', 'latin1', 'gbk', 'ascii'];
 
-export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, onSuccess }: CreateTableDialogProps) {
+export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, onSuccess, dbType = "mysql" }: CreateTableDialogProps) {
     const { t } = useTranslation();
     const [tableName, setTableName] = useState('');
     const [engine, setEngine] = useState('InnoDB');
     const [charset, setCharset] = useState('utf8mb4');
     const [comment, setComment] = useState('');
+    const isSqlite = dbType === "sqlite";
+
     const [columns, setColumns] = useState<TableColumn[]>([
-        { name: 'id', type: 'INT', length: '11', nullable: false, isPrimary: true, autoIncrement: true }
+        { name: 'id', type: isSqlite ? 'INTEGER' : 'INT', length: isSqlite ? '' : '11', nullable: false, isPrimary: true, autoIncrement: true }
     ]);
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -59,8 +64,8 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
     const handleAddColumn = () => {
         setColumns([...columns, {
             name: '',
-            type: 'VARCHAR',
-            length: '255',
+            type: isSqlite ? 'TEXT' : 'VARCHAR',
+            length: isSqlite ? '' : '255',
             nullable: true,
             isPrimary: false,
             autoIncrement: false
@@ -78,6 +83,32 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
     };
 
     const generateDDL = (): string => {
+        if (isSqlite) {
+            const columnDefs = columns.map(col => {
+                let def = `  "${col.name}" ${col.type}`;
+                if (col.isPrimary && col.autoIncrement && col.type.toUpperCase() === 'INTEGER') {
+                    def = `  "${col.name}" INTEGER PRIMARY KEY AUTOINCREMENT`;
+                    return def;
+                }
+                
+                if (col.length && ['VARCHAR', 'CHAR'].includes(col.type.toUpperCase())) {
+                    def += `(${col.length})`;
+                }
+                
+                if (!col.nullable) {
+                    def += ' NOT NULL';
+                }
+                
+                if (col.isPrimary && (!col.autoIncrement || col.type.toUpperCase() !== 'INTEGER')) {
+                    def += ' PRIMARY KEY';
+                }
+                
+                return def;
+            }).join(',\n');
+
+            return `CREATE TABLE "${tableName}" (\n${columnDefs}\n);`;
+        }
+
         const columnDefs = columns.map(col => {
             let def = `  \`${col.name}\` ${col.type}`;
             if (col.length && ['VARCHAR', 'CHAR', 'INT', 'BIGINT', 'DECIMAL'].includes(col.type)) {
@@ -127,13 +158,17 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
         try {
             const sql = generateDDL();
 
-            await invokeSql({ connectionId, sql });
+            if (isSqlite) {
+                await invokeSqliteSql({ connectionId, sql });
+            } else {
+                await invokeSql({ connectionId, sql });
+            }
             onSuccess?.();
             onOpenChange(false);
 
             // 重置表单
             setTableName('');
-            setColumns([{ name: 'id', type: 'INT', length: '11', nullable: false, isPrimary: true, autoIncrement: true }]);
+            setColumns([{ name: 'id', type: isSqlite ? 'INTEGER' : 'INT', length: isSqlite ? '' : '11', nullable: false, isPrimary: true, autoIncrement: true }]);
             setComment('');
         } catch (err: any) {
             console.error("Failed to create table:", err);
@@ -142,6 +177,8 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
             setIsCreating(false);
         }
     };
+
+    const dataTypes = isSqlite ? SQLITE_DATA_TYPES : DATA_TYPES;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,50 +211,56 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                         />
                     </div>
 
-                    {/* 存储引擎 */}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">{t('mysql.engine')}</Label>
-                        <Select value={engine} onValueChange={setEngine}>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {ENGINES.map(eng => (
-                                    <SelectItem key={eng} value={eng}>{eng}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    {!isSqlite && (
+                        <>
+                            {/* 存储引擎 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">{t('mysql.engine')}</Label>
+                                <Select value={engine} onValueChange={setEngine}>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {ENGINES.map(eng => (
+                                            <SelectItem key={eng} value={eng}>{eng}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                    {/* 字符集 */}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">{t('mysql.charset')}</Label>
-                        <Select value={charset} onValueChange={setCharset}>
-                            <SelectTrigger className="col-span-3">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {CHARSETS.map(cs => (
-                                    <SelectItem key={cs} value={cs}>{cs}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                            {/* 字符集 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">{t('mysql.charset')}</Label>
+                                <Select value={charset} onValueChange={setCharset}>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {CHARSETS.map(cs => (
+                                            <SelectItem key={cs} value={cs}>{cs}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </>
+                    )}
 
                     {/* 表注释 */}
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="comment" className="text-right">
-                            {t('mysql.comment')}
-                        </Label>
-                        <Textarea
-                            id="comment"
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            className="col-span-3"
-                            rows={2}
-                            placeholder={t('mysql.commentPlaceholder', 'Column description/comment')}
-                        />
-                    </div>
+                    {!isSqlite && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="comment" className="text-right">
+                                {t('mysql.comment')}
+                            </Label>
+                            <Textarea
+                                id="comment"
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                className="col-span-3"
+                                rows={2}
+                                placeholder={t('mysql.commentPlaceholder', 'Column description/comment')}
+                            />
+                        </div>
+                    )}
 
                     {/* 列定义 */}
                     <div className="col-span-4">
@@ -246,25 +289,27 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {DATA_TYPES.map(type => (
+                                            {dataTypes.map(type => (
                                                 <SelectItem key={type} value={type}>{type}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <Input
-                                        placeholder={t('mysql.lengthPlaceholder', '255')}
-                                        value={col.length}
-                                        onChange={(e) => handleColumnChange(index, 'length', e.target.value)}
-                                        className="col-span-1 h-8 text-xs"
-                                    />
-                                    <div className="col-span-2 flex items-center gap-2">
+                                    {!isSqlite && (
+                                        <Input
+                                            placeholder={t('mysql.lengthPlaceholder', '255')}
+                                            value={col.length}
+                                            onChange={(e) => handleColumnChange(index, 'length', e.target.value)}
+                                            className="col-span-1 h-8 text-xs"
+                                        />
+                                    )}
+                                    <div className={cn(isSqlite ? "col-span-3" : "col-span-2", "flex items-center gap-2")}>
                                         <Checkbox
                                             checked={col.nullable}
                                             onCheckedChange={(checked) => handleColumnChange(index, 'nullable', checked)}
                                         />
                                         <span className="text-xs">NULL</span>
                                     </div>
-                                    <div className="col-span-2 flex items-center gap-2">
+                                    <div className={cn(isSqlite ? "col-span-3" : "col-span-2", "flex items-center gap-2")}>
                                         <Checkbox
                                             checked={col.isPrimary}
                                             onCheckedChange={(checked) => handleColumnChange(index, 'isPrimary', checked)}
@@ -275,7 +320,7 @@ export function CreateTableDialog({ open, onOpenChange, connectionId, dbName, on
                                         <Checkbox
                                             checked={col.autoIncrement}
                                             onCheckedChange={(checked) => handleColumnChange(index, 'autoIncrement', checked)}
-                                            disabled={!['INT', 'BIGINT', 'SMALLINT', 'TINYINT', 'MEDIUMINT'].includes(col.type)}
+                                            disabled={isSqlite ? col.type.toUpperCase() !== 'INTEGER' : !['INT', 'BIGINT', 'SMALLINT', 'TINYINT', 'MEDIUMINT'].includes(col.type)}
                                         />
                                         <span className="text-xs">AI</span>
                                     </div>

@@ -231,8 +231,9 @@ export function useMysqlWorkspaceQuery({
         }
 
         const baseQuery = `${query};`;
-        setExecutedSql(baseQuery);
-        return runQuery(autoAddLimit(baseQuery, nextPageSize, 0), { skipExecutedSqlUpdate: true });
+        const finalQuery = autoAddLimit(baseQuery, nextPageSize, 0);
+        setExecutedSql(finalQuery);
+        return runQuery(finalQuery, { skipExecutedSqlUpdate: true });
     }, [dbName, runQuery, tableName]);
 
     const loadDDL = useCallback(async () => {

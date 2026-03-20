@@ -51,6 +51,8 @@ export function SqlWorkspaceToolbar({
 }: SqlWorkspaceToolbarProps) {
     const { t } = useTranslation();
 
+    const canShowSchema = showSchemaButton && connection?.db_type === 'mysql';
+
     return (
         <div className="p-2 flex gap-2 items-center bg-muted/30 justify-between">
             <div className="flex gap-2 items-center">
@@ -163,7 +165,7 @@ export function SqlWorkspaceToolbar({
             <div className="flex gap-2 items-center">
                 {tableName && connection && (
                     <>
-                        {showSchemaButton && (
+                        {canShowSchema && (
                             <Button
                                 variant="ghost"
                                 size="sm"

@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CreateTableDialog } from "@/components/workspace/mysql/CreateTableDialog.tsx";
-import { CreateDatabaseDialog } from "@/components/workspace/mysql/CreateDatabaseDialog.tsx";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { invokeSql, invokeSqliteSql } from "@/lib/api.ts";
 import { useMysqlDatabases } from "@/components/workspace/mysql/hooks/useMysqlDatabases";
@@ -106,7 +105,6 @@ export function ConnectionTreeItem({
 
     const [showCreateTableDialog, setShowCreateTableDialog] = useState(false);
     const [createTableDbName, setCreateTableDbName] = useState<string>("");
-    const [showCreateDatabaseDialog, setShowCreateDatabaseDialog] = useState(false);
     const [contextMenu, setContextMenu] = useState<{
         type: "connection" | "database" | "table";
         db?: string;
@@ -637,10 +635,17 @@ export function ConnectionTreeItem({
         if (!confirmed) return;
 
         try {
-            await invokeSql({
-                connectionId: connection.id,
-                sql: `DROP TABLE \`${dbName}\`.\`${tableName}\``,
-            });
+            if (isSqlite) {
+                await invokeSqliteSql({
+                    connectionId: connection.id,
+                    sql: `DROP TABLE "${tableName}"`,
+                });
+            } else {
+                await invokeSql({
+                    connectionId: connection.id,
+                    sql: `DROP TABLE \`${dbName}\`.\`${tableName}\``,
+                });
+            }
             await loadTables(dbName, { force: true });
             toast({
                 title: t("common.success"),
@@ -657,39 +662,7 @@ export function ConnectionTreeItem({
         }
     };
 
-    const handleDeleteDatabase = async (dbName: string) => {
-        const confirmed = await confirm({
-            title: t("common.confirmDeletion"),
-            description: t("mysql.confirmDeleteDatabase", { db: dbName }),
-            variant: "destructive",
-        });
-        if (!confirmed) return;
 
-        try {
-            await invokeSql({
-                connectionId: connection.id,
-                sql: `DROP DATABASE \`${dbName}\``,
-            });
-            setExpandedDatabases((prev) => {
-                const next = new Set(prev);
-                next.delete(dbName);
-                return next;
-            });
-            await loadDatabases();
-            toast({
-                title: t("common.success"),
-                description: t("mysql.deleteDatabaseSuccess", { db: dbName }),
-                variant: "success",
-            });
-        } catch (err: any) {
-            console.error("Failed to drop database:", err);
-            toast({
-                title: t("common.error"),
-                description: String(err),
-                variant: "destructive",
-            });
-        }
-    };
 
     const handleNewQueryTab = (dbName: string, tableName?: string) => {
         const initialSql = tableName ? `SELECT * FROM \`${dbName}\`.\`${tableName}\`;` : `-- ${t("mysql.newQueryTab", "New Query")}`;
@@ -960,15 +933,9 @@ export function ConnectionTreeItem({
                         onClick={(e) => e.stopPropagation()}
                     >
                         {contextMenu.type === "connection" && (
-                            <button
-                                className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
-                                onClick={() => {
-                                    setShowCreateDatabaseDialog(true);
-                                    setContextMenu(null);
-                                }}
-                            >
-                                {t("mysql.createDatabase")}
-                            </button>
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground italic">
+                                {t("common.noActions", "No Actions")}
+                            </div>
                         )}
 
                         {contextMenu.type === "database" && contextMenu.db && (
@@ -1013,25 +980,7 @@ export function ConnectionTreeItem({
                                         >
                                             {t("mysql.createTable")}
                                         </button>
-                                        <div className="h-px bg-border my-1" />
-                                        <button
-                                            className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
-                                            onClick={() => {
-                                                setShowCreateDatabaseDialog(true);
-                                                setContextMenu(null);
-                                            }}
-                                        >
-                                            {t("mysql.createDatabase")}
-                                        </button>
-                                        <button
-                                            className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap text-red-600"
-                                            onClick={() => {
-                                                void handleDeleteDatabase(contextMenu.db!);
-                                                setContextMenu(null);
-                                            }}
-                                        >
-                                            {t("mysql.deleteDatabase")}
-                                        </button>
+
                                     </>
                                 )}
                             </>
@@ -1048,15 +997,17 @@ export function ConnectionTreeItem({
                                 >
                                     {t("mysql.viewData")}
                                 </button>
-                                <button
-                                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
-                                    onClick={() => {
-                                        handleViewTableSchema(contextMenu.db!, contextMenu.table!);
-                                        setContextMenu(null);
-                                    }}
-                                >
-                                    {t("mysql.viewSchema")}
-                                </button>
+                                {isMySql && (
+                                    <button
+                                        className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
+                                        onClick={() => {
+                                            handleViewTableSchema(contextMenu.db!, contextMenu.table!);
+                                            setContextMenu(null);
+                                        }}
+                                    >
+                                        {t("mysql.viewSchema")}
+                                    </button>
+                                )}
                                 <button
                                     className="w-full px-2 py-1.5 text-left text-sm hover:bg-accent whitespace-nowrap"
                                     onClick={() => {
@@ -1091,27 +1042,17 @@ export function ConnectionTreeItem({
                 </div>
             )}
 
-            {isMySql && (
+            {(isMySql || isSqlite) && (
                 <CreateTableDialog
                     open={showCreateTableDialog}
                     onOpenChange={setShowCreateTableDialog}
                     connectionId={connection.id}
                     dbName={createTableDbName}
+                    dbType={connection.db_type as "mysql" | "sqlite"}
                     onSuccess={() => {
                         if (createTableDbName) {
                             void loadTables(createTableDbName, { force: true });
                         }
-                    }}
-                />
-            )}
-
-            {isMySql && (
-                <CreateDatabaseDialog
-                    open={showCreateDatabaseDialog}
-                    onOpenChange={setShowCreateDatabaseDialog}
-                    connectionId={connection.id}
-                    onSuccess={() => {
-                        void loadDatabases();
                     }}
                 />
             )}

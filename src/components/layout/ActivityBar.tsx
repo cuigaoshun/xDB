@@ -290,8 +290,8 @@ export function ConnectionSidebar({ collapsed, onToggle }: { collapsed: boolean,
             type: conn.db_type,
             connectionId: conn.id,
             initialSql: conn.db_type === 'sqlite'
-                ? `SELECT * FROM "${table}";`
-                : `SELECT * FROM \`${db}\`.\`${table}\`;`,
+                ? `SELECT * FROM "${table}" LIMIT 20;`
+                : `SELECT * FROM \`${db}\`.\`${table}\` LIMIT 20;`,
             dbName: db,
             tableName: table
         };

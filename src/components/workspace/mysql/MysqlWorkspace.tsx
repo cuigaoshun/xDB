@@ -412,6 +412,9 @@ export function MysqlWorkspace({
                                 schemaColumnsRef={schemaColumnsRef}
                                 onEditorMount={(editor) => {
                                     editorRef.current = editor;
+                                    if (defaultSqlRef.current) {
+                                        editor.setValue(defaultSqlRef.current);
+                                    }
                                 }}
                                 onSqlChange={handleEditorSqlChange}
                                 onExecute={handleExecute}

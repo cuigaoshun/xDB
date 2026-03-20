@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -42,19 +42,43 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
     const [orderByField, setOrderByField] = useState<string>('');
     const [orderByDirection, setOrderByDirection] = useState<'ASC' | 'DESC'>('DESC');
 
-    // 当主键信息可用时，自动设置默认排序字段
+    const initialConditionAdded = useRef(false);
+
+    // 当主键信息可用时，自动设置默认排序字段和初始查询条件
     useEffect(() => {
-        if (primaryKeys.length > 0 && !orderByField) {
-            setOrderByField(primaryKeys[0]);
+        if (primaryKeys.length > 0) {
+            if (!orderByField) {
+                setOrderByField(primaryKeys[0]);
+            }
+
+            // 只有在没有初始状态且主键可用时，才默认展开主键条件
+            if (!initialState && !initialConditionAdded.current) {
+                setRoot(prev => ({
+                    ...prev,
+                    children: [
+                        {
+                            id: 'default-condition',
+                            type: 'condition',
+                            isActive: true,
+                            logic: 'AND',
+                            field: primaryKeys[0],
+                            operator: '=',
+                            value: '',
+                            nextLogic: 'AND'
+                        }
+                    ]
+                }));
+                initialConditionAdded.current = true;
+            }
         }
-    }, [primaryKeys]);
+    }, [primaryKeys, initialState, orderByField]);
 
     // 当列信息可用且没有设置排序字段时，使用第一个列
     useEffect(() => {
         if (columns.length > 0 && !orderByField && primaryKeys.length === 0) {
             setOrderByField(columns[0].name);
         }
-    }, [columns]);
+    }, [columns, primaryKeys, orderByField]);
 
     // Notify parent of changes
     useEffect(() => {
