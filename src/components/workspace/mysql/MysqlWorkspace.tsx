@@ -140,6 +140,14 @@ export function MysqlWorkspace({
         [result],
     );
 
+    const isTableDataView = useMemo(() => {
+        const sql = savedSql || initialSql || "";
+        return Boolean(tableName) && sql.trim().toUpperCase().startsWith("SELECT * FROM");
+    }, [tableName, savedSql, initialSql]);
+
+    const editorDefaultSize = isTableDataView ? 30 : 50;
+    const resultDefaultSize = isTableDataView ? 70 : 50;
+
     const ddlPanelRef = useDDLPanelResize(ddl, showDDL, isLoadingDDL);
 
     const handleEditorSqlChange = useCallback((sql: string) => {
@@ -405,7 +413,7 @@ export function MysqlWorkspace({
                     <ResizablePanel defaultSize={showDDL ? 60 : 100} minSize={30}>
                         <div className="h-full flex flex-col">
                             <ResizablePanelGroup direction="vertical">
-                                <ResizablePanel defaultSize={70} minSize={10}>
+                                <ResizablePanel defaultSize={editorDefaultSize} minSize={10}>
                                     <SqlQueryEditor
                                         connectionId={connectionId}
                                         dbName={dbName}
@@ -426,7 +434,7 @@ export function MysqlWorkspace({
                                 {(result || error || isLoading) && (
                                     <>
                                         <ResizableHandle withHandle />
-                                        <ResizablePanel defaultSize={30} minSize={10}>
+                                        <ResizablePanel defaultSize={resultDefaultSize} minSize={10}>
                                             <div className="flex-1 h-full min-h-0 pb-1 overflow-hidden flex flex-col pt-1">
                                                 {error && (
                                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2 overflow-auto mx-2">
