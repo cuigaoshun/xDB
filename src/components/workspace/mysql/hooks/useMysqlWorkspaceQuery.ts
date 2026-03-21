@@ -211,6 +211,55 @@ export function useMysqlWorkspaceQuery({
         }
     }, [connectionId, dbName, detectPrimaryKeys, result?.columns, t, tableName]);
 
+    const runBatchQueries = useCallback(async (queries: string[]) => {
+        if (!queries.length) return null;
+
+        setIsLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        let affectedRowsTotal = 0;
+        let completed = 0;
+
+        try {
+            for (let query of queries) {
+                if (!query.trim().endsWith(";")) {
+                    query += ";";
+                }
+                const rawData = await invokeSql<SqlResult>({
+                    connectionId,
+                    sql: query,
+                    dbName,
+                });
+                affectedRowsTotal += rawData.affected_rows || 0;
+                completed++;
+            }
+
+            const message = t("mysql.batchStatementsExecutedSuccessfully", "{{count}} statement(s) executed successfully", { count: completed });
+            setSuccessMessage(message);
+            toast({
+                title: t("common.success", "Success"),
+                description: message,
+                duration: 3000,
+            });
+
+            const finalResult = {
+                columns: [],
+                rows: [],
+                affected_rows: affectedRowsTotal
+            };
+            setResult(finalResult);
+            return finalResult;
+        } catch (executeError: any) {
+            console.error(`Execute batch failed at statement ${completed + 1}:`, executeError);
+            const errorMsg = typeof executeError === "string" ? executeError : JSON.stringify(executeError);
+            setError(`Error at statement ${completed + 1}:\n${errorMsg}`);
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [connectionId, dbName, t]);
+
     const refresh = useCallback(async (query = executedSql) => {
         return runQuery(query, { skipExecutedSqlUpdate: true });
     }, [executedSql, runQuery]);
@@ -407,6 +456,7 @@ export function useMysqlWorkspaceQuery({
         result,
         runFilteredQuery,
         runQuery,
+        runBatchQueries,
         schemaColumnsRef,
         setDdl,
         setError,

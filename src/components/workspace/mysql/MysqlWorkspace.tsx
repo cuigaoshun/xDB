@@ -17,6 +17,7 @@ import { autoAddLimit } from "@/hooks/usePagination";
 import { useDDLPanelResize } from "@/hooks/useDDLPanelResize";
 import type { SqlResult } from "@/types/sql";
 import { buildFilteredRowEntries, buildUniqueColumnValueMap } from "@/components/workspace/sql/utils/resultTable";
+import { splitSqlStatements } from "@/components/workspace/sql/utils/sql";
 import { useMysqlWorkspaceQuery } from "./hooks/useMysqlWorkspaceQuery";
 import { useMysqlRowEditing } from "./hooks/useMysqlRowEditing";
 import { SqlWorkspaceToolbar } from "@/components/workspace/sql/components/SqlWorkspaceToolbar";
@@ -91,6 +92,7 @@ export function MysqlWorkspace({
         result,
         runFilteredQuery,
         runQuery,
+        runBatchQueries,
         schemaColumnsRef,
         setError,
         setResult,
@@ -182,21 +184,43 @@ export function MysqlWorkspace({
             setPageSize(nextPageSize);
         }
 
-        let sqlToExecute = getEditorSql();
-        if (sqlToExecute) {
-            if (sqlToExecute.endsWith(";")) {
-                sqlToExecute = sqlToExecute.slice(0, -1).trim();
-            }
-            sqlToExecute += ";";
-        }
-
-        if (!sqlToExecute) {
+        const sqlToExecute = getEditorSql();
+        if (!sqlToExecute.trim()) {
             return;
         }
 
         setCurrentPage(0);
-        await runQuery(sqlToExecute);
-    }, [pageSizeInput, runQuery]);
+
+        const trimmedUpper = sqlToExecute.trim().toUpperCase();
+        const isQuery =
+            trimmedUpper.startsWith("SELECT") ||
+            trimmedUpper.startsWith("SHOW") ||
+            trimmedUpper.startsWith("DESCRIBE") ||
+            trimmedUpper.startsWith("DESC") ||
+            trimmedUpper.startsWith("EXPLAIN") ||
+            trimmedUpper.startsWith("WITH");
+
+        if (isQuery) {
+            let finalSql = sqlToExecute;
+            if (finalSql.endsWith(";")) {
+                finalSql = finalSql.slice(0, -1).trim();
+            }
+            finalSql += ";";
+            await runQuery(finalSql);
+        } else {
+            const statements = splitSqlStatements(sqlToExecute);
+            if (statements.length > 1) {
+                await runBatchQueries(statements);
+            } else {
+                let finalSql = sqlToExecute;
+                if (finalSql.endsWith(";")) {
+                    finalSql = finalSql.slice(0, -1).trim();
+                }
+                finalSql += ";";
+                await runQuery(finalSql);
+            }
+        }
+    }, [pageSizeInput, runQuery, runBatchQueries]);
 
     const handleFormatSql = useCallback(() => {
         try {

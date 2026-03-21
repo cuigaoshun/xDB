@@ -324,6 +324,7 @@ const resources = {
         "executing": "Executing...",
         "execute": "Execute",
         "statementExecutedSuccessfully": "statement executed successfully",
+        "batchStatementsExecutedSuccessfully": "{{count}} statement(s) executed successfully",
         "affectedRows": "affected rows"
       },
       "redis": {
@@ -820,6 +821,7 @@ const resources = {
         "executing": "执行中...",
         "execute": "执行",
         "statementExecutedSuccessfully": "语句执行成功",
+        "batchStatementsExecutedSuccessfully": "成功执行 {{count}} 条语句",
         "affectedRows": "受影响行数"
       },
       "redis": {
