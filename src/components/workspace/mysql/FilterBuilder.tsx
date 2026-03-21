@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -42,36 +42,14 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
     const [orderByField, setOrderByField] = useState<string>('');
     const [orderByDirection, setOrderByDirection] = useState<'ASC' | 'DESC'>('DESC');
 
-    const initialConditionAdded = useRef(false);
-
-    // 当主键信息可用时，自动设置默认排序字段和初始查询条件
+    // 当主键信息可用时，自动设置默认排序字段
     useEffect(() => {
         if (primaryKeys.length > 0) {
             if (!orderByField) {
                 setOrderByField(primaryKeys[0]);
             }
-
-            // 只有在没有初始状态且主键可用时，才默认展开主键条件
-            if (!initialState && !initialConditionAdded.current) {
-                setRoot(prev => ({
-                    ...prev,
-                    children: [
-                        {
-                            id: 'default-condition',
-                            type: 'condition',
-                            isActive: true,
-                            logic: 'AND',
-                            field: primaryKeys[0],
-                            operator: '=',
-                            value: '',
-                            nextLogic: 'AND'
-                        }
-                    ]
-                }));
-                initialConditionAdded.current = true;
-            }
         }
-    }, [primaryKeys, initialState, orderByField]);
+    }, [primaryKeys, orderByField]);
 
     // 当列信息可用且没有设置排序字段时，使用第一个列
     useEffect(() => {

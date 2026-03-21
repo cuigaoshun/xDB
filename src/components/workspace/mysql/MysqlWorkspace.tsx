@@ -459,7 +459,7 @@ export function MysqlWorkspace({
                                     <>
                                         <ResizableHandle withHandle />
                                         <ResizablePanel defaultSize={resultDefaultSize} minSize={10}>
-                                            <div className="flex-1 h-full min-h-0 pb-1 overflow-hidden flex flex-col pt-1">
+                                            <div className="flex-1 h-full min-h-0 pb-1 overflow-hidden flex flex-col pt-1 relative">
                                                 {error && (
                                                     <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-mono whitespace-pre-wrap flex items-start justify-between gap-2 overflow-auto mx-2">
                                                         <span>Error: {error}</span>
@@ -546,7 +546,7 @@ export function MysqlWorkspace({
                                                 )}
 
                                                 {isLoading && (
-                                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm gap-2">
+                                                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-[1px] text-muted-foreground text-sm gap-2">
                                                         <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                                                         {t("common.running", "Running...")}
                                                     </div>
