@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -42,14 +42,36 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
     const [orderByField, setOrderByField] = useState<string>('');
     const [orderByDirection, setOrderByDirection] = useState<'ASC' | 'DESC'>('DESC');
 
-    // 当主键信息可用时，自动设置默认排序字段
+    const initialConditionAdded = useRef(false);
+
+    // 当主键信息可用时，自动设置默认排序字段和初始查询条件
     useEffect(() => {
         if (primaryKeys.length > 0) {
             if (!orderByField) {
                 setOrderByField(primaryKeys[0]);
             }
+
+            // 只有在没有初始状态且主键可用时，才默认展示一个初态下“未勾选”的主键条件，以防直接搜索空字符串
+            if (!initialState && !initialConditionAdded.current) {
+                setRoot(prev => ({
+                    ...prev,
+                    children: [
+                        {
+                            id: 'default-condition',
+                            type: 'condition',
+                            isActive: false, // <-- 默认反勾选
+                            logic: 'AND',
+                            field: primaryKeys[0],
+                            operator: '=',
+                            value: '',
+                            nextLogic: 'AND'
+                        }
+                    ]
+                }));
+                initialConditionAdded.current = true;
+            }
         }
-    }, [primaryKeys, orderByField]);
+    }, [primaryKeys, initialState, orderByField]);
 
     // 当列信息可用且没有设置排序字段时，使用第一个列
     useEffect(() => {
@@ -344,13 +366,27 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                         <Input
                                             type="datetime-local"
                                             value={node.value || ''}
-                                            onChange={e => updateNode(node.id, { value: e.target.value })}
+                                            onChange={e => {
+                                                const newValue = e.target.value;
+                                                const updates: Partial<FilterNode> = { value: newValue };
+                                                if (!node.value && newValue) {
+                                                    updates.isActive = true;
+                                                }
+                                                updateNode(node.id, updates);
+                                            }}
                                             className="w-[200px] h-8 text-xs"
                                         />
                                     ) : (
                                         <Input
                                             value={node.value}
-                                            onChange={e => updateNode(node.id, { value: e.target.value })}
+                                            onChange={e => {
+                                                const newValue = e.target.value;
+                                                const updates: Partial<FilterNode> = { value: newValue };
+                                                if (!node.value && newValue) {
+                                                    updates.isActive = true;
+                                                }
+                                                updateNode(node.id, updates);
+                                            }}
                                             className="w-[150px] h-8 text-xs"
                                             placeholder="Value"
                                         />
