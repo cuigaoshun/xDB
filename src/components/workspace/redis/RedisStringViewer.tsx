@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { TextFormatterWrapper } from "@/components/common/TextFormatterWrapper.tsx";
 import Editor from "@monaco-editor/react";
 import oceanicNextTheme from "@/components/workspace/sql/components/oceanic-next.json";
 import { useIsDarkTheme } from "@/hooks/useIsDarkTheme.ts";
@@ -142,37 +141,29 @@ export function RedisStringViewer({
             {t('redis.loadingValue', 'Loading value...')}
           </div>
         )}
-        <TextFormatterWrapper
-          content={displayedContent}
-          onSave={(newContent) => setDisplayedContent(newContent)}
-          title="Format Value"
-          originalContent={content}
-          initialFormat={selectedFormat as FormatType}
-        >
-          <div className="flex-1 flex flex-col min-h-0 border rounded-md overflow-hidden">
-            <Editor
-              height="100%"
-              language={
-                selectedFormat === "json" || selectedFormat === "json-minified" ? "json" :
-                selectedFormat === "xml" ? "xml" : "plaintext"
-              }
-              theme={isDark ? "oceanic-next" : "light"}
-              beforeMount={(monaco) => {
-                monaco.editor.defineTheme("oceanic-next", oceanicNextTheme as any);
-              }}
-              value={displayedContent}
-              onChange={(value) => setDisplayedContent(value || "")}
-              options={{
-                minimap: { enabled: false },
-                wordWrap: "on",
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                formatOnPaste: true,
-                contextmenu: false,
-              }}
-            />
-          </div>
-        </TextFormatterWrapper>
+        <div className="flex-1 flex flex-col min-h-0 border rounded-md overflow-hidden">
+          <Editor
+            height="100%"
+            language={
+              selectedFormat === "json" || selectedFormat === "json-minified" ? "json" :
+              selectedFormat === "xml" ? "xml" : "plaintext"
+            }
+            theme={isDark ? "oceanic-next" : "light"}
+            beforeMount={(monaco) => {
+              monaco.editor.defineTheme("oceanic-next", oceanicNextTheme as any);
+            }}
+            value={displayedContent}
+            onChange={(value) => setDisplayedContent(value || "")}
+            options={{
+              minimap: { enabled: false },
+              wordWrap: "on",
+              scrollBeyondLastLine: false,
+              fontSize: 14,
+              formatOnPaste: true,
+              contextmenu: false,
+            }}
+          />
+        </div>
       </div>
     </div>
   );

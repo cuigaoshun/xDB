@@ -183,7 +183,7 @@ export function TextFormatterDialog({
                                 scrollBeyondLastLine: false,
                                 fontSize: 14,
                                 formatOnPaste: false,
-                                contextmenu: true,
+                                contextmenu: false,
                             }}
                         />
                     </div>
