@@ -753,6 +753,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   }, [valueHasMore, valueLoading, fetchComplexValues, selectedKey, keys]);
 
   const handleKeyClick = useCallback(async (keyItem: KeyDetail) => {
+    if (selectedKey === keyItem.key) return;
+
     setSelectedKey(keyItem.key);
     setSelectedValue(null);
 
@@ -789,7 +791,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
       }
     }
     // List and complex types are handled by useEffect
-  }, [connectionId, db, t]);
+  }, [connectionId, db, t, selectedKey]);
 
   const formatTTL = useCallback((seconds?: number): string => {
     if (seconds === undefined || seconds === null) return "-";
