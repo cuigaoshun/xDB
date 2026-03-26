@@ -107,6 +107,8 @@ export function ConnectionTreeItem({
     const prefetchLoadingRef = useRef(false);
     const lastPrefetchSignatureRef = useRef<string | null>(null);
     const virtualListRef = useRef<HTMLDivElement>(null);
+    const searchExpandOverrides = useRef<Record<string, boolean>>({});
+    const lastFilterTermRef = useRef<string>("");
 
     const { fetchMysqlDatabases } = useMysqlDatabases();
     const { fetchRedisDatabases } = useRedisDatabases();
@@ -142,11 +144,12 @@ export function ConnectionTreeItem({
 
     const filteredDatabasesMap = useMemo(() => {
         if (!filterTermLower) {
-            return { databases, tablesMap: {} as Record<string, TableInfo[]> };
+            return { databases, tablesMap: {} as Record<string, TableInfo[]>, explicitTableMatch: {} as Record<string, boolean> };
         }
 
         const filteredDbs: string[] = [];
         const tablesMap: Record<string, TableInfo[]> = {};
+        const explicitTableMatch: Record<string, boolean> = {};
         const dbScores: Record<string, number> = {};
 
         for (const db of databases) {
@@ -161,7 +164,8 @@ export function ConnectionTreeItem({
 
             if (dbMatch || matchedTables.length > 0) {
                 filteredDbs.push(db);
-                tablesMap[db] = dbMatch ? dbTables : matchedTables;
+                tablesMap[db] = matchedTables.length > 0 ? matchedTables : dbTables;
+                explicitTableMatch[db] = matchedTables.length > 0;
 
                 let score = 0;
                 if (dbLower === filterTermLower) {
@@ -177,8 +181,28 @@ export function ConnectionTreeItem({
 
         filteredDbs.sort((a, b) => dbScores[b] - dbScores[a]);
 
-        return { databases: filteredDbs, tablesMap };
+        return { databases: filteredDbs, tablesMap, explicitTableMatch };
     }, [databases, filterTermLower, getCachedTables, isExactMatch]);
+
+    // Reset search expand overrides when search term changes
+    if (filterTermLower !== lastFilterTermRef.current) {
+        searchExpandOverrides.current = {};
+        lastFilterTermRef.current = filterTermLower;
+    }
+
+    // Determine if a database should be shown expanded, considering search context
+    const isDatabaseEffectivelyExpanded = useCallback((db: string): boolean => {
+        if (!filterTermLower) {
+            // No search active: use normal expandedDatabases state
+            return expandedDatabases.has(db);
+        }
+        // Search is active: check if user has manually overridden
+        if (db in searchExpandOverrides.current) {
+            return searchExpandOverrides.current[db];
+        }
+        // No manual override: auto-expand only if there are explicit table matches
+        return !!filteredDatabasesMap.explicitTableMatch?.[db];
+    }, [expandedDatabases, filterTermLower, filteredDatabasesMap]);
 
     const flattenedNodes = useMemo((): FlatTreeNode[] => {
         const nodes: FlatTreeNode[] = [];
@@ -186,7 +210,7 @@ export function ConnectionTreeItem({
         for (const db of filteredDatabasesMap.databases) {
             nodes.push({ type: "database", db });
 
-            if (expandedDatabases.has(db) && (isMySql || isSqlite)) {
+            if (isDatabaseEffectivelyExpanded(db) && (isMySql || isSqlite)) {
                 const dbTables = filterTermLower ? filteredDatabasesMap.tablesMap[db] || [] : getCachedTables(db);
                 const loading = isTableLoading(db) && dbTables.length === 0;
 
@@ -203,10 +227,10 @@ export function ConnectionTreeItem({
 
         return nodes;
     }, [
-        expandedDatabases,
         filterTermLower,
         filteredDatabasesMap,
         getCachedTables,
+        isDatabaseEffectivelyExpanded,
         isMySql,
         isSqlite,
         isTableLoading,
@@ -455,22 +479,6 @@ export function ConnectionTreeItem({
         }
     }, [isActive, isExpanded, isMySql, prefetchAllTables]);
 
-    useEffect(() => {
-        if (filterTermLower && isMySql) {
-            const dbsToExpand = filteredDatabasesMap.databases.filter((db) => {
-                const hasMatchingTables = (filteredDatabasesMap.tablesMap[db] || []).length > 0;
-                return hasMatchingTables && !expandedDatabases.has(db);
-            });
-
-            if (dbsToExpand.length > 0) {
-                setExpandedDatabases((prev) => {
-                    const next = new Set(prev);
-                    dbsToExpand.forEach((db) => next.add(db));
-                    return next;
-                });
-            }
-        }
-    }, [expandedDatabases, filterTermLower, filteredDatabasesMap, isMySql]);
 
 
 
@@ -536,8 +544,22 @@ export function ConnectionTreeItem({
             return;
         }
 
-        const isCurrentlyExpanded = expandedDatabases.has(dbName);
-        if (!filterTermLower) {
+        const isCurrentlyExpanded = isDatabaseEffectivelyExpanded(dbName);
+
+        if (filterTermLower) {
+            // During search, record user's manual override
+            searchExpandOverrides.current[dbName] = !isCurrentlyExpanded;
+            // Also update expandedDatabases so React re-renders
+            setExpandedDatabases((prev) => {
+                const next = new Set(prev);
+                if (isCurrentlyExpanded) {
+                    next.delete(dbName);
+                } else {
+                    next.add(dbName);
+                }
+                return next;
+            });
+        } else {
             setExpandedDatabases((prev) => {
                 const next = new Set(prev);
                 if (next.has(dbName)) {
@@ -778,9 +800,9 @@ export function ConnectionTreeItem({
                                                         setContextMenu({ type: "database", db: node.db, x: e.clientX, y: e.clientY });
                                                     }}
                                                 >
-                                                    {(isMySql || isSqlite) && !filterTermLower && (
+                                                    {(isMySql || isSqlite) && (
                                                         <button className="p-0.5">
-                                                            {expandedDatabases.has(node.db) ? (
+                                                            {isDatabaseEffectivelyExpanded(node.db) ? (
                                                                 <ChevronDown className="h-3 w-3" />
                                                             ) : (
                                                                 <ChevronRight className="h-3 w-3" />
