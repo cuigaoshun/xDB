@@ -220,13 +220,14 @@ export function SqlResultTable({
 
             const diff = upEvent.clientX - resizingRef.current.startX;
             const newWidth = Math.max(80, resizingRef.current.startWidth + diff);
+            const resizingColName = resizingRef.current.colName;
+
+            resizingRef.current = null;
 
             setColumnWidths((previousWidths) => ({
                 ...previousWidths,
-                [resizingRef.current!.colName]: newWidth,
+                [resizingColName]: newWidth,
             }));
-
-            resizingRef.current = null;
             document.removeEventListener("mousemove", handleResizeMove);
             document.removeEventListener("mouseup", handleResizeEnd);
             document.body.style.cursor = "";
