@@ -166,6 +166,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   const [hasSearched, setHasSearched] = useState(savedResult?.hasSearched ?? false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
 
   // 计算搜索建议：前缀匹配
   const suggestedHistory = useMemo(() => {
@@ -178,7 +179,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   // 当列表改变时重置选择索引
   useEffect(() => {
     setSelectedIndex(-1);
-  }, [suggestedHistory]);
+  }, [suggestedHistory, showHistoryDropdown]);
 
   // 显示 Scan More 按钮的条件：非精确搜索 + 搜索框非空 + 已搜索
   // hasMore 只决定按钮是否可点击，不决定是否显示
@@ -703,6 +704,17 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const valueObserverTarget = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowHistoryDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -912,7 +924,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           {/* Left Sidebar */}
           <ResizablePanel defaultSize={35} minSize={20} maxSize={50} className="flex flex-col">
             {/* Filter */}
-            <div className="p-2">
+            <div className="p-2" ref={searchContainerRef}>
               {/* 第一行: 搜索框 + 历史 + 搜索按钮 */}
               <div className="flex items-center gap-1">
                 <div className="relative flex-1">
@@ -933,11 +945,14 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                       setTimeout(() => setIsInputFocused(false), 250);
                     }}
                     onKeyDown={(e) => {
-                      if (isInputFocused && suggestedHistory.length > 0) {
+                      const list = showHistoryDropdown ? searchHistory : suggestedHistory;
+                      const isOpen = showHistoryDropdown || (isInputFocused && suggestedHistory.length > 0);
+                      
+                      if (isOpen && list.length > 0) {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
                           setSelectedIndex(prev =>
-                            prev < suggestedHistory.length - 1 ? prev + 1 : prev
+                            prev < list.length - 1 ? prev + 1 : prev
                           );
                           return;
                         }
@@ -948,91 +963,104 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                         }
                         if (e.key === 'Enter' && selectedIndex >= 0) {
                           e.preventDefault();
-                          const selectedItem = suggestedHistory[selectedIndex];
+                          const selectedItem = list[selectedIndex];
                           setFilter(selectedItem);
-                          setIsInputFocused(false); // 关闭下拉框，不立即触发搜索
+                          setIsInputFocused(false);
+                          setShowHistoryDropdown(false);
                           return;
                         }
                       }
                       if (e.key === 'Enter') {
                         setIsInputFocused(false);
+                        setShowHistoryDropdown(false);
                         handleSearch();
                       }
                     }}
                   />
-                  {/* 搜索建议下拉 */}
-                  {isInputFocused && suggestedHistory.length > 0 && (
+                  {/* 搜索建议/历史下拉 */}
+                  {showHistoryDropdown || (isInputFocused && suggestedHistory.length > 0) ? (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground border rounded-md shadow-md z-50 py-1 max-h-[300px] overflow-auto">
-                      {suggestedHistory.map((item, i) => (
-                        <div
-                          key={i}
-                          className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex items-center gap-2 ${i === selectedIndex ? "bg-accent text-accent-foreground" : ""
-                            }`}
-                          onMouseEnter={() => setSelectedIndex(i)}
-                          onMouseDown={(e) => {
-                            // 阻止默认事件防止 input 失去焦点，导致点击失效
-                            e.preventDefault();
-                          }}
-                          onClick={() => {
-                            setFilter(item);
-                            setIsInputFocused(false);
-                            // 延迟执行搜索，确保 filter 状态已更新
-                            setTimeout(() => handleSearch(item), 0);
-                          }}
-                        >
-                          <History className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="truncate">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 搜索历史下拉 */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" title={t('redis.searchHistory')}>
-                      <History className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {searchHistory.length === 0 ? (
-                      <DropdownMenuItem disabled className="text-muted-foreground">
-                        {t('redis.noSearchHistory')}
-                      </DropdownMenuItem>
-                    ) : (
-                      <>
-                        {searchHistory.map((item, i) => (
-                          <DropdownMenuItem
+                      {showHistoryDropdown ? (
+                        searchHistory.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">{t('redis.noSearchHistory')}</div>
+                        ) : (
+                          <>
+                            {searchHistory.map((item, i) => (
+                              <div
+                                key={i}
+                                className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex items-center gap-2 ${i === selectedIndex ? "bg-accent text-accent-foreground" : ""}`}
+                                onMouseEnter={() => setSelectedIndex(i)}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setFilter(item);
+                                  setShowHistoryDropdown(false);
+                                  setTimeout(() => handleSearch(item), 0);
+                                }}
+                              >
+                                <History className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span className="truncate">{item}</span>
+                              </div>
+                            ))}
+                            <div className="h-px bg-border my-1" />
+                            <div
+                              className="px-3 py-1.5 text-sm cursor-pointer text-destructive hover:bg-accent"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                clearRedisSearchHistory(connectionId, db);
+                                setShowHistoryDropdown(false);
+                              }}
+                            >
+                              {t('redis.clearHistory')}
+                            </div>
+                          </>
+                        )
+                      ) : (
+                        suggestedHistory.map((item, i) => (
+                          <div
                             key={i}
+                            className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex items-center gap-2 ${i === selectedIndex ? "bg-accent text-accent-foreground" : ""
+                              }`}
+                            onMouseEnter={() => setSelectedIndex(i)}
+                            onMouseDown={(e) => {
+                              // 阻止默认事件防止 input 失去焦点，导致点击失效
+                              e.preventDefault();
+                            }}
                             onClick={() => {
                               setFilter(item);
+                              setIsInputFocused(false);
                               // 延迟执行搜索，确保 filter 状态已更新
                               setTimeout(() => handleSearch(item), 0);
                             }}
-                            className="font-mono text-xs truncate"
                           >
-                            {item}
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => clearRedisSearchHistory(connectionId, db)}
-                          className="text-destructive"
-                        >
-                          {t('redis.clearHistory')}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                            <History className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="truncate">{item}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* 搜索历史下拉 */}
+                <Button
+                  variant={showHistoryDropdown ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  title={t('redis.searchHistory')}
+                  onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
 
                 {/* 搜索按钮 */}
                 <Button
                   variant="outline"
                   size="icon"
                   className="h-9 w-9 shrink-0"
-                  onClick={() => handleSearch()}
+                  onClick={() => {
+                    setShowHistoryDropdown(false);
+                    handleSearch();
+                  }}
                   title={t('redis.search')}
                 >
                   <Search className="h-4 w-4" />
