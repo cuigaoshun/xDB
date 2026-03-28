@@ -1,5 +1,5 @@
 // src/components/redis/RedisKeyTree.tsx
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -160,6 +160,71 @@ export function RedisKeyTree({
 
     return root;
   }, [keys, delimiter]);
+
+  // Handle auto-expansion
+  const seenFoldersRef = useRef<Set<string>>(new Set());
+  const prevDelimiterRef = useRef<string>(delimiter);
+
+  useEffect(() => {
+    // Reset seen folders if delimiter changes
+    if (prevDelimiterRef.current !== delimiter) {
+      seenFoldersRef.current.clear();
+      setExpandedNodes(new Set());
+      prevDelimiterRef.current = delimiter;
+    }
+
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      let updated = false;
+
+      const traverse = (node: TreeNode, depth: number) => {
+        if (node.id !== "root" && !node.isLeaf) {
+          if (!seenFoldersRef.current.has(node.id)) {
+            seenFoldersRef.current.add(node.id);
+
+            // Condition: 层数限制在最多2层内（depth < 2），且该文件夹内不能直接包含叶子节点
+            const hasLeafNode = node.children.some((c) => c.isLeaf);
+            if (depth < 2 && !hasLeafNode) {
+              next.add(node.id);
+              updated = true;
+            }
+          }
+        }
+
+        for (const child of node.children) {
+          if (!child.isLeaf) {
+            traverse(child, node.id === "root" ? 0 : depth + 1);
+          }
+        }
+      };
+
+      traverse(tree, -1);
+      return updated ? next : prev;
+    });
+  }, [tree, delimiter]);
+
+  // Auto-expand parents for the selected key so it remains visible (e.g., when switching from list view)
+  useEffect(() => {
+    if (selectedKey && delimiter) {
+      setExpandedNodes((prev) => {
+        const next = new Set(prev);
+        let updated = false;
+
+        const parts = selectedKey.split(delimiter);
+        let currentPath = "";
+        for (let i = 0; i < parts.length - 1; i++) {
+          currentPath = currentPath ? `${currentPath}${delimiter}${parts[i]}` : parts[i];
+          const folderId = `folder:${currentPath}`;
+          if (!next.has(folderId)) {
+            next.add(folderId);
+            updated = true;
+          }
+        }
+
+        return updated ? next : prev;
+      });
+    }
+  }, [selectedKey, delimiter]);
 
   // Flatten tree structure for virtual scrolling
   const flattenedNodes = useMemo(() => {
