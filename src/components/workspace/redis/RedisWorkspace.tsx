@@ -1156,6 +1156,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                 onKeyClick={handleKeyClick}
                 loading={loading}
                 formatTTL={formatTTL}
+                isSearchActive={hasSearched && lastScannedFilter.trim() !== '' && lastScannedFilter.trim() !== '*'}
               />
             ) : (
               <div ref={parentRef} className="flex-1 overflow-auto">

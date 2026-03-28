@@ -35,6 +35,7 @@ interface RedisKeyTreeProps {
   onKeyClick: (keyItem: KeyDetail) => void;
   loading: boolean;
   formatTTL: (seconds?: number) => string;
+  isSearchActive?: boolean;
 }
 
 // 获取类型颜色
@@ -71,10 +72,16 @@ export function RedisKeyTree({
   onKeyClick,
   loading,
   formatTTL,
+  isSearchActive,
 }: RedisKeyTreeProps) {
   const { t } = useTranslation();
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const parentRef = useRef<HTMLDivElement>(null);
+  const [manualToggleState, setManualToggleState] = useState<Record<string, boolean>>({});
+
+  // Reset manual state when delimiter changes
+  useEffect(() => {
+    setManualToggleState({});
+  }, [delimiter]);
 
   // Build tree structure
   const tree = useMemo(() => {
@@ -161,70 +168,69 @@ export function RedisKeyTree({
     return root;
   }, [keys, delimiter]);
 
-  // Handle auto-expansion
-  const seenFoldersRef = useRef<Set<string>>(new Set());
-  const prevDelimiterRef = useRef<string>(delimiter);
-
-  useEffect(() => {
-    // Reset seen folders if delimiter changes
-    if (prevDelimiterRef.current !== delimiter) {
-      seenFoldersRef.current.clear();
-      setExpandedNodes(new Set());
-      prevDelimiterRef.current = delimiter;
+  // Compute parents of selected key
+  const parentsOfSelectedKey = useMemo(() => {
+    const set = new Set<string>();
+    if (selectedKey && delimiter) {
+      const parts = selectedKey.split(delimiter);
+      let p = "";
+      for (let i = 0; i < parts.length - 1; i++) {
+        p = p ? `${p}${delimiter}${parts[i]}` : parts[i];
+        set.add(`folder:${p}`);
+      }
     }
+    return set;
+  }, [selectedKey, delimiter]);
 
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      let updated = false;
+  // Synchronously compute final expanded nodes based on manual state and auto-expand rules
+  const expandedNodes = useMemo(() => {
+    const result = new Set<string>();
 
-      const traverse = (node: TreeNode, depth: number) => {
-        if (node.id !== "root" && !node.isLeaf) {
-          if (!seenFoldersRef.current.has(node.id)) {
-            seenFoldersRef.current.add(node.id);
-
-            // Condition: 层数限制在最多2层内（depth < 2），且该文件夹内不能直接包含叶子节点
+    const traverse = (node: TreeNode, depth: number) => {
+      if (node.id !== "root" && !node.isLeaf) {
+        // Did the user explicitly toggle this node?
+        if (manualToggleState[node.id] !== undefined) {
+          if (manualToggleState[node.id]) {
+            result.add(node.id);
+          }
+        } 
+        // Parents of selected key should be forcibly expanded
+        else if (parentsOfSelectedKey.has(node.id)) {
+          result.add(node.id);
+        }
+        // Auto-expand rule: if searching, expand up to 3 layers max. Otherwise apply normal rules.
+        else {
+          if (isSearchActive) {
+            if (depth < 3) {
+              result.add(node.id);
+            }
+          } else {
             const hasLeafNode = node.children.some((c) => c.isLeaf);
             if (depth < 2 && !hasLeafNode) {
-              next.add(node.id);
-              updated = true;
+              result.add(node.id);
             }
           }
         }
+      }
 
-        for (const child of node.children) {
-          if (!child.isLeaf) {
-            traverse(child, node.id === "root" ? 0 : depth + 1);
-          }
+      for (const child of node.children) {
+        if (!child.isLeaf) {
+          traverse(child, node.id === "root" ? 0 : depth + 1);
         }
-      };
+      }
+    };
 
-      traverse(tree, -1);
-      return updated ? next : prev;
-    });
-  }, [tree, delimiter]);
-
-  // Auto-expand parents for the selected key so it remains visible (e.g., when switching from list view)
-  useEffect(() => {
-    if (selectedKey && delimiter) {
-      setExpandedNodes((prev) => {
-        const next = new Set(prev);
-        let updated = false;
-
-        const parts = selectedKey.split(delimiter);
-        let currentPath = "";
-        for (let i = 0; i < parts.length - 1; i++) {
-          currentPath = currentPath ? `${currentPath}${delimiter}${parts[i]}` : parts[i];
-          const folderId = `folder:${currentPath}`;
-          if (!next.has(folderId)) {
-            next.add(folderId);
-            updated = true;
-          }
-        }
-
-        return updated ? next : prev;
-      });
+    traverse(tree, -1);
+    
+    // Ensure selected key parents are always expanded even if somehow missed in traversal
+    for (const parentId of parentsOfSelectedKey) {
+      if (manualToggleState[parentId] !== false) {
+        result.add(parentId);
+      }
     }
-  }, [selectedKey, delimiter]);
+
+    return result;
+  }, [tree, manualToggleState, parentsOfSelectedKey]);
 
   // Flatten tree structure for virtual scrolling
   const flattenedNodes = useMemo(() => {
@@ -254,16 +260,14 @@ export function RedisKeyTree({
 
   // Toggle expanded/collapsed
   const toggleNode = useCallback((nodeId: string) => {
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
+    setManualToggleState((prev) => {
+      const isCurrentlyExpanded = expandedNodes.has(nodeId);
+      return {
+        ...prev,
+        [nodeId]: !isCurrentlyExpanded,
+      };
     });
-  }, []);
+  }, [expandedNodes]);
 
   // Virtual list
   const rowVirtualizer = useVirtualizer({
