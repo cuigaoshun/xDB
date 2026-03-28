@@ -4,6 +4,18 @@ import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu.tsx";
+import { RefreshCw, Trash2 } from "lucide-react";
 
 interface KeyDetail {
   key: string;
@@ -36,6 +48,8 @@ interface RedisKeyTreeProps {
   loading: boolean;
   formatTTL: (seconds?: number) => string;
   isSearchActive?: boolean;
+  onRefreshKey?: (keyItem: KeyDetail) => void;
+  onDeleteKey?: (keyItem: KeyDetail) => void;
 }
 
 // 获取类型颜色
@@ -73,6 +87,8 @@ export function RedisKeyTree({
   loading,
   formatTTL,
   isSearchActive,
+  onRefreshKey,
+  onDeleteKey,
 }: RedisKeyTreeProps) {
   const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
@@ -298,6 +314,77 @@ export function RedisKeyTree({
           const { node, depth, isExpanded } = flattenedNodes[virtualRow.index];
           const isSelected = node.isLeaf && node.keyDetail?.key === selectedKey;
 
+          const content = (
+            <div
+              className={`flex items-center h-full px-2 cursor-pointer hover:bg-accent/50 transition-colors ${isSelected ? "bg-accent" : ""
+                }`}
+              style={{ paddingLeft: `${depth * 16 + 8}px` }}
+              onClick={() => {
+                if (node.isLeaf && node.keyDetail) {
+                  onKeyClick(node.keyDetail);
+                } else {
+                  toggleNode(node.id);
+                }
+              }}
+            >
+              {/* Expand/Collapse icon or placeholder */}
+              {!node.isLeaf ? (
+                <button
+                  className="p-0.5 hover:bg-accent rounded mr-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleNode(node.id);
+                  }}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
+              ) : (
+                <span className="w-5 mr-1" />
+              )}
+
+              {/* Icon */}
+              {node.isLeaf ? (
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] px-1 py-0 h-4 rounded min-w-[32px] justify-center uppercase border-0 mr-2 ${getTypeColor(
+                    node.keyDetail?.type
+                  )}`}
+                >
+                  {node.keyDetail?.type || "..."}
+                </Badge>
+              ) : isExpanded ? (
+                <FolderOpen className="w-4 h-4 text-yellow-600 mr-2 shrink-0" />
+              ) : (
+                <Folder className="w-4 h-4 text-yellow-600 mr-2 shrink-0" />
+              )}
+
+              {/* Name */}
+              <span
+                className={`flex-1 text-sm truncate ${node.isLeaf ? "font-mono" : "font-medium"
+                  }`}
+                title={node.isLeaf ? node.keyDetail?.key : node.fullPath}
+              >
+                {node.name}
+              </span>
+
+              {/* Right side info */}
+              {node.isLeaf ? (
+                <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-2">
+                  <span>{formatTTL(node.keyDetail?.ttl)}</span>
+                  <span>{formatSize(node.keyDetail?.length)}</span>
+                </div>
+              ) : (
+                <span className="text-[10px] text-muted-foreground ml-2">
+                  {node.keyCount}
+                </span>
+              )}
+            </div>
+          );
+
           return (
             <div
               key={node.id}
@@ -310,74 +397,44 @@ export function RedisKeyTree({
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
-              <div
-                className={`flex items-center h-full px-2 cursor-pointer hover:bg-accent/50 transition-colors ${isSelected ? "bg-accent" : ""
-                  }`}
-                style={{ paddingLeft: `${depth * 16 + 8}px` }}
-                onClick={() => {
-                  if (node.isLeaf && node.keyDetail) {
-                    onKeyClick(node.keyDetail);
-                  } else {
-                    toggleNode(node.id);
-                  }
-                }}
-              >
-                {/* Expand/Collapse icon or placeholder */}
-                {!node.isLeaf ? (
-                  <button
-                    className="p-0.5 hover:bg-accent rounded mr-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleNode(node.id);
-                    }}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
-                ) : (
-                  <span className="w-5 mr-1" />
-                )}
-
-                {/* Icon */}
-                {node.isLeaf ? (
-                  <Badge
-                    variant="outline"
-                    className={`text-[9px] px-1 py-0 h-4 rounded min-w-[32px] justify-center uppercase border-0 mr-2 ${getTypeColor(
-                      node.keyDetail?.type
-                    )}`}
-                  >
-                    {node.keyDetail?.type || "..."}
-                  </Badge>
-                ) : isExpanded ? (
-                  <FolderOpen className="w-4 h-4 text-yellow-600 mr-2 shrink-0" />
-                ) : (
-                  <Folder className="w-4 h-4 text-yellow-600 mr-2 shrink-0" />
-                )}
-
-                {/* Name */}
-                <span
-                  className={`flex-1 text-sm truncate ${node.isLeaf ? "font-mono" : "font-medium"
-                    }`}
-                  title={node.isLeaf ? node.keyDetail?.key : node.fullPath}
-                >
-                  {node.name}
-                </span>
-
-                {/* Right side info */}
-                {node.isLeaf ? (
-                  <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-2">
-                    <span>{formatTTL(node.keyDetail?.ttl)}</span>
-                    <span>{formatSize(node.keyDetail?.length)}</span>
-                  </div>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground ml-2">
-                    {node.keyCount}
-                  </span>
-                )}
-              </div>
+              {node.isLeaf && node.keyDetail ? (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    {content}
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => onRefreshKey?.(node.keyDetail!)}>
+                      <RefreshCw className="mr-2 w-4 h-4" />
+                      {t('common.refresh', 'Refresh')}
+                    </ContextMenuItem>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                        <Trash2 className="mr-2 w-4 h-4" />
+                        {t('common.delete', 'Delete')}
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="w-64">
+                        <ContextMenuLabel>{t('common.confirmDeletion')}</ContextMenuLabel>
+                        <div className="px-2 pt-2 pb-0.5 text-xs text-muted-foreground">
+                          {t('redis.deleteKeyPrompt', 'Will delete key:')}
+                        </div>
+                        <div className="px-2 pb-2 text-xs font-mono font-medium break-all">
+                          {node.keyDetail!.key}
+                        </div>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem 
+                          className="text-destructive focus:text-destructive cursor-pointer focus:bg-red-50"
+                          onClick={() => onDeleteKey?.(node.keyDetail!)} 
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {t('common.delete', 'Delete')}
+                        </ContextMenuItem>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  </ContextMenuContent>
+                </ContextMenu>
+              ) : (
+                content
+              )}
             </div>
           );
         })}

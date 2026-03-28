@@ -5,6 +5,17 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu.tsx";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -323,24 +334,28 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     }
   }, [connectionId, db, redisScanCount]);
 
-  const handleDeleteKey = useCallback(async () => {
-    if (!selectedKey) return;
+  const handleDeleteKey = useCallback(async (keyToDelete?: string | any) => {
+    let targetKeyStr = selectedKey;
+    if (typeof keyToDelete === 'string') {
+      targetKeyStr = keyToDelete;
+    }
+    if (!targetKeyStr) return;
 
     try {
       await invokeRedisCommand({
         connectionId,
         command: "DEL",
-        args: [selectedKey],
+        args: [targetKeyStr],
         db,
       });
-      setSelectedKey(null);
-      setKeys((prev) => prev.filter((k) => k.key !== selectedKey));
+      if (selectedKey === targetKeyStr) setSelectedKey(null);
+      setKeys((prev) => prev.filter((k) => k.key !== targetKeyStr));
       toast({ title: t('redis.deletedSuccess'), variant: 'subtle' });
     } catch (error) {
       console.error("Failed to delete key", error);
       toast({ title: t('redis.deleteFailed'), description: String(error), variant: 'destructive' });
     }
-  }, [connectionId, db, selectedKey, fetchKeys]);
+  }, [connectionId, db, selectedKey, t]);
 
   const handleUpdateTTL = useCallback(async () => {
     if (!selectedKey) return;
@@ -829,16 +844,21 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
   );
 
   // P1: Extract onRefresh callback to avoid recreation on each render
-  const handleRefresh = useCallback(() => {
-    const currentSelectedKey = selectedKeyRef.current;
+  const handleRefresh = useCallback((keyToRefresh?: string | any) => {
+    let targetKeyStr = selectedKeyRef.current;
+    if (typeof keyToRefresh === 'string') {
+      targetKeyStr = keyToRefresh;
+    }
+    if (!targetKeyStr) return;
+
     const currentKeys = keysRef.current;
-    const currentKeyItem = currentKeys.find((k) => k.key === currentSelectedKey);
-    if (!currentSelectedKey || !currentKeyItem) return;
+    const currentKeyItem = currentKeys.find((k) => k.key === targetKeyStr);
+    if (!currentKeyItem) return;
 
     // Refresh key details (TTL, length, etc)
     invokeGetKeysDetails<KeyDetail[]>({
       connectionId,
-      keys: [currentSelectedKey],
+      keys: [targetKeyStr],
       db,
     }).then(details => {
       let updatedType = currentKeyItem.type;
@@ -847,7 +867,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         updatedType = isAutoDeleted ? currentKeyItem.type : details[0].type;
         
         setKeys(prev => prev.map(k => {
-          if (k.key === currentSelectedKey) {
+          if (k.key === targetKeyStr) {
             return {
               ...details[0],
               type: updatedType,
@@ -859,24 +879,26 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         }));
       }
 
-      if (updatedType === "string") {
-        setValueLoading(true);
-        invokeRedisCommand<RedisResult>({
-          connectionId,
-          command: "GET",
-          args: [currentSelectedKey],
-          db,
-        }).then(valRes => {
-          setSelectedValue(valRes.output);
-        }).catch(error => {
-          console.error("Failed to refresh string value", error);
-        }).finally(() => {
-          setValueLoading(false);
-        });
-      } else if (updatedType === "list") {
-        fetchListValues(0, 99, updatedType);
-      } else {
-        fetchComplexValues(true, updatedType);
+      if (targetKeyStr === selectedKeyRef.current) {
+        if (updatedType === "string") {
+          setValueLoading(true);
+          invokeRedisCommand<RedisResult>({
+            connectionId,
+            command: "GET",
+            args: [targetKeyStr],
+            db,
+          }).then(valRes => {
+            setSelectedValue(valRes.output);
+          }).catch(error => {
+            console.error("Failed to refresh string value", error);
+          }).finally(() => {
+            setValueLoading(false);
+          });
+        } else if (updatedType === "list") {
+          fetchListValues(0, 99, updatedType);
+        } else {
+          fetchComplexValues(true, updatedType);
+        }
       }
     }).catch(error => {
       console.error("Failed to refresh key details", error);
@@ -1157,6 +1179,8 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                 loading={loading}
                 formatTTL={formatTTL}
                 isSearchActive={hasSearched && lastScannedFilter.trim() !== '' && lastScannedFilter.trim() !== '*'}
+                onRefreshKey={(k) => handleRefresh(k.key)}
+                onDeleteKey={(k) => handleDeleteKey(k.key)}
               />
             ) : (
               <div ref={parentRef} className="flex-1 overflow-auto">
@@ -1169,6 +1193,35 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const key = keys[virtualRow.index];
+                    const content = (
+                      <div
+                        className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 transition-colors gap-3 border-b ${selectedKey === key.key ? "bg-accent" : ""
+                          }`}
+                        onClick={() => handleKeyClick(key)}
+                      >
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-1.5 py-0 h-5 rounded min-w-[40px] justify-center uppercase border-0 ${getTypeColor(
+                            key.type
+                          )}`}
+                        >
+                          {key.type || "..."}
+                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className="text-sm font-medium truncate font-mono"
+                            title={key.key}
+                          >
+                            {key.key}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+                          <span>{formatTTL(key.ttl)}</span>
+                          <span>{formatSize(key.length)}</span>
+                        </div>
+                      </div>
+                    );
+
                     return (
                       <div
                         key={key.key}
@@ -1181,32 +1234,40 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
                           transform: `translateY(${virtualRow.start}px)`,
                         }}
                       >
-                        <div
-                          className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 transition-colors gap-3 border-b ${selectedKey === key.key ? "bg-accent" : ""
-                            }`}
-                          onClick={() => handleKeyClick(key)}
-                        >
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] px-1.5 py-0 h-5 rounded min-w-[40px] justify-center uppercase border-0 ${getTypeColor(
-                              key.type
-                            )}`}
-                          >
-                            {key.type || "..."}
-                          </Badge>
-                          <div className="flex-1 min-w-0">
-                            <div
-                              className="text-sm font-medium truncate font-mono"
-                              title={key.key}
-                            >
-                              {key.key}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
-                            <span>{formatTTL(key.ttl)}</span>
-                            <span>{formatSize(key.length)}</span>
-                          </div>
-                        </div>
+                        <ContextMenu>
+                          <ContextMenuTrigger asChild>
+                            {content}
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem onClick={() => handleRefresh(key.key)}>
+                              <RefreshCw className="mr-2 w-4 h-4" />
+                              {t('common.refresh', 'Refresh')}
+                            </ContextMenuItem>
+                            <ContextMenuSub>
+                              <ContextMenuSubTrigger className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                <Trash2 className="mr-2 w-4 h-4" />
+                                {t('common.delete', 'Delete')}
+                              </ContextMenuSubTrigger>
+                              <ContextMenuSubContent className="w-64">
+                                <ContextMenuLabel>{t('common.confirmDeletion')}</ContextMenuLabel>
+                                <div className="px-2 pt-2 pb-0.5 text-xs text-muted-foreground">
+                                  {t('redis.deleteKeyPrompt', 'Will delete key:')}
+                                </div>
+                                <div className="px-2 pb-2 text-xs font-mono font-medium break-all">
+                                  {key.key}
+                                </div>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem 
+                                  className="text-destructive focus:text-destructive cursor-pointer focus:bg-red-50"
+                                  onClick={() => handleDeleteKey(key.key)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {t('common.delete', 'Delete')}
+                                </ContextMenuItem>
+                              </ContextMenuSubContent>
+                            </ContextMenuSub>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       </div>
                     );
                   })}
