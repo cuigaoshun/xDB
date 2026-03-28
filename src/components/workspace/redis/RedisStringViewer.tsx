@@ -135,13 +135,13 @@ export function RedisStringViewer({
           {isSubmitting ? t('redis.saving') : t('redis.saveChanges')}
         </Button>
       </div>
-      <div className="flex-1 flex flex-col min-h-0 p-4">
+      <div className="flex-1 flex flex-col min-h-0">
         {loading && !content && (
-          <div className="mb-3 text-xs text-muted-foreground">
+          <div className="px-4 py-3 text-xs text-muted-foreground">
             {t('redis.loadingValue', 'Loading value...')}
           </div>
         )}
-        <div className="flex-1 flex flex-col min-h-0 border rounded-md overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <Editor
             height="100%"
             language={
