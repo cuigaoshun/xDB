@@ -236,26 +236,30 @@ export function RedisSetViewer({
               const isEditing = editingMember === memberStr;
               return (
                 <TableRow key={`${memberStr}-${i}`} className="group hover:bg-muted/50">
-                  <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
-                    {isEditing ? (
+                  {isEditing ? (
+                    <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
                         autoFocus
                       />
-                    ) : (
-                      <TextFormatterWrapper
-                        content={memberStr}
-                        readonly
-                        title="View formatted"
-                      >
-                        <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{memberStr}</span>
-                        </div>
-                      </TextFormatterWrapper>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  ) : (
+                    <TextFormatterWrapper
+                      content={memberStr}
+                      onEdit={() => handleStartEdit(memberStr)}
+                      onDelete={() => handleDelete(memberStr)}
+                      deleteConfirmPrompt={t('redis.deleteSetMemberPrompt')}
+                      deleteItemName={memberStr}
+                      readonly
+                      title="View formatted"
+                    >
+                      <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap cursor-context-menu">
+                        {memberStr}
+                      </TableCell>
+                    </TextFormatterWrapper>
+                  )}
                   <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">

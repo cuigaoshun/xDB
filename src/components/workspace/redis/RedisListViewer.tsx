@@ -160,28 +160,32 @@ export function RedisListViewer({
                   <TableCell className="font-mono text-xs align-top text-muted-foreground">
                     {i}
                   </TableCell>
-                  <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
-                    {isEditing ? (
+                  {isEditing ? (
+                    <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
                         autoFocus
                       />
-                    ) : (
-                      <TextFormatterWrapper
-                        content={String(val)}
-                        onSave={async (newValue) => {
-                          await handleSave(i, newValue);
-                        }}
-                        title="Format value"
-                      >
-                        <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{String(val)}</span>
-                        </div>
-                      </TextFormatterWrapper>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  ) : (
+                    <TextFormatterWrapper
+                      content={String(val)}
+                      onSave={async (newValue) => {
+                        await handleSave(i, newValue);
+                      }}
+                      onEdit={() => handleStartEdit(i, String(val))}
+                      onDelete={() => handleDelete(i)}
+                      deleteConfirmPrompt={t('redis.deleteListItemPrompt')}
+                      deleteItemName={String(val)}
+                      title="Format value"
+                    >
+                      <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap cursor-context-menu">
+                        {String(val)}
+                      </TableCell>
+                    </TextFormatterWrapper>
+                  )}
                   <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">

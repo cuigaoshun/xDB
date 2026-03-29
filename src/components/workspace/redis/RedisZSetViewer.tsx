@@ -270,25 +270,29 @@ export function RedisZSetViewer({
               const isEditing = inlineEditMember === item.member;
               return (
                 <TableRow key={`${item.member}-${i}`} className="group hover:bg-muted/50">
-                  <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
-                    {isEditing ? (
+                  {isEditing ? (
+                    <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                       <Textarea
                         value={editMemberVal}
                         onChange={(e) => setEditMemberVal(e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
                       />
-                    ) : (
-                      <TextFormatterWrapper
-                        content={item.member}
-                        readonly
-                        title="View formatted"
-                      >
-                        <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{item.member}</span>
-                        </div>
-                      </TextFormatterWrapper>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  ) : (
+                    <TextFormatterWrapper
+                      content={item.member}
+                      onEdit={() => handleStartEdit(item)}
+                      onDelete={() => handleDelete(item.member)}
+                      deleteConfirmPrompt={t('redis.deleteZSetMemberPrompt')}
+                      deleteItemName={item.member}
+                      readonly
+                      title="View formatted"
+                    >
+                      <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap cursor-context-menu">
+                        {item.member}
+                      </TableCell>
+                    </TextFormatterWrapper>
+                  )}
                   <TableCell className="font-mono text-xs align-top text-blue-600 dark:text-blue-400">
                     {isEditing ? (
                       <Input

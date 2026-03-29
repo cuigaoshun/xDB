@@ -212,28 +212,32 @@ export function RedisHashViewer({
                   <TableCell className="font-mono text-xs align-top font-medium text-blue-600 dark:text-blue-400">
                     {pair.field}
                   </TableCell>
-                  <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
-                    {isEditing ? (
+                  {isEditing ? (
+                    <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap">
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         className="min-h-[80px] font-mono text-xs"
                         autoFocus
                       />
-                    ) : (
-                      <TextFormatterWrapper
-                        content={pair.value}
-                        onSave={async (newValue) => {
-                          await handleSave(pair.field, newValue);
-                        }}
-                        title="Format value"
-                      >
-                        <div className="flex items-start gap-2 cursor-context-menu">
-                          <span className="flex-1">{pair.value}</span>
-                        </div>
-                      </TextFormatterWrapper>
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  ) : (
+                    <TextFormatterWrapper
+                      content={pair.value}
+                      onSave={async (newValue) => {
+                        await handleSave(pair.field, newValue);
+                      }}
+                      onEdit={() => handleStartEdit(pair)}
+                      onDelete={() => handleDelete(pair.field)}
+                      deleteConfirmPrompt={t('redis.deleteHashFieldPrompt')}
+                      deleteItemName={pair.field}
+                      title="Format value"
+                    >
+                      <TableCell className="font-mono text-xs align-top break-all whitespace-pre-wrap cursor-context-menu">
+                        {pair.value}
+                      </TableCell>
+                    </TextFormatterWrapper>
+                  )}
                   <TableCell className="text-right align-top pr-8">
                     {isEditing ? (
                       <div className="flex justify-end gap-1">
