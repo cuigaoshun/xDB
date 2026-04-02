@@ -50,6 +50,7 @@ interface ConnectionTreeItemProps {
     isActive: boolean;
     onSelect: (conn: Connection) => void;
     onSelectTable?: (conn: Connection, db: string, table: string) => void;
+    onCommitSearchHistory?: () => void;
     filterTerm?: string;
     isExactMatch?: boolean;
 }
@@ -68,6 +69,7 @@ export function ConnectionTreeItem({
     isActive,
     onSelect,
     onSelectTable,
+    onCommitSearchHistory,
     filterTerm,
     isExactMatch,
 }: ConnectionTreeItemProps) {
@@ -494,6 +496,7 @@ export function ConnectionTreeItem({
     };
 
     const handleSelect = async () => {
+        onCommitSearchHistory?.();
         onSelect(connection);
 
         if (!isExpanded) {
@@ -533,6 +536,7 @@ export function ConnectionTreeItem({
 
     const toggleDatabaseExpand = async (dbName: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        onCommitSearchHistory?.();
 
         if (isMySql || isSqlite) {
             addRecentDatabase(connection.id, dbName);
@@ -652,7 +656,10 @@ export function ConnectionTreeItem({
 
         return (
             <div
-                onClick={() => onSelect(connection)}
+                onClick={() => {
+                    onCommitSearchHistory?.();
+                    onSelect(connection);
+                }}
                 className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors mb-1 text-sm",
                     isActive
@@ -834,6 +841,7 @@ export function ConnectionTreeItem({
                                                     className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent text-muted-foreground hover:text-foreground text-xs ml-6"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        onCommitSearchHistory?.();
                                                         onSelectTable?.(connection, node.db, node.table.name);
                                                     }}
                                                     onContextMenu={(e) => {

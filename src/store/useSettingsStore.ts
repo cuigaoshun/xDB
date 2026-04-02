@@ -12,8 +12,9 @@ export interface Settings {
   redisScanCount: number;
   // Redis 视图偏好: key 格式为 `${connectionId}:${db}`
   redisViewPreferences: Record<string, RedisViewPreference>;
-  // Redis 搜索历史: key 格式为 `${connectionId}:${db}`, 值为最近10条搜索记录
+  // Redis 搜索历史: key 格式为 `${connectionId}:${db}`
   redisSearchHistory: Record<string, string[]>;
+  explorerSearchHistory: string[];
   // MySQL 预取数据库数量: 'all' 或具体数字
   mysqlPrefetchDbCount: number | 'all';
   // 最近访问的数据库: key 格式为 connectionId, 值为数据库名数组（按访问时间倒序）
@@ -34,6 +35,9 @@ interface SettingsState extends Settings {
   getRedisSearchHistory: (connectionId: number, db: number) => string[];
   addRedisSearchHistory: (connectionId: number, db: number, keyword: string) => void;
   clearRedisSearchHistory: (connectionId: number, db: number) => void;
+  getExplorerSearchHistory: () => string[];
+  addExplorerSearchHistory: (keyword: string) => void;
+  clearExplorerSearchHistory: () => void;
   // MySQL 预取设置方法
   setMysqlPrefetchDbCount: (count: number | 'all') => void;
   // 系统数据库设置
@@ -53,6 +57,7 @@ const defaultSettings: Settings = {
   redisScanCount: 10000,
   redisViewPreferences: {},
   redisSearchHistory: {},
+  explorerSearchHistory: [],
   mysqlPrefetchDbCount: 'all',
   recentDatabases: {},
 
@@ -115,7 +120,6 @@ export const useSettingsStore = create<SettingsState>()(
           const currentHistory = state.redisSearchHistory[key] ?? [];
           // 去重：移除已存在的相同关键词
           const filtered = currentHistory.filter((item) => item !== keyword);
-          // 添加到头部，保留最多10条
           const newHistory = [keyword, ...filtered].slice(0, 10);
           return {
             redisSearchHistory: {
@@ -135,6 +139,22 @@ export const useSettingsStore = create<SettingsState>()(
           },
         }));
       },
+
+      getExplorerSearchHistory: () => get().explorerSearchHistory,
+
+      addExplorerSearchHistory: (keyword) => {
+        const trimmedKeyword = keyword.trim();
+        if (!trimmedKeyword) return;
+
+        set((state) => {
+          const filtered = state.explorerSearchHistory.filter((item) => item !== trimmedKeyword);
+          return {
+            explorerSearchHistory: [trimmedKeyword, ...filtered].slice(0, 100),
+          };
+        });
+      },
+
+      clearExplorerSearchHistory: () => set({ explorerSearchHistory: [] }),
 
       // MySQL 预取设置方法
       setMysqlPrefetchDbCount: (count) => set({ mysqlPrefetchDbCount: count }),
