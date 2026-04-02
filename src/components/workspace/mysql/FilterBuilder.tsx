@@ -248,15 +248,14 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                     {onExecute && (
                                         <Button
                                             size="sm"
-                                            variant="outline"
                                             onClick={() => {
                                                 const whereClause = generateWhereClause(root);
                                                 const orderByClause = orderByField ? `${orderByField} ${orderByDirection}` : '';
                                                 onExecute(whereClause, orderByClause);
                                             }}
-                                            className="text-xs h-7"
+                                            className="text-xs h-7 bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
                                         >
-                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', '应用筛选')}
+                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', 'Apply')}
                                         </Button>
                                     )}
                                 </>
@@ -304,15 +303,14 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
                                     {onExecute && (
                                         <Button
                                             size="sm"
-                                            variant="outline"
                                             onClick={() => {
                                                 const whereClause = generateWhereClause(root);
                                                 const orderByClause = orderByField ? `${orderByField} ${orderByDirection}` : '';
                                                 onExecute(whereClause, orderByClause);
                                             }}
-                                            className="text-xs h-7"
+                                            className="text-xs h-7 bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
                                         >
-                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', '应用筛选')}
+                                            <Filter className="h-3 w-3 mr-1" /> {t('common.applyFilter', 'Apply')}
                                         </Button>
                                     )}
                                 </>
@@ -452,4 +450,3 @@ export function FilterBuilder({ columns, onChange, onExecute, initialState, prim
         </div>
     );
 }
-
