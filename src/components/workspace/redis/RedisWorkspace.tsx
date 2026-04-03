@@ -1,42 +1,17 @@
-import { Search, Plus, Trash2, Info, History, List, FolderTree, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Checkbox } from "@/components/ui/checkbox.tsx";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-} from "@/components/ui/context-menu.tsx";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu.tsx";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable.tsx";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { RedisHashViewer } from "@/components/workspace/redis/RedisHashViewer.tsx";
-import { RedisSetViewer } from "@/components/workspace/redis/RedisSetViewer.tsx";
-import { RedisZSetViewer } from "@/components/workspace/redis/RedisZSetViewer.tsx";
-import { RedisListViewer } from "@/components/workspace/redis/RedisListViewer.tsx";
-import { RedisStringViewer } from "@/components/workspace/redis/RedisStringViewer.tsx";
 import { RedisAddKeyDialog } from "@/components/workspace/redis/RedisAddKeyDialog.tsx";
-import { RedisKeyTree } from "@/components/workspace/redis/RedisKeyTree.tsx";
+import { RedisKeyBrowserPanel } from "@/components/workspace/redis/RedisKeyBrowserPanel.tsx";
+import { RedisValuePanel } from "@/components/workspace/redis/RedisValuePanel.tsx";
 import { useAppStore } from "@/store/useAppStore.ts";
 import { toast } from "@/hooks/useToast.ts";
 import { useSettingsStore } from "@/store/useSettingsStore.ts";
@@ -57,69 +32,13 @@ import {
   invokeScanZsetMembers,
   invokeScanListValues
 } from "@/lib/api.ts";
-
-interface RedisResult {
-  output: any;
-}
-
-interface KeyDetail {
-  key: string;
-  type: string;
-  ttl: number;
-  length: number | null;
-}
-
-interface ValueScanResult {
-  cursor: string;
-  values: any[];
-}
-
-interface ScanResult {
-  cursor: string;
-  keys: KeyDetail[];
-}
-
-// Pure function - extract outside component to avoid recreation
-const getSearchPattern = (searchTerm: string): string => {
-  if (!searchTerm.trim()) {
-    return "*"; // Full scan
-  }
-
-  // Check if it's a prefix pattern (ends with *)
-  if (searchTerm.endsWith('*')) {
-    const prefix = searchTerm.slice(0, -1);
-    return prefix ? `${prefix}*` : "*";
-  }
-
-  // For exact search, we'll use pattern search but filter client-side
-  return `${searchTerm}*`;
-};
-
-// Pure functions - extract outside component
-const getTypeColor = (type?: string): string => {
-  switch (type) {
-    case "string":
-      return "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200";
-    case "hash":
-      return "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200";
-    case "list":
-      return "bg-green-100 text-green-700 hover:bg-green-200 border-green-200";
-    case "set":
-      return "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200";
-    case "zset":
-      return "bg-pink-100 text-pink-700 hover:bg-pink-200 border-pink-200";
-    default:
-      return "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200";
-  }
-};
-
-const formatSize = (bytes?: number | null): string => {
-  if (bytes === null || bytes === undefined) return "-";
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(2)} KB`;
-};
-
-const KEY_ITEM_HEIGHT = 52; // Fixed height for each key item
+import {
+  getSearchPattern,
+  type RedisResult,
+  type KeyDetail,
+  type ValueScanResult,
+  type ScanResult,
+} from "@/components/workspace/redis/redisWorkspace.shared.ts";
 
 export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult }: { tabId: string; name: string; connectionId: number; db?: number; savedResult?: any }) {
   const { t } = useTranslation();
@@ -905,16 +824,7 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
     });
   }, [connectionId, db, fetchListValues, fetchComplexValues]);
 
-  // Virtual list parent ref
   const parentRef = useRef<HTMLDivElement>(null);
-
-  // Virtual list for keys
-  const rowVirtualizer = useVirtualizer({
-    count: keys.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => KEY_ITEM_HEIGHT,
-    overscan: 5,
-  });
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -945,511 +855,82 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
         <ResizablePanelGroup direction="horizontal">
           {/* Left Sidebar */}
           <ResizablePanel defaultSize={35} minSize={20} maxSize={50} className="flex flex-col">
-            {/* Filter */}
-            <div className="p-2" ref={searchContainerRef}>
-              {/* 第一行: 搜索框 + 历史 + 搜索按钮 */}
-              <div className="flex items-center gap-1">
-                <div className="relative flex-1">
-                  <Search
-                    className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-                  />
-                  <Input
-                    placeholder={t('redis.filterKeysPlaceholder')}
-                    className="pl-8 h-9"
-                    value={filter}
-                    onChange={(e) => {
-                      setFilter(e.target.value);
-                      setIsInputFocused(true);
-                    }}
-                    onFocus={() => setIsInputFocused(true)}
-                    onBlur={() => {
-                      // 这里延迟高一点，因为键盘输入或者其他情况下的blur可能太快
-                      setTimeout(() => setIsInputFocused(false), 250);
-                    }}
-                    onKeyDown={(e) => {
-                      const list = showHistoryDropdown ? searchHistory : suggestedHistory;
-                      const isOpen = showHistoryDropdown || (isInputFocused && suggestedHistory.length > 0);
-                      
-                      if (isOpen && list.length > 0) {
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          setSelectedIndex(prev =>
-                            prev < list.length - 1 ? prev + 1 : prev
-                          );
-                          return;
-                        }
-                        if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
-                          return;
-                        }
-                        if (e.key === 'Enter' && selectedIndex >= 0) {
-                          e.preventDefault();
-                          const selectedItem = list[selectedIndex];
-                          setFilter(selectedItem);
-                          setIsInputFocused(false);
-                          setShowHistoryDropdown(false);
-                          return;
-                        }
-                      }
-                      if (e.key === 'Enter') {
-                        setIsInputFocused(false);
-                        setShowHistoryDropdown(false);
-                        handleSearch();
-                      }
-                    }}
-                  />
-                  {/* 搜索建议/历史下拉 */}
-                  {showHistoryDropdown || (isInputFocused && suggestedHistory.length > 0) ? (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground border rounded-md shadow-md z-50 py-1 max-h-[300px] overflow-auto">
-                      {showHistoryDropdown ? (
-                        searchHistory.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">{t('redis.noSearchHistory')}</div>
-                        ) : (
-                          <>
-                            {searchHistory.map((item, i) => (
-                              <div
-                                key={i}
-                                className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex items-center gap-2 ${i === selectedIndex ? "bg-accent text-accent-foreground" : ""}`}
-                                onMouseEnter={() => setSelectedIndex(i)}
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => {
-                                  setFilter(item);
-                                  setShowHistoryDropdown(false);
-                                  setTimeout(() => handleSearch(item), 0);
-                                }}
-                              >
-                                <History className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <span className="truncate">{item}</span>
-                              </div>
-                            ))}
-                            <div className="h-px bg-border my-1" />
-                            <div
-                              className="px-3 py-1.5 text-sm cursor-pointer text-destructive hover:bg-accent"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                clearRedisSearchHistory(connectionId, db);
-                                setShowHistoryDropdown(false);
-                              }}
-                            >
-                              {t('redis.clearHistory')}
-                            </div>
-                          </>
-                        )
-                      ) : (
-                        suggestedHistory.map((item, i) => (
-                          <div
-                            key={i}
-                            className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex items-center gap-2 ${i === selectedIndex ? "bg-accent text-accent-foreground" : ""
-                              }`}
-                            onMouseEnter={() => setSelectedIndex(i)}
-                            onMouseDown={(e) => {
-                              // 阻止默认事件防止 input 失去焦点，导致点击失效
-                              e.preventDefault();
-                            }}
-                            onClick={() => {
-                              setFilter(item);
-                              setIsInputFocused(false);
-                              // 延迟执行搜索，确保 filter 状态已更新
-                              setTimeout(() => handleSearch(item), 0);
-                            }}
-                          >
-                            <History className="h-3 w-3 text-muted-foreground shrink-0" />
-                            <span className="truncate">{item}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* 搜索历史下拉 */}
-                <Button
-                  variant={showHistoryDropdown ? "secondary" : "outline"}
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  title={t('redis.searchHistory')}
-                  onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
-                >
-                  <History className="h-4 w-4" />
-                </Button>
-
-                {/* 搜索按钮 */}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => {
-                    setShowHistoryDropdown(false);
-                    handleSearch();
-                  }}
-                  title={t('redis.search')}
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* 第二行: Total + Scan More | 视图切换 + 精确搜索 */}
-              <div className="flex justify-between items-center mt-2 px-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {t('common.total')}: {keys.length}
-                    {hasMore ? "+" : ""}
-                  </span>
-
-                  {/* Scan More 按钮 - 放在总数右边 */}
-                  {showScanMore && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`h-6 px-2 text-[11px] font-medium ${hasMore
-                        ? "text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-                        : "text-muted-foreground border-muted"
-                        }`}
-                      onClick={() => {
-                        // 继续扫描
-                        if (hasMore && filter === lastScannedFilter && cursor !== "0") {
-                          fetchKeys(false);
-                        } else {
-                          fetchKeys(true);
-                        }
-                      }}
-                      disabled={loading || !hasMore}
-                    >
-                      {loading ? t('common.scanning') : t('common.scanMore')}
-                    </Button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* 视图切换下拉 */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
-                        {viewPreference.viewMode === 'list' ? (
-                          <List className="h-3 w-3" />
-                        ) : (
-                          <FolderTree className="h-3 w-3" />
-                        )}
-                        {viewPreference.viewMode === 'list' ? t('redis.listView') : t('redis.treeView')}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setRedisViewMode(connectionId, db, 'list')}>
-                        <List className="mr-2 h-4 w-4" />
-                        {t('redis.listView')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setRedisViewMode(connectionId, db, 'tree')}>
-                        <FolderTree className="mr-2 h-4 w-4" />
-                        {t('redis.treeView')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <div className="px-2 py-1.5">
-                        <label className="text-xs text-muted-foreground">{t('redis.delimiter')}</label>
-                        <Input
-                          className="h-7 mt-1 text-xs"
-                          value={viewPreference.delimiter}
-                          onChange={(e) => setRedisDelimiter(connectionId, db, e.target.value)}
-                          placeholder=":"
-                        />
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  {/* 精确搜索 - 一直展示 */}
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-                    <Checkbox
-                      checked={exactSearch}
-                      onCheckedChange={(checked) => setExactSearch(checked === true)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="text-muted-foreground">{t('redis.exactSearch')}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Key List - 根据视图模式渲染 */}
-            {viewPreference.viewMode === 'tree' ? (
-              <RedisKeyTree
-                keys={keys}
-                delimiter={viewPreference.delimiter}
-                selectedKey={selectedKey}
-                onKeyClick={handleKeyClick}
-                loading={loading}
-                formatTTL={formatTTL}
-                isSearchActive={hasSearched && lastScannedFilter.trim() !== '' && lastScannedFilter.trim() !== '*'}
-                onRefreshKey={(k) => handleRefresh(k.key)}
-                onDeleteKey={(k) => handleDeleteKey(k.key)}
-              />
-            ) : (
-              <div ref={parentRef} className="flex-1 overflow-auto">
-                <div
-                  style={{
-                    height: `${rowVirtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative',
-                  }}
-                >
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const key = keys[virtualRow.index];
-                    const content = (
-                      <div
-                        className={`flex items-center p-3 cursor-pointer hover:bg-accent/50 transition-colors gap-3 border-b ${selectedKey === key.key ? "bg-accent" : ""
-                          }`}
-                        onClick={() => handleKeyClick(key)}
-                      >
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] px-1.5 py-0 h-5 rounded min-w-[40px] justify-center uppercase border-0 ${getTypeColor(
-                            key.type
-                          )}`}
-                        >
-                          {key.type || "..."}
-                        </Badge>
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className="text-sm font-medium truncate font-mono"
-                            title={key.key}
-                          >
-                            {key.key}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
-                          <span>{formatTTL(key.ttl)}</span>
-                          <span>{formatSize(key.length)}</span>
-                        </div>
-                      </div>
-                    );
-
-                    return (
-                      <div
-                        key={key.key}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <ContextMenu>
-                          <ContextMenuTrigger asChild>
-                            {content}
-                          </ContextMenuTrigger>
-                          <ContextMenuContent>
-                            <ContextMenuItem onClick={() => handleRefresh(key.key)}>
-                              <RefreshCw className="mr-2 w-4 h-4" />
-                              {t('common.refresh', 'Refresh')}
-                            </ContextMenuItem>
-                            <ContextMenuSub>
-                              <ContextMenuSubTrigger className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                <Trash2 className="mr-2 w-4 h-4" />
-                                {t('common.delete', 'Delete')}
-                              </ContextMenuSubTrigger>
-                              <ContextMenuSubContent className="w-64">
-                                <ContextMenuLabel>{t('common.confirmDeletion')}</ContextMenuLabel>
-                                <div className="px-2 pt-2 pb-0.5 text-xs text-muted-foreground">
-                                  {t('redis.deleteKeyPrompt', 'Will delete key:')}
-                                </div>
-                                <div className="px-2 pb-2 text-xs font-mono font-medium break-all">
-                                  {key.key}
-                                </div>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem 
-                                  className="text-destructive focus:text-destructive cursor-pointer focus:bg-red-50"
-                                  onClick={() => handleDeleteKey(key.key)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  {t('common.delete', 'Delete')}
-                                </ContextMenuItem>
-                              </ContextMenuSubContent>
-                            </ContextMenuSub>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      </div>
-                    );
-                  })}
-                </div>
-                {keys.length === 0 && !loading && (
-                  <div className="p-8 text-center text-muted-foreground text-sm">
-                    {t('redis.noKeys')}
-                  </div>
-                )}
-
-                {/* Sentinel for infinite scroll */}
-                <div ref={observerTarget} className="h-px w-full" />
-
-                {loading && (
-                  <div className="p-4 text-center text-muted-foreground text-xs">
-                    {t('common.loading')}
-                  </div>
-                )}
-              </div>
-            )}
+            <RedisKeyBrowserPanel
+              keys={keys}
+              selectedKey={selectedKey}
+              loading={loading}
+              filter={filter}
+              setFilter={setFilter}
+              searchHistory={searchHistory}
+              suggestedHistory={suggestedHistory}
+              isInputFocused={isInputFocused}
+              setIsInputFocused={setIsInputFocused}
+              selectedIndex={selectedIndex}
+              setSelectedIndex={setSelectedIndex}
+              showHistoryDropdown={showHistoryDropdown}
+              setShowHistoryDropdown={setShowHistoryDropdown}
+              exactSearch={exactSearch}
+              setExactSearch={setExactSearch}
+              hasMore={hasMore}
+              hasSearched={hasSearched}
+              lastScannedFilter={lastScannedFilter}
+              cursor={cursor}
+              showScanMore={showScanMore}
+              viewPreference={viewPreference}
+              connectionId={connectionId}
+              db={db}
+              setRedisViewMode={setRedisViewMode}
+              setRedisDelimiter={setRedisDelimiter}
+              clearRedisSearchHistory={clearRedisSearchHistory}
+              onSearch={handleSearch}
+              onFetchKeys={fetchKeys}
+              onKeyClick={handleKeyClick}
+              onRefreshKey={handleRefresh}
+              onDeleteKey={handleDeleteKey}
+              formatTTL={formatTTL}
+              searchContainerRef={searchContainerRef}
+              observerTarget={observerTarget}
+              parentRef={parentRef}
+            />
           </ResizablePanel>
 
           <ResizableHandle />
 
           {/* Right Content */}
           <ResizablePanel defaultSize={40}>
-            {selectedKey ? (
-              <div className="h-full flex flex-col">
-                {/* Content Header */}
-                <div className="p-4 border-b flex justify-between items-start bg-background">
-                  <div className="flex flex-col gap-2 overflow-hidden flex-1 mr-4">
-                    <div className="flex items-center">
-                      <Badge
-                        className={`uppercase rounded-sm ${getTypeColor(
-                          selectedKeyItem?.type
-                        )} border-0`}
-                      >
-                        {selectedKeyItem?.type || "UNKNOWN"}
-                      </Badge>
-                    </div>
-                    <h1
-                      className="text-lg font-bold font-mono break-all select-text"
-                      title={selectedKey}
-                    >
-                      {selectedKey}
-                    </h1>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-muted"
-                      onClick={handleRefresh}
-                      disabled={valueLoading}
-                      title={t('common.refresh', 'Refresh')}
-                    >
-                      <RefreshCw className={`w-4 h-4 ${valueLoading ? "animate-spin" : ""}`} />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 hover:text-destructive"
-                          title={t('redis.deleteKey', 'Delete Key')}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuLabel>{t('common.confirmDeletion')}</DropdownMenuLabel>
-                        <div className="px-2 pt-2 pb-0.5 text-xs text-muted-foreground">
-                          {t('redis.deleteKeyPrompt', 'Will delete key:')}
-                        </div>
-                        <div className="px-2 pb-2 text-xs font-mono font-medium break-all">
-                          {selectedKey}
-                        </div>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer focus:bg-red-50"
-                          onClick={handleDeleteKey}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {t('common.delete', 'Delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                {/* Metadata Bar */}
-                <div className="px-4 py-2 border-b bg-muted/10 flex gap-6 text-xs text-muted-foreground">
-                  <div className="flex gap-1">
-                    <span className="font-medium">{t('redis.size', 'Size')}:</span>
-                    <span>{formatSize(selectedKeyItem?.length)}</span>
-                  </div>
-                  <div className="flex gap-1 items-center">
-                    <span className="font-medium">{t('redis.ttl', 'TTL')}:</span>
-                    <span>{formatTTL(selectedKeyItem?.ttl)}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 ml-1 text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setEditTTLValue(selectedKeyItem?.ttl?.toString() || "-1");
-                        setIsEditTTLDialogOpen(true);
-                      }}
-                      title={t('redis.editTTL', 'Edit TTL')}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 Z"></path></svg>
-                    </Button>
-                  </div>
-                  <div className="flex gap-1">
-                    <span className="font-medium">{t('redis.type', 'Type')}:</span>
-                    <span className="uppercase">{selectedKeyItem?.type}</span>
-                  </div>
-                  {(selectedKeyItem?.type === 'hash' || selectedKeyItem?.type === 'zset') && (
-                    <div className="flex gap-1">
-                      <span className="font-medium">{t('redis.total', 'Total')}:</span>
-                      <span>
-                        {totalItemCount !== null
-                          ? totalItemCount
-                          : `${Math.floor(allValues.length / 2)}${valueHasMore ? "+" : ""}`}
-                      </span>
-                    </div>
-                  )}
-                  {(selectedKeyItem?.type === 'set' || selectedKeyItem?.type === 'list') && (
-                    <div className="flex gap-1">
-                      <span className="font-medium">{t('redis.total', 'Total')}:</span>
-                      <span>
-                        {totalItemCount !== null
-                          ? totalItemCount
-                          : `${allValues.length}${valueHasMore ? "+" : ""}`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Value Content */}
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <div className="flex-1 min-h-0">
-                    <ValueViewer
-                      connectionId={connectionId}
-                      db={db}
-                      keyName={selectedKey || ""}
-                      value={selectedValue}
-                      type={selectedKeyItem?.type}
-                      allValues={allValues}
-                      hasMore={valueHasMore}
-                      loading={valueLoading}
-                      filter={valueFilter}
-                      onFilterChange={setValueFilter}
-                      onSearch={() => {
-                        setHasValueSearched(true);
-                        fetchComplexValues(true);
-                      }}
-                      onScanMore={() => {
-                        if (valueHasMore && valueFilter === lastScannedValueFilter && valueCursor !== "0") {
-                          fetchComplexValues(false);
-                        } else {
-                          fetchComplexValues(true);
-                        }
-                      }}
-                      hasSearched={hasValueSearched}
-                      onRefresh={handleRefresh}
-                      observerTarget={valueObserverTarget}
-                      zsetOrder={zsetOrder}
-                      onZsetOrderChange={setZsetOrder}
-                      exactSearch={valueExactSearch}
-                      onExactSearchChange={setValueExactSearch}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-                <div className="bg-muted/50 p-4 rounded-full">
-                  <Info className="w-8 h-8 opacity-50" />
-                </div>
-                <p>{t('common.selectKeyToView')}</p>
-              </div>
-            )}
+            <RedisValuePanel
+              connectionId={connectionId}
+              db={db}
+              selectedKey={selectedKey}
+              selectedKeyItem={selectedKeyItem}
+              selectedValue={selectedValue}
+              allValues={allValues}
+              valueHasMore={valueHasMore}
+              valueLoading={valueLoading}
+              valueFilter={valueFilter}
+              setValueFilter={setValueFilter}
+              hasValueSearched={hasValueSearched}
+              valueObserverTarget={valueObserverTarget}
+              zsetOrder={zsetOrder}
+              setZsetOrder={setZsetOrder}
+              valueExactSearch={valueExactSearch}
+              setValueExactSearch={setValueExactSearch}
+              totalItemCount={totalItemCount}
+              lastScannedValueFilter={lastScannedValueFilter}
+              valueCursor={valueCursor}
+              onRefresh={handleRefresh}
+              onDeleteKey={handleDeleteKey}
+              onOpenEditTTL={() => {
+                setEditTTLValue(selectedKeyItem?.ttl?.toString() || "-1");
+                setIsEditTTLDialogOpen(true);
+              }}
+              onSearchValues={() => {
+                setHasValueSearched(true);
+                fetchComplexValues(true);
+              }}
+              onFetchComplexValues={fetchComplexValues}
+              formatTTL={formatTTL}
+            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
@@ -1505,159 +986,6 @@ export function RedisWorkspace({ tabId, name, connectionId, db = 0, savedResult 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function ValueViewer({
-  connectionId,
-  db,
-  keyName,
-  value,
-  type,
-  allValues,
-  hasMore,
-  loading,
-  filter,
-  onFilterChange,
-  onSearch,
-  onScanMore,
-  hasSearched,
-  onRefresh,
-  observerTarget,
-  zsetOrder,
-  onZsetOrderChange,
-  exactSearch,
-  onExactSearchChange
-}: {
-  connectionId: number;
-  db: number;
-  keyName: string;
-  value: any;
-  type?: string;
-  allValues: any[];
-  hasMore: boolean;
-  loading: boolean;
-  filter: string;
-  onFilterChange: (filter: string) => void;
-  onSearch: () => void;
-  onScanMore: () => void;
-  hasSearched: boolean;
-  onRefresh: () => void;
-  observerTarget: React.RefObject<HTMLDivElement | null>;
-  zsetOrder: 'asc' | 'desc';
-  onZsetOrderChange: (order: 'asc' | 'desc') => void;
-  exactSearch: boolean;
-  onExactSearchChange: (exact: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  if (!type) return <div className="text-muted-foreground italic p-4">{t('common.selectKeyToView')}</div>;
-
-  if (type === "string") {
-    return (
-      <RedisStringViewer
-        connectionId={connectionId}
-        db={db}
-        keyName={keyName}
-        value={value}
-        onRefresh={onRefresh}
-      />
-    );
-  }
-
-  if (type === "hash") {
-    return (
-      <RedisHashViewer
-        connectionId={connectionId}
-        db={db}
-        keyName={keyName}
-        data={allValues}
-        loading={loading}
-        hasMore={hasMore}
-        filter={filter}
-        onFilterChange={onFilterChange}
-        onSearch={onSearch}
-        onScanMore={onScanMore}
-        hasSearched={hasSearched}
-        onRefresh={onRefresh}
-        observerTarget={observerTarget}
-        exactSearch={exactSearch}
-        onExactSearchChange={onExactSearchChange}
-      />
-    );
-  }
-
-  if (type === "set") {
-    return (
-      <RedisSetViewer
-        connectionId={connectionId}
-        db={db}
-        keyName={keyName}
-        data={allValues}
-        loading={loading}
-        hasMore={hasMore}
-        filter={filter}
-        onFilterChange={onFilterChange}
-        onSearch={onSearch}
-        onScanMore={onScanMore}
-        hasSearched={hasSearched}
-        onRefresh={onRefresh}
-        observerTarget={observerTarget}
-        exactSearch={exactSearch}
-        onExactSearchChange={onExactSearchChange}
-      />
-    );
-  }
-
-  if (type === "zset") {
-    return (
-      <RedisZSetViewer
-        connectionId={connectionId}
-        db={db}
-        keyName={keyName}
-        data={allValues}
-        loading={loading}
-        hasMore={hasMore}
-        filter={filter}
-        onFilterChange={onFilterChange}
-        onSearch={onSearch}
-        onScanMore={onScanMore}
-        hasSearched={hasSearched}
-        onRefresh={onRefresh}
-        observerTarget={observerTarget}
-        sortOrder={zsetOrder}
-        onSortOrderChange={onZsetOrderChange}
-        exactSearch={exactSearch}
-        onExactSearchChange={onExactSearchChange}
-      />
-    );
-  }
-
-  if (type === "list") {
-    return (
-      <RedisListViewer
-        connectionId={connectionId}
-        db={db}
-        keyName={keyName}
-        data={allValues}
-        loading={loading}
-        onRefresh={onRefresh}
-      />
-    );
-  }
-
-  if (type === "none") {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground p-8">
-        <div className="text-4xl">🗑️</div>
-        <div className="text-sm">{t('redis.keyAutoDeleted')}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-muted-foreground italic p-4">
-      Unsupported data type: {type}
     </div>
   );
 }
