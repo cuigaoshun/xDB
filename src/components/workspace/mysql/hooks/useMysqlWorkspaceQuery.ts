@@ -163,9 +163,7 @@ export function useMysqlWorkspaceQuery({
             }
 
             setResult(mergedData);
-            if (mergedData.columns && mergedData.columns.length > 0) {
-                setFilterColumns(mergedData.columns);
-            } else if (!dbName || !tableName) {
+            if (!dbName || !tableName) {
                 setFilterColumns([]);
             }
 
