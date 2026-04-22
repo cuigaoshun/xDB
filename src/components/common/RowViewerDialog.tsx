@@ -35,6 +35,7 @@ interface RowViewerDialogProps {
     submitLabel?: string;
     editable?: boolean;
     onSave?: (editedRow: Record<string, any>) => Promise<void>;
+    onCancel?: () => void;
 }
 
 export function RowViewerDialog({
@@ -46,6 +47,7 @@ export function RowViewerDialog({
     submitLabel,
     editable = false,
     onSave,
+    onCancel,
 }: RowViewerDialogProps) {
     const { t } = useTranslation();
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -232,7 +234,14 @@ export function RowViewerDialog({
                     <DialogFooter>
                         <Button
                             variant="outline"
-                            onClick={() => onOpenChange(false)}
+                            onClick={() => {
+                                if (onCancel) {
+                                    onCancel();
+                                    return;
+                                }
+
+                                onOpenChange(false);
+                            }}
                             disabled={isSaving}
                         >
                             {t('common.cancel', 'Cancel')}

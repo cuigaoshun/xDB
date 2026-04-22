@@ -50,6 +50,7 @@ export function useMysqlRowEditing({
     const [viewingRowSource, setViewingRowSource] = useState<ViewingRowSource>("existing");
     const [viewingRow, setViewingRow] = useState<Record<string, any> | null>(null);
     const [viewingRowIndex, setViewingRowIndex] = useState(-1);
+    const [pendingCopiedRowIndex, setPendingCopiedRowIndex] = useState<number | null>(null);
 
     const selectedRowIndexSet = useMemo(() => new Set(selectedRowIndices), [selectedRowIndices]);
     const noPrimaryKeyMessage = t("common.noPrimaryKey", "Cannot update/delete: table has no primary key");
@@ -207,6 +208,7 @@ export function useMysqlRowEditing({
 
         const nextIndex = newRows.length;
         setNewRows((previousRows) => [...previousRows, copiedRow]);
+        setPendingCopiedRowIndex(nextIndex);
         openNewBufferedRowViewer(copiedRow, nextIndex);
     }, [newRows.length, openNewBufferedRowViewer, primaryKeys, result]);
 
@@ -397,20 +399,33 @@ export function useMysqlRowEditing({
     ]);
 
     const handleCancelChanges = useCallback(async () => {
-        const confirmed = await confirm({
-            title: t("common.confirmDeletion"),
-            description: t("common.confirmCancelChanges"),
-            variant: "default",
-        });
-
-        if (confirmed) {
-            setNewRows([]);
-        }
-    }, [t]);
+        setNewRows([]);
+        setPendingCopiedRowIndex(null);
+    }, []);
 
     const removeNewRow = useCallback((rowIdx: number) => {
         setNewRows((previousRows) => previousRows.filter((_, index) => index !== rowIdx));
+        setPendingCopiedRowIndex((previousIndex) => {
+            if (previousIndex === null) {
+                return previousIndex;
+            }
+
+            if (previousIndex === rowIdx) {
+                return null;
+            }
+
+            return previousIndex > rowIdx ? previousIndex - 1 : previousIndex;
+        });
     }, []);
+
+    const handleRowViewerCancel = useCallback(() => {
+        if (pendingCopiedRowIndex !== null && viewingRowSource === "new" && rowViewerMode === "create" && viewingRowIndex === pendingCopiedRowIndex) {
+            setNewRows((previousRows) => previousRows.filter((_, index) => index !== pendingCopiedRowIndex));
+            setPendingCopiedRowIndex(null);
+        }
+
+        setRowViewerOpen(false);
+    }, [pendingCopiedRowIndex, rowViewerMode, viewingRowIndex, viewingRowSource]);
 
     const toggleRowSelection = useCallback((rowIdx: number) => {
         setSelectedRowIndices((previousIndices) => (
@@ -439,6 +454,7 @@ export function useMysqlRowEditing({
                 nextRows[viewingRowIndex] = editedRow;
                 return nextRows;
             });
+            setPendingCopiedRowIndex((previousIndex) => (previousIndex === viewingRowIndex ? null : previousIndex));
             return;
         }
 
@@ -527,6 +543,7 @@ export function useMysqlRowEditing({
         handleCopyRow,
         handleCopySingleRow,
         handleDeleteSingleRow,
+        handleRowViewerCancel,
         handleRowDelete,
         handleRowViewerSave,
         handleSubmitChanges,

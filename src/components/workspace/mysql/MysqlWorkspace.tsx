@@ -585,6 +585,7 @@ export function MysqlWorkspace({
             <RowViewerDialog
                 open={rowEditing.rowViewerOpen}
                 onOpenChange={rowEditing.setRowViewerOpen}
+                onCancel={rowEditing.handleRowViewerCancel}
                 row={rowEditing.viewingRow}
                 columns={result?.columns || []}
                 title={
