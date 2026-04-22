@@ -526,7 +526,7 @@ export function MysqlWorkspace({
                                                             renderColumnTypeIcon={renderColumnTypeIcon}
                                                         />
 
-                                                        {result.rows.length > 0 && (
+                                                        {(result.rows.length > 0 || currentPage > 0) && (
                                                             <SqlPaginationBar
                                                                 currentPage={currentPage}
                                                                 pageSize={pageSize}
