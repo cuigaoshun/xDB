@@ -226,11 +226,11 @@ export function SettingsPage() {
                   id="redisScanCount"
                   type="number"
                   min={10}
-                  max={10000}
+                  max={1000000}
                   value={redisScanCount}
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 10 && val <= 10000) {
+                    if (!isNaN(val) && val >= 10 && val <= 1000000) {
                       setRedisScanCount(val);
                     }
                   }}
