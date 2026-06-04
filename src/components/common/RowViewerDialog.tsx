@@ -36,6 +36,7 @@ interface RowViewerDialogProps {
     editable?: boolean;
     onSave?: (editedRow: Record<string, any>) => Promise<void>;
     onCancel?: () => void;
+    formatValueDisplay?: (value: any, column: ColumnInfo) => string | null;
 }
 
 export function RowViewerDialog({
@@ -48,6 +49,7 @@ export function RowViewerDialog({
     editable = false,
     onSave,
     onCancel,
+    formatValueDisplay,
 }: RowViewerDialogProps) {
     const { t } = useTranslation();
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export function RowViewerDialog({
                             {columns.map((col) => {
                                 const value = editedRow[col.name];
                                 const formattedValue = formatValue(value);
+                                const displayValue = formatValueDisplay?.(value, col) ?? formattedValue;
                                 const isLongText = isLongTextField(col.type_name) || formattedValue.length > 100;
 
                                 return (
@@ -198,10 +201,10 @@ export function RowViewerDialog({
                                                         <span className="text-muted-foreground italic">NULL</span>
                                                     ) : isLongText ? (
                                                         <pre className="whitespace-pre-wrap break-all text-sm font-mono bg-muted/30 p-2 rounded max-h-[200px] overflow-auto">
-                                                            {formattedValue}
+                                                            {displayValue}
                                                         </pre>
                                                     ) : (
-                                                        <span className="text-sm">{formattedValue}</span>
+                                                        <span className="text-sm">{displayValue}</span>
                                                     )}
                                                 </>
                                             )}

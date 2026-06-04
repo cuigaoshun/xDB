@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useConsoleStore, CommandEntry } from '@/store/useConsoleStore';
 import { useAppStore } from '@/store/useAppStore';
 import { invokeRedisCommand } from "@/lib/api.ts";
+import { formatLocalTimestamp } from '@/lib/datetime';
 
 interface CommandConsoleProps {
   className?: string;
@@ -186,16 +187,6 @@ export function CommandConsole({ className = '', style }: CommandConsoleProps) {
     }
   };
 
-  const formatTimestamp = (date: Date) => {
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleTimeString('zh-CN', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }) + '.' + d.getMilliseconds().toString().padStart(3, '0');
-  };
-
   return (
     <div className={`h-full bg-background border text-foreground font-mono text-xs flex flex-col ${className}`} style={style}>
       {/* Resize handle */}
@@ -265,7 +256,7 @@ export function CommandConsole({ className = '', style }: CommandConsoleProps) {
                       {cmd.databaseType.toUpperCase()}
                     </span>
                     <span>
-                      [{formatTimestamp(cmd.timestamp)}]
+                      [{formatLocalTimestamp(cmd.timestamp, { milliseconds: true })}]
                     </span>
                     {cmd.duration && (
                       <span>

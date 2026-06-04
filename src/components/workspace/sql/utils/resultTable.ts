@@ -134,8 +134,11 @@ export function getCellDisplayValue(value: any): string {
 export function buildFilteredRowEntries(
     rows: Record<string, any>[],
     inlineFilters: Record<string, string>,
+    columns?: ColumnInfo[],
+    formatCellDisplay?: (value: any, column: ColumnInfo) => string | null,
 ): FilteredRowEntry[] {
     const activeFilters = Object.entries(inlineFilters).filter(([, value]) => value.trim() !== "");
+    const columnMap = new Map((columns || []).map((column) => [column.name, column]));
 
     if (activeFilters.length === 0) {
         return rows.map((row, originalIndex) => ({ row, originalIndex }));
@@ -148,7 +151,12 @@ export function buildFilteredRowEntries(
                 return filterValue.toLowerCase() === "null";
             }
 
-            return getCellDisplayValue(cellValue).toLowerCase().includes(filterValue.toLowerCase());
+            const column = columnMap.get(columnName);
+            const displayValue = column
+                ? formatCellDisplay?.(cellValue, column) ?? getCellDisplayValue(cellValue)
+                : getCellDisplayValue(cellValue);
+
+            return displayValue.toLowerCase().includes(filterValue.toLowerCase());
         });
 
         if (matches) {
@@ -159,9 +167,13 @@ export function buildFilteredRowEntries(
     }, []);
 }
 
-export function buildUniqueColumnValueMap(columns: ColumnInfo[], rows: Record<string, any>[]) {
+export function buildUniqueColumnValueMap(
+    columns: ColumnInfo[],
+    rows: Record<string, any>[],
+    formatCellDisplay?: (value: any, column: ColumnInfo) => string | null,
+) {
     return columns.reduce<Record<string, string[]>>((accumulator, column) => {
-        const uniqueValues = [...new Set(rows.map((row) => getCellDisplayValue(row[column.name])))]
+        const uniqueValues = [...new Set(rows.map((row) => formatCellDisplay?.(row[column.name], column) ?? getCellDisplayValue(row[column.name])))]
             .slice(0, 50);
         accumulator[column.name] = uniqueValues;
         return accumulator;

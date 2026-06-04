@@ -17,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { invokeSetMemcached, invokeGetMemcached, invokeDeleteMemcached } from "@/lib/api.ts";
+import { formatLocalTimestamp } from "@/lib/datetime";
 
 export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: { tabId: string; name: string; connectionId: number; savedResult?: any }) {
     const { t } = useTranslation();
@@ -335,7 +336,7 @@ export function MemcachedWorkspace({ tabId, name, connectionId, savedResult }: {
                                 <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/5 shrink-0">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <Badge variant="outline" className="font-mono text-xs text-muted-foreground">
-                                            {new Date(item.timestamp).toLocaleTimeString()}
+                                            {formatLocalTimestamp(item.timestamp)}
                                         </Badge>
                                         <code className="text-sm font-bold font-mono text-primary px-1 rounded select-text truncate max-w-[400px]" title={item.key}>
                                             {item.key}

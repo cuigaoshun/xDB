@@ -103,6 +103,7 @@ interface SqlResultTableProps {
     onInlineFilterChange: (columnName: string, value: string) => void;
     onOpenFormatter: (rowIdx: number, colName: string, value: any) => void;
     renderColumnTypeIcon: (typeName: string) => ReactNode;
+    formatCellDisplay?: (value: any, column: { name: string; type_name: string }) => string | null;
 }
 
 export function SqlResultTable({
@@ -132,6 +133,7 @@ export function SqlResultTable({
     onInlineFilterChange,
     onOpenFormatter,
     renderColumnTypeIcon,
+    formatCellDisplay,
 }: SqlResultTableProps) {
     const { t } = useTranslation();
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
@@ -423,7 +425,7 @@ export function SqlResultTable({
                                                             {row[column.name] === null || row[column.name] === "" ? (
                                                                 <span className="text-muted-foreground italic">NULL</span>
                                                             ) : (
-                                                                getCellDisplayValue(row[column.name])
+                                                                formatCellDisplay?.(row[column.name], column) ?? getCellDisplayValue(row[column.name])
                                                             )}
                                                         </div>
                                                     </ContextMenuTrigger>
@@ -501,7 +503,7 @@ export function SqlResultTable({
                                                                 {row[column.name] === null ? (
                                                                     <span className="text-muted-foreground italic truncate">NULL</span>
                                                                 ) : (
-                                                                    <span className="flex-1 truncate">{getCellDisplayValue(row[column.name])}</span>
+                                                                    <span className="flex-1 truncate">{formatCellDisplay?.(row[column.name], column) ?? getCellDisplayValue(row[column.name])}</span>
                                                                 )}
                                                             </div>
                                                         </ContextMenuTrigger>
