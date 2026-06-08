@@ -170,6 +170,10 @@ fn wkb_to_wkt(wkb: &[u8]) -> Option<String> {
 }
 
 fn format_mysql_datetime(value: NaiveDateTime) -> String {
+    value.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+fn format_mysql_timestamp(value: NaiveDateTime) -> String {
     value.and_utc().with_timezone(&Local).format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
@@ -244,9 +248,13 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
                 .map(Value::String)
                 .unwrap_or(Value::Null),
             // 日期时间
-            "DATETIME" | "TIMESTAMP" => row
+            "DATETIME" => row
                 .try_get::<NaiveDateTime, _>(i)
                 .map(|v| Value::String(format_mysql_datetime(v)))
+                .unwrap_or(Value::Null),
+            "TIMESTAMP" => row
+                .try_get::<NaiveDateTime, _>(i)
+                .map(|v| Value::String(format_mysql_timestamp(v)))
                 .or_else(|_| {
                     row.try_get::<DateTime<Utc>, _>(i)
                         .map(|v| Value::String(v.with_timezone(&Local).format("%Y-%m-%d %H:%M:%S").to_string()))
