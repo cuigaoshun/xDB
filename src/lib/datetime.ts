@@ -19,19 +19,3 @@ export function formatLocalTimestamp(value: Date | number | string, options: { m
     ? `${timestamp}.${String(date.getMilliseconds()).padStart(3, '0')}`
     : timestamp;
 }
-
-export function formatMysqlDateTime(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim().replace(' ', 'T');
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
-  const date = new Date(hasTimezone ? normalized : `${normalized}Z`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return formatLocalTimestamp(date);
-}

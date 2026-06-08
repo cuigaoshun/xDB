@@ -25,7 +25,6 @@ import { SqlQueryEditor } from "@/components/workspace/sql/components/SqlQueryEd
 import { SqlResultTable } from "@/components/workspace/sql/components/SqlResultTable";
 import { SqlPaginationBar } from "@/components/workspace/sql/components/SqlPaginationBar";
 import { SqlDdlPanel } from "@/components/workspace/sql/components/SqlDdlPanel";
-import { formatMysqlDateTime } from "@/lib/datetime";
 
 interface MysqlWorkspaceProps {
     tabId: string;
@@ -37,16 +36,6 @@ interface MysqlWorkspaceProps {
     tableName?: string;
     savedResult?: SqlResult;
 }
-
-const formatMysqlCellDisplay = (value: any, column: { type_name: string }): string | null => {
-    const typeName = column.type_name.toUpperCase();
-
-    if (!typeName.includes("DATETIME") && !typeName.includes("TIMESTAMP")) {
-        return null;
-    }
-
-    return formatMysqlDateTime(value);
-};
 
 export function MysqlWorkspace({
     tabId,
@@ -139,7 +128,7 @@ export function MysqlWorkspace({
     });
 
     const filteredRowEntries = useMemo(
-        () => (result ? buildFilteredRowEntries(result.rows, inlineFilters, result.columns, formatMysqlCellDisplay) : []),
+        () => (result ? buildFilteredRowEntries(result.rows, inlineFilters) : []),
         [inlineFilters, result],
     );
 
@@ -149,7 +138,7 @@ export function MysqlWorkspace({
     );
 
     const uniqueColumnValueMap = useMemo(
-        () => (result ? buildUniqueColumnValueMap(result.columns, result.rows, formatMysqlCellDisplay) : {}),
+        () => (result ? buildUniqueColumnValueMap(result.columns, result.rows) : {}),
         [result],
     );
 
@@ -535,7 +524,6 @@ export function MysqlWorkspace({
                                                             }}
                                                             onOpenFormatter={handleOpenFormatter}
                                                             renderColumnTypeIcon={renderColumnTypeIcon}
-                                                            formatCellDisplay={formatMysqlCellDisplay}
                                                         />
 
                                                         {(result.rows.length > 0 || currentPage > 0) && (
@@ -614,7 +602,6 @@ export function MysqlWorkspace({
                 }
                 editable={editableState.isEditable || rowEditing.rowViewerMode === "create"}
                 onSave={rowEditing.handleRowViewerSave}
-                formatValueDisplay={formatMysqlCellDisplay}
             />
         </div>
     );

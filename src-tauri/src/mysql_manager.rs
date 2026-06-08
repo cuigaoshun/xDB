@@ -1,7 +1,7 @@
 use crate::db::DbState;
 use crate::models::{ColumnInfo, Connection, SqlResult};
 use crate::state::AppState;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::{Map, Value};
 use sqlx::mysql::{MySqlPoolOptions, MySqlRow};
@@ -169,6 +169,10 @@ fn wkb_to_wkt(wkb: &[u8]) -> Option<String> {
     }
 }
 
+fn format_mysql_datetime(value: NaiveDateTime) -> String {
+    value.and_utc().with_timezone(&Local).format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 // 将 MySQL 的 Row 转换为 JSON Object，按类型分组精确解码
 fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
     let mut json_row = Map::new();
@@ -242,10 +246,10 @@ fn row_to_json(row: &MySqlRow) -> Map<String, Value> {
             // 日期时间
             "DATETIME" | "TIMESTAMP" => row
                 .try_get::<NaiveDateTime, _>(i)
-                .map(|v| Value::String(v.to_string()))
+                .map(|v| Value::String(format_mysql_datetime(v)))
                 .or_else(|_| {
                     row.try_get::<DateTime<Utc>, _>(i)
-                        .map(|v| Value::String(v.naive_utc().to_string()))
+                        .map(|v| Value::String(v.with_timezone(&Local).format("%Y-%m-%d %H:%M:%S").to_string()))
                 })
                 .unwrap_or(Value::Null),
             "DATE" => row
